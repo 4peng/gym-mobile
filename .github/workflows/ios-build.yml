@@ -27,8 +27,8 @@ jobs:
 
       - name: Build App with Xcode
         run: |
-          # Detect the scheme name automatically
-          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
+          # Detect the first scheme that isn't 'Pods'
+          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
           echo "Detected Scheme: $SCHEME"
           
           xcodebuild -workspace ios/*.xcworkspace \
