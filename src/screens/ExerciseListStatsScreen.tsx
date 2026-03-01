@@ -15,6 +15,8 @@ import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
+import { toTitleCase } from "@/utils/string";
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -61,12 +63,14 @@ export default function ExerciseListStatsScreen() {
 
   const exerciseStats = useMemo(() => {
     const exerciseMap = new Map<string, number[]>();
+    const originalNameMap = new Map<string, string>();
     
-    // Last 10 sessions for mini chart
-    history.slice(0, 20).forEach(session => {
+    history.forEach(session => {
       session.exercises.forEach(ex => {
-        if (!exerciseMap.has(ex.name)) {
-          exerciseMap.set(ex.name, []);
+        const lowerName = ex.name.toLowerCase();
+        if (!exerciseMap.has(lowerName)) {
+          exerciseMap.set(lowerName, []);
+          originalNameMap.set(lowerName, ex.name);
         }
         
         let vol = 0;
@@ -74,7 +78,7 @@ export default function ExerciseListStatsScreen() {
           if (s.completedAt && s.weight && s.reps) vol += s.weight * s.reps;
         });
         
-        const currentData = exerciseMap.get(ex.name)!;
+        const currentData = exerciseMap.get(lowerName)!;
         if (currentData.length < 10) {
           currentData.unshift(vol);
         }
@@ -83,10 +87,10 @@ export default function ExerciseListStatsScreen() {
 
     return Array.from(exerciseMap.keys())
       .sort()
-      .filter(name => name.toLowerCase().includes(search.toLowerCase()))
-      .map(name => ({
-        name,
-        recentVolume: exerciseMap.get(name) || []
+      .filter(lowerName => lowerName.includes(search.toLowerCase()))
+      .map(lowerName => ({
+        name: originalNameMap.get(lowerName) || lowerName,
+        recentVolume: exerciseMap.get(lowerName) || []
       }));
   }, [history, search]);
 
@@ -94,7 +98,7 @@ export default function ExerciseListStatsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.back()} style={UI.SHARED.iconBtn}>
           <ChevronLeft size={28} color={COLORS.TEXT_PRIMARY} />
         </Pressable>
         <Text style={styles.title}>Exercise Stats</Text>
@@ -128,13 +132,14 @@ export default function ExerciseListStatsScreen() {
         renderItem={({ item }) => (
           <Pressable
             style={({ pressed }) => [
-              styles.item,
+              UI.SHARED.card,
+              { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
               pressed && { backgroundColor: COLORS.CARD_HOVER }
             ]}
             onPress={() => router.push(`/exercises/${encodeURIComponent(item.name)}/volume`)}
           >
             <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.name}</Text>
+              <Text style={styles.itemName}>{toTitleCase(item.name)}</Text>
               <Text style={styles.itemSub}>View full trends</Text>
             </View>
             
@@ -154,20 +159,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.BG,
   },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 24,
+    paddingTop: UI.HEADER_TOP - 10,
+    paddingHorizontal: UI.LAYOUT_PADDING,
     paddingBottom: 24,
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#1D1D21",
-    justifyContent: "center",
-    alignItems: "center",
   },
   title: {
     color: COLORS.TEXT_PRIMARY,
@@ -180,7 +177,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.CARD_BG,
-    marginHorizontal: 24,
+    marginHorizontal: UI.LAYOUT_PADDING,
     paddingHorizontal: 16,
     borderRadius: 16,
     marginBottom: 20,
@@ -191,23 +188,15 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.TEXT_PRIMARY,
     fontSize: 15,
-    paddingVertical: 14,
+    paddingVertical: 12,
     marginLeft: 10,
     fontFamily: FONT_FAMILIES.MEDIUM,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   listContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: UI.LAYOUT_PADDING,
     paddingBottom: 40,
-  },
-  item: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.02)",
   },
   itemInfo: {
     flex: 1,

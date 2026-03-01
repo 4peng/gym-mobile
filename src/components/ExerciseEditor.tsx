@@ -8,10 +8,12 @@ import {
   Platform,
   LayoutAnimation,
 } from "react-native";
-import { Trash2, Hash, Clock, StickyNote, Type, Dumbbell } from "lucide-react-native";
+import { Trash2, Hash, Clock, Dumbbell } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
-import { formatSecondsToMMSS, parseMMSSToSeconds } from "@/utils/conversions";
+import { UI } from "@/constants/ui";
+import { formatSecondsToMMSS } from "@/utils/conversions";
+import RestTimerPicker from "./RestTimerPicker";
 
 // ──────────────────────────────────────────────
 // Types
@@ -43,11 +45,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
   onUpdate,
   onRemove,
 }) {
-  const [restInput, setRestInput] = useState(formatSecondsToMMSS(exercise.restSeconds));
-
-  useEffect(() => {
-    setRestInput(formatSecondsToMMSS(exercise.restSeconds));
-  }, [exercise.restSeconds]);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const handleNameChange = useCallback(
     (text: string) => onUpdate(exercise.id, { name: text }),
@@ -68,11 +66,9 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     [exercise.id, onUpdate]
   );
 
-  const handleRestBlur = useCallback(() => {
-    const totalSeconds = parseMMSSToSeconds(restInput);
-    onUpdate(exercise.id, { restSeconds: totalSeconds });
-    setRestInput(formatSecondsToMMSS(totalSeconds));
-  }, [restInput, exercise.id, onUpdate]);
+  const handleRestSave = useCallback((seconds: number) => {
+    onUpdate(exercise.id, { restSeconds: seconds });
+  }, [exercise.id, onUpdate]);
 
   const handleToggleUnit = useCallback(() => {
     const nextUnit = exercise.weightUnit === "lbs" ? "kg" : "lbs";
@@ -90,14 +86,13 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
   }, [exercise.id, onRemove]);
 
   return (
-    <View style={styles.card}>
+    <View style={UI.SHARED.card}>
       {/* Header Area */}
       <View style={styles.header}>
         <View style={styles.indexBadge}>
           <Text style={styles.indexLabel}>{String(index + 1).padStart(2, '0')}</Text>
         </View>
         <View style={styles.nameInputContainer}>
-          <Type size={14} color={COLORS.TEXT_TERTIARY} style={styles.inputIcon} />
           <TextInput
             style={styles.nameInput}
             value={exercise.name}
@@ -138,14 +133,12 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
             <Clock size={12} color={COLORS.TEXT_TERTIARY} />
             <Text style={styles.fieldLabel}>Rest</Text>
           </View>
-          <TextInput
-            style={styles.numericInput}
-            placeholder="00:00"
-            placeholderTextColor={COLORS.TEXT_TERTIARY}
-            value={restInput}
-            onChangeText={setRestInput}
-            onBlur={handleRestBlur}
-          />
+          <Pressable 
+            style={({ pressed }) => [styles.pickerTrigger, pressed && { opacity: 0.7 }]}
+            onPress={() => setPickerVisible(true)}
+          >
+            <Text style={styles.pickerText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
+          </Pressable>
         </View>
 
         <View style={styles.gridItem}>
@@ -165,7 +158,6 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
       {/* Notes Area */}
       <View style={styles.notesArea}>
         <View style={styles.fieldHeader}>
-          <StickyNote size={12} color={COLORS.TEXT_TERTIARY} />
           <Text style={styles.fieldLabel}>Instructions / Notes</Text>
         </View>
         <TextInput
@@ -178,6 +170,13 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
           numberOfLines={2}
         />
       </View>
+
+      <RestTimerPicker 
+        visible={pickerVisible}
+        initialSeconds={exercise.restSeconds}
+        onClose={() => setPickerVisible(false)}
+        onSave={handleRestSave}
+      />
     </View>
   );
 });
@@ -189,19 +188,6 @@ export default ExerciseEditor;
 // ──────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 32,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -231,9 +217,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
-  },
-  inputIcon: {
-    marginRight: 10,
   },
   nameInput: {
     flex: 1,
@@ -284,14 +267,29 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
     paddingVertical: 16,
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
+  },
+  pickerTrigger: {
+    backgroundColor: COLORS.BG,
+    paddingVertical: 16,
+    borderRadius: UI.RADIUS_INPUT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pickerText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 18,
+    fontWeight: "800",
   },
   unitToggle: {
     backgroundColor: COLORS.BG,
     paddingVertical: 16,
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     justifyContent: "center",
@@ -314,7 +312,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: 16,
     paddingHorizontal: 18,
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     textAlignVertical: "top",

@@ -18,6 +18,7 @@ import { useProgramStore } from "@/stores/programStore";
 import { generateId } from "@/utils/id";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import ExerciseEditor, {
   type ExerciseFormData,
 } from "@/components/ExerciseEditor";
@@ -42,7 +43,7 @@ function createEmptyExercise(): ExerciseFormData {
 
 export default function CreateProgramScreen() {
   const addProgramWithExercises = useProgramStore(
-    (s) => s.addProgramWithExercises
+    (s) => s.addProgram
   );
   const router = useAppRouter();
 
@@ -77,13 +78,11 @@ export default function CreateProgramScreen() {
       return;
     }
 
-    // Validate: at least one exercise
     if (exercises.length === 0) {
       showAlert("Error", "Add at least one exercise before saving.");
       return;
     }
 
-    // Validate: all exercises have names
     const emptyNameIdx = exercises.findIndex((e) => e.name.trim() === "");
     if (emptyNameIdx !== -1) {
       showAlert("Error", `Exercise ${emptyNameIdx + 1} needs a name.`);
@@ -93,6 +92,7 @@ export default function CreateProgramScreen() {
     addProgramWithExercises(
       trimmedName,
       exercises.map((e) => ({
+        id: generateId(),
         name: e.name.trim(),
         defaultSets: e.defaultSets,
         restSeconds: e.restSeconds,
@@ -119,12 +119,14 @@ export default function CreateProgramScreen() {
 
   const renderExercise = useCallback(
     ({ item, index }: { item: ExerciseFormData; index: number }) => (
-      <ExerciseEditor
-        exercise={item}
-        index={index}
-        onUpdate={handleUpdateExercise}
-        onRemove={handleRemoveExercise}
-      />
+      <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
+        <ExerciseEditor
+          exercise={item}
+          index={index}
+          onUpdate={handleUpdateExercise}
+          onRemove={handleRemoveExercise}
+        />
+      </View>
     ),
     [handleUpdateExercise, handleRemoveExercise]
   );
@@ -134,98 +136,107 @@ export default function CreateProgramScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      {/* Dynamic Header Area */}
-      <View style={styles.header}>
-        <View style={styles.headerTitleGroup}>
-          <Text style={styles.headerLabel}>Setup Mode</Text>
-          <Text style={styles.headerTitle}>New Routine</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable 
-            onPress={handleCancel} 
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
-          >
-            <X size={24} color={COLORS.TEXT_SECONDARY} />
-          </Pressable>
-          <Pressable 
-            onPress={handleSave} 
-            style={({ pressed }) => [styles.saveBtn, pressed && { transform: [{scale: 0.96}] }]}
-          >
-            <Check size={24} color={COLORS.TEXT_PRIMARY} strokeWidth={3} />
-          </Pressable>
-        </View>
-      </View>
+      <FlatList
+        data={exercises}
+        renderItem={renderExercise}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View>
+            {/* Dynamic Header Area */}
+            <View style={styles.header}>
+              <View style={styles.headerTitleGroup}>
+                <Text style={styles.headerLabel}>Setup Mode</Text>
+                <Text style={styles.headerTitle}>New Routine</Text>
+              </View>
+              <View style={styles.headerActions}>
+                <Pressable 
+                  onPress={handleCancel} 
+                  style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <X size={24} color={COLORS.DANGER} />
+                </Pressable>
+                <Pressable 
+                  onPress={handleSave} 
+                  style={({ pressed }) => [UI.SHARED.actionBtn, pressed && { transform: [{scale: 0.96}] }]}
+                >
+                  <Check size={24} color={COLORS.TEXT_PRIMARY} strokeWidth={3} />
+                </Pressable>
+              </View>
+            </View>
 
-      {/* Program Metadata */}
-      <View style={styles.metaSection}>
-        <Text style={styles.sectionLabel}>Identification</Text>
-        <View style={styles.nameInputContainer}>
-          <Layout size={20} color={COLORS.TEXT_TERTIARY} />
-          <TextInput
-            style={styles.nameInput}
-            value={programName}
-            onChangeText={setProgramName}
-            placeholder="Routine name"
-            placeholderTextColor={COLORS.TEXT_TERTIARY}
-            autoFocus
-          />
-        </View>
-      </View>
+            {/* Program Metadata */}
+            <View style={styles.metaSection}>
+              <Text style={UI.SHARED.sectionLabel}>Routine Name</Text>
+              <View style={styles.nameInputContainer}>
+                <Layout size={24} color={COLORS.TEXT_TERTIARY} />
+                <TextInput
+                  style={styles.nameInput}
+                  value={programName}
+                  onChangeText={setProgramName}
+                  placeholder="Push Day"
+                  placeholderTextColor={COLORS.TEXT_TERTIARY}
+                  autoFocus
+                />
+              </View>
+            </View>
 
-      {/* Exercises Section */}
-      <View style={{ flex: 1 }}>
-        <Text style={styles.sectionLabel}>Exercise Stack</Text>
-        <FlatList
-          data={exercises}
-          renderItem={renderExercise}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
+            <Text style={[UI.SHARED.sectionLabel, { paddingHorizontal: UI.LAYOUT_PADDING }]}>Exercise Stack</Text>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
+            <Pressable 
+              onPress={handleAddExercise}
+              style={({ pressed }) => [
+                styles.emptyContainer,
+                pressed && { opacity: 0.7 }
+              ]}
+            >
               <View style={styles.emptyIconCircle}>
-                <Plus size={32} color={COLORS.BORDER_LIGHT} />
+                <Plus size={32} color={COLORS.ACCENT_BLUE} strokeWidth={2.5} />
               </View>
               <Text style={styles.emptyText}>Empty Routine</Text>
               <Text style={styles.emptySubtext}>
-                No exercises added.
+                Tap here to add your first exercise
               </Text>
-            </View>
-          }
-          ListFooterComponent={
-            <Pressable 
-              onPress={handleAddExercise} 
-              style={({ pressed }) => [
-                styles.addBtn,
-                pressed && { backgroundColor: "#1D1D21", transform: [{scale: 0.99}] }
-              ]}
-            >
-              <Plus size={20} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
-              <Text style={styles.addBtnText}>Add Exercise</Text>
             </Pressable>
-          }
-        />
-      </View>
+          </View>
+        }
+        ListFooterComponent={
+          exercises.length > 0 ? (
+            <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
+              <Pressable 
+                onPress={handleAddExercise} 
+                style={({ pressed }) => [
+                  styles.addBtn,
+                  pressed && { backgroundColor: "#1D1D21", transform: [{scale: 0.99}] }
+                ]}
+              >
+                <Plus size={20} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
+                <Text style={styles.addBtnText}>Add Exercise</Text>
+              </Pressable>
+            </View>
+          ) : null
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
-
-// ──────────────────────────────────────────────
-// Styles (Premium Minimalist)
-// ──────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BG,
   },
-
-  // Header
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 70,
+    paddingHorizontal: UI.LAYOUT_PADDING,
+    paddingTop: UI.HEADER_TOP,
     paddingBottom: 32,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -252,44 +263,11 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: "row",
-    gap: 12,
+    gap: UI.GAP,
   },
-  iconBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#1D1D21",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  saveBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.ACCENT_BLUE,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: COLORS.ACCENT_BLUE,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-
-  // Meta Section
   metaSection: {
-    paddingHorizontal: 24,
+    paddingHorizontal: UI.LAYOUT_PADDING,
     marginBottom: 32,
-  },
-  sectionLabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 16,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    paddingHorizontal: 24,
   },
   nameInputContainer: {
     flexDirection: "row",
@@ -299,39 +277,44 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
+    height: 80,
   },
   nameInput: {
     flex: 1,
-    color: COLORS.ACCENT_YELLOW,
+    color: COLORS.TEXT_PRIMARY,
     fontSize: 24,
     fontWeight: "900",
-    paddingVertical: 20,
-    paddingLeft: 16,
+    marginLeft: 16,
+    padding: 0,
     letterSpacing: -1,
     fontFamily: FONT_FAMILIES.MEDIUM,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    lineHeight: 32,
   },
-
-  // List
   listContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 60,
+    paddingBottom: 120,
   },
-
-  // Empty state
   emptyContainer: {
     alignItems: "center",
     paddingVertical: 60,
+    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: COLORS.BORDER_LIGHT,
   },
   emptyIconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#141416",
+    backgroundColor: "#1D1D21",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: COLORS.ACCENT_BLUE,
+    borderStyle: 'solid',
   },
   emptyText: {
     color: COLORS.TEXT_PRIMARY,
@@ -346,13 +329,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
-
-  // Add Button
   addBtn: {
     flexDirection: "row",
     backgroundColor: "#141416",
     borderWidth: 1.5,
-    borderColor: COLORS.BORDER_LIGHT,
+    borderColor: "rgba(11, 130, 255, 0.2)",
     borderStyle: "dashed",
     borderRadius: 24,
     paddingVertical: 24,

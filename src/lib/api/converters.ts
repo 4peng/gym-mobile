@@ -25,6 +25,7 @@ export function mapProgramToBackend(program: Program): ProgramServer {
     })),
     createdAt: program.createdAt,
     updatedAt: program.updatedAt,
+    deletedAt: program.deletedAt,
   };
 }
 
@@ -46,6 +47,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
     })),
     createdAt: server.createdAt,
     updatedAt: server.updatedAt,
+    deletedAt: server.deletedAt,
   };
 }
 
@@ -63,6 +65,7 @@ export function mapWorkoutToBackend(
     startedAt: session.startedAt,
     completedAt: session.completedAt,
     updatedAt: session.updatedAt,
+    deletedAt: session.deletedAt,
     exercises: session.exercises.map((ex) => ({
       id: ex.id,
       name: ex.name,
@@ -92,6 +95,7 @@ export function mapWorkoutFromBackend(
     startedAt: server.startedAt,
     completedAt: server.completedAt,
     updatedAt: server.updatedAt,
+    deletedAt: server.deletedAt,
     exercises: server.exercises.map((ex) => ({
       id: ex.id,
       name: ex.name,

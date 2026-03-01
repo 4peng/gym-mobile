@@ -9,11 +9,22 @@ import { mapWorkoutToBackend, mapWorkoutFromBackend } from "./converters";
 import { USER_ID } from "@/constants/user";
 
 /**
- * Fetch all completed workouts for the current user from the backend.
+ * Fetch all completed workouts for the current user from the backend (with pagination).
+ * Supports Delta Sync via 'since' parameter.
  */
-export async function fetchWorkouts(): Promise<WorkoutSession[] | null> {
+export async function fetchWorkouts(
+  limit?: number,
+  skip?: number,
+  since?: number
+): Promise<WorkoutSession[] | null> {
+  const queryParams = new URLSearchParams();
+  queryParams.append("userId", USER_ID);
+  if (limit !== undefined) queryParams.append("limit", limit.toString());
+  if (skip !== undefined) queryParams.append("skip", skip.toString());
+  if (since !== undefined) queryParams.append("since", since.toString());
+
   const res = await apiRequest<WorkoutServer[]>(
-    `/workouts?userId=${USER_ID}`
+    `/workouts?${queryParams.toString()}`
   );
   if (!res.ok || !res.data) return null;
   return res.data.map(mapWorkoutFromBackend);
@@ -47,4 +58,16 @@ export async function batchUpsertWorkouts(
   });
   if (!res.ok || !res.data) return null;
   return res.data.map(mapWorkoutFromBackend);
+}
+
+/**
+ * Delete a workout on the backend by _id.
+ */
+export async function deleteRemoteWorkout(
+  workoutId: string
+): Promise<boolean> {
+  const res = await apiRequest(`/workouts/${workoutId}`, {
+    method: "DELETE",
+  });
+  return res.ok;
 }

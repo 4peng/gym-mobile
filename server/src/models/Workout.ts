@@ -49,6 +49,7 @@ const WorkoutSchema = new Schema({
   startedAt: { type: String, required: true },
   completedAt: { type: String },
   updatedAt: { type: Number, required: true, index: true },
+  deletedAt: { type: Number, default: null },
   exercises: [WorkoutExerciseSchema],
 }, { _id: false });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,14 +8,16 @@ import {
   Pressable,
   StyleSheet,
   LayoutAnimation,
+  ScrollView,
 } from "react-native";
-import { Play, Plus, Trash2, ChevronRight, Activity, BarChart2 } from "lucide-react-native";
+import { Play, Plus, Trash2, ChevronRight, Activity, BarChart2, Clock } from "lucide-react-native";
 import { useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import type { Program } from "@/types";
 
 // ──────────────────────────────────────────────
@@ -43,17 +45,20 @@ const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
     <Pressable
       onPress={handlePress}
       style={({ pressed }) => [
-        styles.tile,
+        UI.SHARED.card,
+        { padding: 24 }, // Keeping specific padding for tiles
         pressed && styles.tilePressed
       ]}
     >
       <View style={styles.tileHeader}>
         <View style={styles.tileMainInfo}>
-          <Text style={styles.programName} numberOfLines={1}>{program.name}</Text>
+          <Text style={styles.programName} numberOfLines={1}>
+            {typeof program.name === "string" ? program.name : (program.name as any)?.name || "Untitled Routine"}
+          </Text>
           <View style={styles.metaRow}>
             <Activity size={12} color={COLORS.TEXT_TERTIARY} />
             <Text style={styles.metaText}>
-              {program.exercises.length} {program.exercises.length === 1 ? "Exercise" : "Exercises"}
+              {(program.exercises?.length || 0)} {(program.exercises?.length === 1) ? "Exercise" : "Exercises"}
             </Text>
           </View>
         </View>
@@ -92,14 +97,35 @@ const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 // ──────────────────────────────────────────────
 
 export default function ProgramsListScreen() {
-  const programs = useProgramStore((s) => s.programs);
+  const allPrograms = useProgramStore((s) => s.programs);
   const deleteProgram = useProgramStore((s) => s.deleteProgram);
+  const repairCorruptedData = useProgramStore((s) => s.repairCorruptedData);
+  
+  React.useEffect(() => {
+    repairCorruptedData();
+  }, [repairCorruptedData]);
+
+  const programs = useMemo(() => 
+    allPrograms.filter(p => !p.deletedAt), 
+    [allPrograms]
+  );
+  
+  const allHistory = useWorkoutSessionStore((s) => s.history);
+  const history = useMemo(() => allHistory.filter(s => !s.deletedAt), [allHistory]);
   
   const activeSession = useWorkoutSessionStore((s) => s.activeSession);
   const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
   const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
   
   const router = useAppRouter();
+
+  const todayStr = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    }).toUpperCase();
+  }, []);
 
   const handlePress = useCallback((id: string) => router.push(`/programs/${id}`), [router]);
 
@@ -141,76 +167,97 @@ export default function ProgramsListScreen() {
 
   const handleCreate = useCallback(() => router.push("/programs/create"), [router]);
 
-  const renderItem = useCallback(({ item }: { item: Program }) => (
-    <ProgramTile
-      program={item}
-      onPress={handlePress}
-      onStart={handleStartProgram}
-      onDelete={handleDelete}
-    />
-  ), [handlePress, handleStartProgram, handleDelete]);
-
   return (
     <View style={styles.container}>
       {/* Dynamic Header Area */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Daily Training</Text>
+          <Text style={styles.greeting}>{todayStr}</Text>
           <Text style={styles.headerTitle}>My Programs</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable 
-            onPress={() => router.push("/stats")} 
-            style={({ pressed }) => [styles.headerIconBtn, pressed && { opacity: 0.7 }]}
-          >
-            <BarChart2 size={24} color={COLORS.TEXT_SECONDARY} />
-          </Pressable>
-          <Pressable 
             onPress={handleQuickStart} 
-            style={({ pressed }) => [styles.quickStartIcon, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
           >
             <Play size={24} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
           </Pressable>
         </View>
       </View>
 
-      {/* Active Session Card (If exists) */}
-      {activeSession && (
-        <View style={styles.activeContainer}>
-          <Text style={styles.sectionLabel}>Active Session</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.activeBanner,
-              pressed && { opacity: 0.85 }
-            ]}
-            onPress={() => router.push("/workout")}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Activity Insights Row */}
+        <View style={styles.insightsRow}>
+          <Pressable 
+            onPress={() => router.push("/history")}
+            style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
           >
-            <View style={styles.activeIndicator} />
-            <Text style={styles.activeBannerText}>Workout in progress—resume now</Text>
-            <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
+            <View style={[styles.insightIconCircle, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
+              <Clock size={20} color={COLORS.ACCENT_BLUE} />
+            </View>
+            <View>
+              <Text style={styles.insightLabel}>History</Text>
+              <Text style={styles.insightSublabel}>{history.length} sessions</Text>
+            </View>
+          </Pressable>
+
+          <Pressable 
+            onPress={() => router.push("/stats")}
+            style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
+          >
+            <View style={[styles.insightIconCircle, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
+              <BarChart2 size={20} color={COLORS.ACCENT_GREEN} />
+            </View>
+            <View>
+              <Text style={styles.insightLabel}>Insights</Text>
+              <Text style={styles.insightSublabel}>Volume & PRs</Text>
+            </View>
           </Pressable>
         </View>
-      )}
 
-      {/* Main List */}
-      <View style={{ flex: 1 }}>
-        <Text style={styles.sectionLabel}>Available Routines</Text>
-        {programs.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Activity size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
-            <Text style={styles.emptyText}>No programs yet.</Text>
-            <Text style={styles.emptySubtext}>Create your first custom workout to get started.</Text>
+        {/* Active Session Card (If exists) */}
+        {activeSession && (
+          <View style={styles.activeContainer}>
+            <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Active Session</Text>
+            <Pressable
+              style={({ pressed }) => [
+                UI.SHARED.card,
+                { paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', borderColor: "rgba(11, 130, 255, 0.2)" },
+                pressed && { opacity: 0.85 }
+              ]}
+              onPress={() => router.push("/workout")}
+            >
+              <View style={styles.activeIndicator} />
+              <Text style={styles.activeBannerText}>Workout in progress—resume now</Text>
+              <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
+            </Pressable>
           </View>
-        ) : (
-          <FlatList
-            data={programs}
-            renderItem={renderItem}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
         )}
-      </View>
+
+        {/* Main List */}
+        <View style={{ flex: 1, paddingHorizontal: UI.LAYOUT_PADDING }}>
+          <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Available Routines</Text>
+          {programs.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Activity size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
+              <Text style={styles.emptyText}>No programs yet.</Text>
+              <Text style={styles.emptySubtext}>Create your first custom workout to get started.</Text>
+            </View>
+          ) : (
+            <View style={{ gap: 0 }}>
+              {programs.map((item) => (
+                <ProgramTile
+                  key={item._id}
+                  program={item}
+                  onPress={handlePress}
+                  onStart={handleStartProgram}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Floating Action Button */}
       <Pressable 
@@ -226,20 +273,14 @@ export default function ProgramsListScreen() {
   );
 }
 
-// ──────────────────────────────────────────────
-// Styles (Premium Minimalist)
-// ──────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BG,
   },
-
-  // Header
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 70,
+    paddingHorizontal: UI.LAYOUT_PADDING,
+    paddingTop: UI.HEADER_TOP,
     paddingBottom: 24,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -247,10 +288,10 @@ const styles = StyleSheet.create({
   },
   greeting: {
     color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 2,
+    letterSpacing: 1.5,
     fontFamily: FONT_FAMILIES.MEDIUM,
     marginBottom: 4,
   },
@@ -264,52 +305,40 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: UI.GAP,
     marginBottom: 4,
   },
-  headerIconBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#1D1D21",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quickStartIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#1D1D21",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  // Section Labels
-  sectionLabel: {
-    paddingHorizontal: 24,
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 16,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-
-  // Active Session
-  activeContainer: {
+  insightsRow: {
+    flexDirection: "row",
+    paddingHorizontal: UI.LAYOUT_PADDING,
+    gap: UI.GAP,
     marginBottom: 32,
   },
-  activeBanner: {
-    backgroundColor: "#121214",
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    marginHorizontal: 24,
+  insightCardPressed: {
+    backgroundColor: COLORS.CARD_HOVER,
+  },
+  insightIconCircle: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.2)",
+  },
+  insightLabel: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  insightSublabel: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 1,
+  },
+  activeContainer: {
+    marginBottom: 32,
+    paddingHorizontal: UI.LAYOUT_PADDING,
   },
   activeIndicator: {
     width: 8,
@@ -324,28 +353,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
     fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-
-  // List
-  listContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 120,
-  },
-
-  // Tile Design
-  tile: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 28,
-    padding: 24,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-    // Subtle shadow for depth
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 5,
   },
   tilePressed: {
     backgroundColor: COLORS.CARD_HOVER,
@@ -411,8 +418,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // Empty State
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -435,8 +440,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
-
-  // FAB
   fab: {
     position: "absolute",
     bottom: 40,
@@ -447,7 +450,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.ACCENT_BLUE,
     justifyContent: "center",
     alignItems: "center",
-    // Premium shadow
     shadowColor: COLORS.ACCENT_BLUE,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,

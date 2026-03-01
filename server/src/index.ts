@@ -8,16 +8,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dns from 'dns';
 
-// Force Google DNS for MongoDB SRV resolution
+// Fix for SRV lookup issues in some environments
 dns.setServers(['8.8.8.8', '8.8.4.4']);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 import programRoutes from './routes/programs.js';
 import workoutRoutes from './routes/workouts.js';
 
-// Load env from root if not in server
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const app = express();
@@ -25,47 +24,16 @@ const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  console.error('Error: MONGODB_URI is not defined in .env');
-  process.exit(1);
+  console.error('CRITICAL: MONGODB_URI is not defined in environment variables!');
 }
 
-// Middleware
+// 1. Middlewares
 app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Root endpoint: list available endpoints
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Welcome to the Gym Tracker API',
-    endpoints: {
-      health: 'GET /health',
-      programs: [
-        'GET /programs?userId=...',
-        'PUT /programs (Upsert)',
-        'DELETE /programs/:id',
-        'PUT /programs/batch (Batch Upsert)'
-      ],
-      workouts: [
-        'GET /workouts?userId=...',
-        'PUT /workouts (Upsert)',
-        'PUT /workouts/batch (Batch Upsert)'
-      ]
-    }
-  });
-});
-
-// Routes
-app.use('/programs', programRoutes);
-app.use('/workouts', workoutRoutes);
-
-// Database connection middleware for Vercel
+// 2. Database connection middleware (MUST be before routes)
 app.use(async (req, res, next) => {
   if (mongoose.connection.readyState === 1) {
     return next();
@@ -73,7 +41,10 @@ app.use(async (req, res, next) => {
   
   try {
     console.log('Database not connected. Connecting now...');
-    await mongoose.connect(MONGODB_URI!);
+    await mongoose.connect(MONGODB_URI!, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    console.log('Database connected successfully via middleware.');
     next();
   } catch (err) {
     console.error('Database connection error in middleware:', err);
@@ -81,14 +52,30 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Export the app for Vercel
-export default app;
+// 3. Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    readyState: mongoose.connection.readyState
+  });
+});
 
-// Connect to MongoDB
+// 4. Routes
+app.use('/programs', programRoutes);
+app.use('/workouts', workoutRoutes);
+
+// 5. Default Route
+app.get('/', (req, res) => {
+  res.send('Welcome to the Gym Tracker API');
+});
+
+// Connect to MongoDB for local dev
 if (process.env.NODE_ENV !== 'production') {
-  mongoose.connect(MONGODB_URI)
+  mongoose.connect(MONGODB_URI!)
     .then(() => {
-      console.log('Connected to MongoDB');
+      console.log('Connected to MongoDB (Local)');
       app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
       });
@@ -97,12 +84,12 @@ if (process.env.NODE_ENV !== 'production') {
       console.error('MongoDB connection error:', err);
     });
 } else {
-  // In production (Vercel), we still need to connect to MongoDB
-  // Mongoose handles buffering, but top-level await or a middleware check is better for serverless
-  console.log('Attempting MongoDB connection (Production)...');
-  mongoose.connect(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  console.log('Running in Production mode (Vercel).');
+  mongoose.connect(MONGODB_URI!, {
+    serverSelectionTimeoutMS: 5000,
   })
-    .then(() => console.log('Connected to MongoDB (Serverless)'))
-    .catch(err => console.error('MongoDB connection error (Production):', err.message));
+    .then(() => console.log('Connected to MongoDB (Serverless Early Connect)'))
+    .catch(err => console.error('MongoDB early connection error:', err.message));
 }
+
+export default app;

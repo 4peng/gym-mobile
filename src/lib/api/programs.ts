@@ -10,11 +10,15 @@ import { USER_ID } from "@/constants/user";
 
 /**
  * Fetch all programs for the current user from the backend.
+ * Supports Delta Sync via 'since' parameter.
  */
-export async function fetchPrograms(): Promise<Program[] | null> {
-  const res = await apiRequest<ProgramServer[]>(
-    `/programs?userId=${USER_ID}`
-  );
+export async function fetchPrograms(since?: number): Promise<Program[] | null> {
+  let path = `/programs?userId=${USER_ID}`;
+  if (since) {
+    path += `&since=${since}`;
+  }
+  
+  const res = await apiRequest<ProgramServer[]>(path);
   if (!res.ok || !res.data) return null;
   return res.data.map(mapProgramFromBackend);
 }

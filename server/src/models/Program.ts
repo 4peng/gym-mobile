@@ -32,6 +32,7 @@ const ProgramSchema = new Schema({
   exercises: [ProgramExerciseSchema],
   createdAt: { type: String, required: true },
   updatedAt: { type: Number, required: true, index: true },
+  deletedAt: { type: Number, default: null },
 }, { _id: false });
 
 export default mongoose.model<IProgram>('Program', ProgramSchema);

@@ -39,6 +39,10 @@ interface WorkoutSessionState {
   activeSession: WorkoutSession | null;
   /** Completed sessions, newest first. */
   history: WorkoutSession[];
+  /** IDs of sessions deleted locally but not yet synced to the server. */
+  deletedWorkoutIds: string[];
+  /** Whether there are more sessions to fetch from the server. */
+  hasMoreHistory: boolean;
   /** Background-safe rest timer (persisted via MMKV). */
   activeRestTimer: ActiveRestTimer | null;
   /** True when completed workouts have un-synced changes. */
@@ -53,6 +57,7 @@ interface WorkoutSessionActions {
   startFromProgram: (program: Program) => void;
   completeSession: () => void;
   discardSession: () => void;
+  deleteHistorySession: (sessionId: string) => void;
 
   // ── Exercise mutations ─────────────────────
   addExercise: (name: string) => void;
@@ -73,11 +78,19 @@ interface WorkoutSessionActions {
     field: keyof Pick<WorkoutSet, "weight" | "reps">,
     value: number | null
   ) => void;
+  updateHistorySet: (
+    sessionId: string,
+    exerciseId: string,
+    setId: string,
+    field: keyof Pick<WorkoutSet, "weight" | "reps">,
+    value: number | null
+  ) => void;
   toggleSetCompletion: (exerciseId: string, setId: string) => void;
 
   // ── Queries ────────────────────────────────
   getActiveSession: () => WorkoutSession | null;
   getHistory: () => WorkoutSession[];
+  fetchMoreHistory: () => Promise<void>;
 
   // ── Rest timer ─────────────────────────────
   startRestTimer: (
@@ -90,6 +103,8 @@ interface WorkoutSessionActions {
 
   // ── Sync metadata ─────────────────────────
   markDirty: () => void;
+  clearDeletedWorkouts: (ids: string[]) => void;
+  renameExerciseInHistory: (oldName: string, newName: string) => void;
 
   /**
    * Applies remote data using last-write-wins against the current state.
@@ -126,6 +141,8 @@ export const useWorkoutSessionStore = create<
     immer((set, get) => ({
       activeSession: null,
       history: [],
+      deletedWorkoutIds: [],
+      hasMoreHistory: true,
       activeRestTimer: null,
       isDirty: false,
       lastSyncedAt: null,
@@ -203,6 +220,20 @@ export const useWorkoutSessionStore = create<
         });
       },
 
+      deleteHistorySession: (sessionId) => {
+        set((state) => {
+          const workout = state.history.find(s => s._id === sessionId);
+          if (workout) {
+            workout.deletedAt = Date.now();
+            workout.updatedAt = Date.now();
+          }
+          if (!state.deletedWorkoutIds.includes(sessionId)) {
+            state.deletedWorkoutIds.push(sessionId);
+          }
+          state.isDirty = true;
+        });
+      },
+
       // ── Exercise mutations ───────────────────
 
       addExercise: (name) => {
@@ -229,6 +260,8 @@ export const useWorkoutSessionStore = create<
       },
 
       updateExerciseField: (exerciseId, field, value) => {
+        const oldName = field === "name" ? get().activeSession?.exercises.find(e => e.id === exerciseId)?.name : null;
+        
         set((state) => {
           if (!state.activeSession) return;
           const ex = state.activeSession.exercises.find(
@@ -243,6 +276,11 @@ export const useWorkoutSessionStore = create<
             (ex[field] as string) = value as string;
           }
         });
+
+        // Trigger history rename if name changed during active workout
+        if (field === "name" && oldName && oldName.toLowerCase() !== (value as string).toLowerCase()) {
+          get().renameExerciseInHistory(oldName, value as string);
+        }
       },
 
       toggleExerciseUnit: (exerciseId) => {
@@ -293,6 +331,20 @@ export const useWorkoutSessionStore = create<
         });
       },
 
+      updateHistorySet: (sessionId, exerciseId, setId, field, value) => {
+        set((state) => {
+          const session = state.history.find((s) => s._id === sessionId);
+          if (!session) return;
+          const ex = session.exercises.find((e) => e.id === exerciseId);
+          if (!ex) return;
+          const s = ex.sets.find((s) => s.id === setId);
+          if (!s) return;
+          s[field] = value;
+          session.updatedAt = Date.now();
+          state.isDirty = true;
+        });
+      },
+
       /**
        * Toggle a set between completed and in-progress.
        */
@@ -317,7 +369,26 @@ export const useWorkoutSessionStore = create<
       // ── Queries ──────────────────────────────
 
       getActiveSession: () => get().activeSession,
-      getHistory: () => get().history,
+      getHistory: () => get().history.filter(s => !s.deletedAt),
+      fetchMoreHistory: async () => {
+        const { fetchWorkouts } = await import("@/lib/api/workouts");
+        const currentCount = get().history.filter(s => !s.deletedAt).length;
+        const limit = 20;
+        const remote = await fetchWorkouts(limit, currentCount);
+        
+        if (remote) {
+          if (remote.length < limit) {
+            set((state) => {
+              state.hasMoreHistory = false;
+            });
+          }
+          get().mergeRemoteWorkouts(remote);
+        } else {
+          set((state) => {
+            state.hasMoreHistory = false;
+          });
+        }
+      },
 
       // ── Rest timer ────────────────────────────
 
@@ -372,33 +443,58 @@ export const useWorkoutSessionStore = create<
         });
       },
 
+      clearDeletedWorkouts: (ids) => {
+        set((state) => {
+          state.deletedWorkoutIds = state.deletedWorkoutIds.filter(id => !ids.includes(id));
+          state.history = state.history.filter(s => !ids.includes(s._id) || !s.deletedAt);
+        });
+      },
+
+      renameExerciseInHistory: (oldName, newName) => {
+        if (!oldName || !newName || oldName.toLowerCase() === newName.toLowerCase()) return;
+        
+        set((state) => {
+          let count = 0;
+          state.history.forEach(session => {
+            session.exercises.forEach(ex => {
+              if (ex.name.toLowerCase() === oldName.toLowerCase()) {
+                ex.name = newName;
+                session.updatedAt = Date.now();
+                count++;
+              }
+            });
+          });
+          if (count > 0) state.isDirty = true;
+        });
+      },
+
       applySyncMerge: (remote, syncStartTime) => {
         set((state) => {
           const remoteMap = new Map(remote.map((w) => [w._id, w]));
           const merged = new Map<string, WorkoutSession>();
           const lastSync = state.lastSyncedAt || 0;
 
-          // Process completed workouts only. We leave activeSession untouched.
-          // In the current logic, only completed workouts are in `history`.
           for (const lw of state.history) {
             const rw = remoteMap.get(lw._id);
             if (!rw) {
-              // Local only. Keep it if it has changes since last sync, or if it's strictly local.
-              if (lw.updatedAt > lastSync) {
+              if (lw.updatedAt > lastSync || !lw.deletedAt) {
                 merged.set(lw._id, lw);
               }
             } else {
-              // Both exist. Larger updatedAt wins.
-              merged.set(lw._id, lw.updatedAt >= rw.updatedAt ? lw : rw);
+              const winner = lw.updatedAt >= rw.updatedAt ? lw : rw;
+              if (!winner.deletedAt) {
+                merged.set(lw._id, winner);
+              }
               remoteMap.delete(lw._id);
             }
           }
 
           for (const rw of remoteMap.values()) {
-            merged.set(rw._id, rw);
+            if (!rw.deletedAt) {
+              merged.set(rw._id, rw);
+            }
           }
 
-          // Sort newest first by completedAt.
           state.history = Array.from(merged.values()).sort((a, b) => {
             const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
             const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
@@ -406,24 +502,20 @@ export const useWorkoutSessionStore = create<
           });
 
           state.lastSyncedAt = syncStartTime;
-          state.isDirty = state.history.some(w => w.updatedAt > syncStartTime);
+          state.isDirty = state.history.some(w => w.updatedAt > syncStartTime) || state.deletedWorkoutIds.length > 0;
+          state.hasMoreHistory = false;
         });
       },
 
       mergeRemoteWorkouts: (remote) => {
         set((state) => {
           const localIds = new Set(state.history.map((w) => w._id));
-          const newEntries = remote.filter((w) => !localIds.has(w._id));
+          const newEntries = remote.filter((w) => !localIds.has(w._id) && !w.deletedAt);
           if (newEntries.length > 0) {
             state.history.push(...newEntries);
-            // Re-sort newest first.
             state.history.sort((a, b) => {
-              const aTime = a.completedAt
-                ? new Date(a.completedAt).getTime()
-                : 0;
-              const bTime = b.completedAt
-                ? new Date(b.completedAt).getTime()
-                : 0;
+              const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+              const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
               return bTime - aTime;
             });
           }

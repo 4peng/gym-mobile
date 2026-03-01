@@ -20,6 +20,7 @@ export interface Program {
   exercises: ProgramExercise[];
   createdAt: string; // ISO-8601
   updatedAt: number; // epoch-ms, required for last-write-wins sync
+  deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
 }
 
 // ──────────────────────────────────────────────
@@ -51,6 +52,7 @@ export interface WorkoutSession {
   startedAt: string; // ISO-8601
   completedAt?: string; // ISO-8601
   updatedAt: number; // epoch-ms, required for last-write-wins sync
+  deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
   exercises: WorkoutExercise[];
 }
 

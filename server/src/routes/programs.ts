@@ -3,13 +3,23 @@ import Program from '../models/Program.js';
 
 const router = Router();
 
-// GET all programs for a user
+// GET all programs for a user (with Delta Sync support)
 router.get('/', async (req, res) => {
-  const { userId } = req.query;
+  const { userId, since } = req.query;
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   try {
-    const programs = await Program.find({ userId: userId as string });
+    const query: any = { userId: userId as string };
+    
+    if (since) {
+      // Delta Sync: Return everything modified since 'since' (including soft-deleted ones)
+      query.updatedAt = { $gt: parseInt(since as string) };
+    } else {
+      // Initial Sync: Only return active (non-deleted) programs
+      query.deletedAt = null;
+    }
+
+    const programs = await Program.find(query);
     res.json(programs);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch programs' });
@@ -26,22 +36,12 @@ router.put('/', async (req, res) => {
   try {
     const program = await Program.findOneAndUpdate(
       { _id: programData._id },
-      programData,
+      { ...programData, deletedAt: null }, // Reset deletedAt if re-uploaded
       { upsert: true, new: true }
     );
     res.json(program);
   } catch (err) {
     res.status(500).json({ error: 'Failed to upsert program' });
-  }
-});
-
-// DELETE a program
-router.delete('/:id', async (req, res) => {
-  try {
-    await Program.deleteOne({ _id: req.params.id });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete program' });
   }
 });
 
@@ -56,19 +56,35 @@ router.put('/batch', async (req, res) => {
     const ops = programs.map((p) => ({
       updateOne: {
         filter: { _id: p._id },
-        update: p,
+        update: { ...p, deletedAt: null },
         upsert: true,
       },
     }));
 
     await Program.bulkWrite(ops);
-    
-    // Return the updated list (optional, but sync engine might expect it)
+
     const ids = programs.map(p => p._id);
     const updated = await Program.find({ _id: { $in: ids } });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Failed to batch upsert programs' });
+  }
+});
+
+// DELETE a program (Soft Delete)
+router.delete('/:id', async (req, res) => {
+  try {
+    // We update deletedAt and updatedAt so clients know to remove it.
+    await Program.updateOne(
+      { _id: req.params.id },
+      { 
+        deletedAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to soft delete program' });
   }
 });
 
