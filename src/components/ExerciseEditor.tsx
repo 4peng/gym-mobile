@@ -1,0 +1,325 @@
+import React, { useCallback, useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Platform,
+  LayoutAnimation,
+} from "react-native";
+import { Trash2, Hash, Clock, StickyNote, Type, Dumbbell } from "lucide-react-native";
+import { COLORS } from "@/constants/colors";
+import { FONT_FAMILIES } from "@/constants/fonts";
+import { formatSecondsToMMSS, parseMMSSToSeconds } from "@/utils/conversions";
+
+// ──────────────────────────────────────────────
+// Types
+// ──────────────────────────────────────────────
+
+export interface ExerciseFormData {
+  id: string;
+  name: string;
+  defaultSets: number;
+  restSeconds: number;
+  notes: string;
+  weightUnit?: "kg" | "lbs";
+}
+
+interface ExerciseEditorProps {
+  exercise: ExerciseFormData;
+  index: number;
+  onUpdate: (id: string, updates: Partial<Omit<ExerciseFormData, "id">>) => void;
+  onRemove: (id: string) => void;
+}
+
+// ──────────────────────────────────────────────
+// Component
+// ──────────────────────────────────────────────
+
+const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
+  exercise,
+  index,
+  onUpdate,
+  onRemove,
+}) {
+  const [restInput, setRestInput] = useState(formatSecondsToMMSS(exercise.restSeconds));
+
+  useEffect(() => {
+    setRestInput(formatSecondsToMMSS(exercise.restSeconds));
+  }, [exercise.restSeconds]);
+
+  const handleNameChange = useCallback(
+    (text: string) => onUpdate(exercise.id, { name: text }),
+    [exercise.id, onUpdate]
+  );
+
+  const handleDefaultSetsChange = useCallback(
+    (text: string) => {
+      const val = parseInt(text, 10);
+      if (text === "") {
+        onUpdate(exercise.id, { defaultSets: 1 });
+        return;
+      }
+      if (!isNaN(val) && val >= 1) {
+        onUpdate(exercise.id, { defaultSets: val });
+      }
+    },
+    [exercise.id, onUpdate]
+  );
+
+  const handleRestBlur = useCallback(() => {
+    const totalSeconds = parseMMSSToSeconds(restInput);
+    onUpdate(exercise.id, { restSeconds: totalSeconds });
+    setRestInput(formatSecondsToMMSS(totalSeconds));
+  }, [restInput, exercise.id, onUpdate]);
+
+  const handleToggleUnit = useCallback(() => {
+    const nextUnit = exercise.weightUnit === "lbs" ? "kg" : "lbs";
+    onUpdate(exercise.id, { weightUnit: nextUnit });
+  }, [exercise.id, exercise.weightUnit, onUpdate]);
+
+  const handleNotesChange = useCallback(
+    (text: string) => onUpdate(exercise.id, { notes: text }),
+    [exercise.id, onUpdate]
+  );
+
+  const handleRemove = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    onRemove(exercise.id);
+  }, [exercise.id, onRemove]);
+
+  return (
+    <View style={styles.card}>
+      {/* Header Area */}
+      <View style={styles.header}>
+        <View style={styles.indexBadge}>
+          <Text style={styles.indexLabel}>{String(index + 1).padStart(2, '0')}</Text>
+        </View>
+        <View style={styles.nameInputContainer}>
+          <Type size={14} color={COLORS.TEXT_TERTIARY} style={styles.inputIcon} />
+          <TextInput
+            style={styles.nameInput}
+            value={exercise.name}
+            onChangeText={handleNameChange}
+            placeholder="Exercise name"
+            placeholderTextColor={COLORS.TEXT_TERTIARY}
+          />
+        </View>
+        <Pressable 
+          onPress={handleRemove} 
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.removeBtn,
+            pressed && { backgroundColor: "rgba(239, 68, 68, 0.15)" }
+          ]}
+        >
+          <Trash2 size={18} color={COLORS.DANGER} />
+        </Pressable>
+      </View>
+
+      {/* Settings Grid */}
+      <View style={styles.grid}>
+        <View style={styles.gridItem}>
+          <View style={styles.fieldHeader}>
+            <Hash size={12} color={COLORS.TEXT_TERTIARY} />
+            <Text style={styles.fieldLabel}>Sets</Text>
+          </View>
+          <TextInput
+            style={styles.numericInput}
+            keyboardType="number-pad"
+            value={String(exercise.defaultSets)}
+            onChangeText={handleDefaultSetsChange}
+          />
+        </View>
+
+        <View style={styles.gridItem}>
+          <View style={styles.fieldHeader}>
+            <Clock size={12} color={COLORS.TEXT_TERTIARY} />
+            <Text style={styles.fieldLabel}>Rest</Text>
+          </View>
+          <TextInput
+            style={styles.numericInput}
+            placeholder="00:00"
+            placeholderTextColor={COLORS.TEXT_TERTIARY}
+            value={restInput}
+            onChangeText={setRestInput}
+            onBlur={handleRestBlur}
+          />
+        </View>
+
+        <View style={styles.gridItem}>
+          <View style={styles.fieldHeader}>
+            <Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />
+            <Text style={styles.fieldLabel}>Unit</Text>
+          </View>
+          <Pressable 
+            style={({ pressed }) => [styles.unitToggle, pressed && { opacity: 0.7 }]} 
+            onPress={handleToggleUnit}
+          >
+            <Text style={styles.unitText}>{exercise.weightUnit || "kg"}</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Notes Area */}
+      <View style={styles.notesArea}>
+        <View style={styles.fieldHeader}>
+          <StickyNote size={12} color={COLORS.TEXT_TERTIARY} />
+          <Text style={styles.fieldLabel}>Instructions / Notes</Text>
+        </View>
+        <TextInput
+          style={styles.notesInput}
+          value={exercise.notes}
+          onChangeText={handleNotesChange}
+          placeholder="Notes..."
+          placeholderTextColor={COLORS.TEXT_TERTIARY}
+          multiline
+          numberOfLines={2}
+        />
+      </View>
+    </View>
+  );
+});
+
+export default ExerciseEditor;
+
+// ──────────────────────────────────────────────
+// Styles
+// ──────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 32,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.03)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+    gap: 12,
+  },
+  indexBadge: {
+    backgroundColor: "#1D1D21",
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  indexLabel: {
+    color: COLORS.ACCENT_YELLOW,
+    fontSize: 12,
+    fontWeight: "900",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  nameInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.BG,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  nameInput: {
+    flex: 1,
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 16,
+    fontWeight: "700",
+    paddingVertical: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  removeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(239, 68, 68, 0.05)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Grid
+  grid: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
+  gridItem: {
+    flex: 1,
+  },
+  fieldHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+    paddingLeft: 4,
+  },
+  fieldLabel: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  numericInput: {
+    backgroundColor: COLORS.BG,
+    color: COLORS.TEXT_PRIMARY,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+    paddingVertical: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+  },
+  unitToggle: {
+    backgroundColor: COLORS.BG,
+    paddingVertical: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  unitText: {
+    color: COLORS.ACCENT_YELLOW,
+    fontSize: 16,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+
+  // Notes
+  notesArea: {
+    marginTop: 4,
+  },
+  notesInput: {
+    backgroundColor: COLORS.BG,
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    textAlignVertical: "top",
+    minHeight: 80,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    lineHeight: 22,
+  },
+});
