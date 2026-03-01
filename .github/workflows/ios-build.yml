@@ -25,16 +25,13 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform ios
 
-      - name: Install xcpretty
-        run: gem install xcpretty
-
       - name: Build App with Xcode
         run: |
           # Detect the first scheme that isn't 'Pods'
           SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
           echo "Detected Scheme: $SCHEME"
           
-          set -o pipefail && xcodebuild -workspace ios/*.xcworkspace \
+          xcodebuild -workspace ios/*.xcworkspace \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
@@ -42,15 +39,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE_SPECIFIER="" | xcpretty -c
+            PROVISIONING_PROFILE_SPECIFIER=""
 
       - name: Find and Copy App
         run: |
-          # Find the .app file regardless of where xcodebuild put it
+          # Debug: List the build directory structure
+          find build -maxdepth 4
+          
+          # Find the .app file
           APP_PATH=$(find build -name "*.app" -type d | head -n 1)
           echo "Found app at: $APP_PATH"
           if [ -z "$APP_PATH" ]; then
-            echo "Error: Could not find .app file"
+            echo "Error: Could not find .app file. Listing all products:"
+            find build -type d -name "Products" -exec ls -R {} +
             exit 1
           fi
           mkdir -p Payload
