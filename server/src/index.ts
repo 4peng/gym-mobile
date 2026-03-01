@@ -65,14 +65,25 @@ app.get('/', (req, res) => {
 app.use('/programs', programRoutes);
 app.use('/workouts', workoutRoutes);
 
+// Export the app for Vercel
+export default app;
+
 // Connect to MongoDB
-mongoose.connect(MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+if (process.env.NODE_ENV !== 'production') {
+  mongoose.connect(MONGODB_URI)
+    .then(() => {
+      console.log('Connected to MongoDB');
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('MongoDB connection error:', err);
     });
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error:', err);
-  });
+} else {
+  // In production (Vercel), we still need to connect to MongoDB
+  // Mongoose handles buffering, but top-level await or a middleware check is better for serverless
+  mongoose.connect(MONGODB_URI)
+    .then(() => console.log('Connected to MongoDB (Serverless)'))
+    .catch(err => console.error('MongoDB connection error:', err));
+}
