@@ -16,7 +16,7 @@ export interface IWorkoutExercise {
   sets: IWorkoutSet[];
 }
 
-export interface IWorkout extends Document {
+export interface IWorkout extends Document<string> {
   _id: string;
   userId: string;
   programId?: string;

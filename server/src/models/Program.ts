@@ -8,7 +8,7 @@ export interface IProgramExercise {
   notes: string;
 }
 
-export interface IProgram extends Document {
+export interface IProgram extends Document<string> {
   _id: string;
   userId: string;
   name: string;
