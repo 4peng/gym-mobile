@@ -25,13 +25,16 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform ios
 
+      - name: Install xcpretty
+        run: gem install xcpretty
+
       - name: Build App with Xcode
         run: |
           # Detect the first scheme that isn't 'Pods'
           SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
           echo "Detected Scheme: $SCHEME"
           
-          xcodebuild -workspace ios/*.xcworkspace \
+          set -o pipefail && xcodebuild -workspace ios/*.xcworkspace \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
@@ -39,7 +42,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE_SPECIFIER=""
+            PROVISIONING_PROFILE_SPECIFIER="" | xcpretty -c
 
       - name: Create Payload and IPA
         run: |
