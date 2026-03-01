@@ -4,14 +4,14 @@
     "slug": "gym-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./public/icon.svg",
+    "icon": "./public/apple-icon.png",
     "scheme": "gym-mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
       "package": "com.x4peng.myproject",
       "adaptiveIcon": {
-        "foregroundImage": "./public/icon.svg",
+        "foregroundImage": "./public/apple-icon.png",
         "backgroundColor": "#ffffff"
       }
     },
