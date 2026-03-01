@@ -15,6 +15,10 @@
         "backgroundColor": "#ffffff"
       }
     },
+    "ios": {
+      "bundleIdentifier": "com.x4peng.gym-mobile",
+      "supportsTablet": true
+    },
     "web": {
       "bundler": "metro"
     },
