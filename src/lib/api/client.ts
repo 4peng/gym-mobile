@@ -17,19 +17,8 @@ import Constants from "expo-constants";
  * - Physical Device: Your machine's local IP (provided by expo-constants)
  */
 const getBaseUrl = () => {
-  if (__DEV__) {
-    // If running via Expo, we can often get the host's IP address
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localhost = debuggerHost?.split(":")[0] || "localhost";
-
-    if (Platform.OS === "android" && localhost === "localhost") {
-      return "http://10.0.2.2:4000";
-    }
-    return `http://${localhost}:4000`;
-  }
-  
-  // Production URL
-  return "https://api.yourproductionurl.com";
+  // Always use the Vercel backend
+  return "https://apen-gym-backend.vercel.app";
 };
 
 const BASE_URL = getBaseUrl();
