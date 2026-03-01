@@ -25,13 +25,14 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform ios
 
-      - name: List Schemes
-        run: xcodebuild -workspace ios/*.xcworkspace -list
-
       - name: Build App with Xcode
         run: |
+          # Detect the scheme name automatically
+          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
+          echo "Detected Scheme: $SCHEME"
+          
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme "gym-mobile" \
+            -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
