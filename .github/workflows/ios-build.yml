@@ -27,15 +27,28 @@ jobs:
 
       - name: Build App with Xcode
         run: |
-          # Detect the first scheme that isn't 'Pods'
-          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
-          echo "Detected Scheme: $SCHEME"
+          # 1. List everything for debugging
+          echo "--- Available Schemes ---"
+          xcodebuild -workspace ios/*.xcworkspace -list
           
-          xcodebuild -workspace ios/*.xcworkspace \
+          # 2. Try to find the main app scheme (usually matches the project name or slug)
+          # We look for a scheme that is NOT 'Pods' and contains the project name.
+          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | grep -i "gym" | head -n 1)
+          
+          # Fallback: just take the first non-Pods scheme if the search fails
+          if [ -z "$SCHEME" ]; then
+            SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
+          fi
+          
+          echo "Final Selected Scheme: $SCHEME"
+          
+          # 3. Use 'archive' which is more robust for creating the .app
+          xcodebuild archive \
+            -workspace ios/*.xcworkspace \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build \
+            -archivePath build/GymMobile.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -43,17 +56,16 @@ jobs:
 
       - name: Find and Copy App
         run: |
-          # Debug: List the build directory structure
-          find build -maxdepth 4
-          
-          # Find the .app file
-          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
+          # In an xcarchive, the app is always in the same place
+          APP_PATH=$(find build/GymMobile.xcarchive -name "*.app" -type d | head -n 1)
           echo "Found app at: $APP_PATH"
+          
           if [ -z "$APP_PATH" ]; then
-            echo "Error: Could not find .app file. Listing all products:"
-            find build -type d -name "Products" -exec ls -R {} +
+            echo "Error: Could not find .app file in archive. Listing archive contents:"
+            find build -maxdepth 5
             exit 1
           fi
+          
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
           zip -r GymMobile.ipa Payload
