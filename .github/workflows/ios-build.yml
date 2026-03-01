@@ -25,16 +25,19 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform ios
 
+      - name: List Schemes
+        run: xcodebuild -workspace ios/*.xcworkspace -list
+
       - name: Build App with Xcode
         run: |
-          xcodebuild -workspace ios/*.xcworkspace 
-            -scheme "GymMobile" 
-            -configuration Release 
-            -sdk iphoneos 
-            -derivedDataPath build 
-            CODE_SIGNING_ALLOWED=NO 
-            CODE_SIGNING_REQUIRED=NO 
-            CODE_SIGN_IDENTITY="" 
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme "gym-mobile" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER=""
 
       - name: Create Payload and IPA
