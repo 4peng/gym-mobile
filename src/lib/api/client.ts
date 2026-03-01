@@ -18,7 +18,7 @@ import Constants from "expo-constants";
  */
 const getBaseUrl = () => {
   // Always use the Vercel backend
-  return "https://apen-gym-backend.vercel.app";
+  return "https://apen-gym.vercel.app";
 };
 
 const BASE_URL = getBaseUrl();

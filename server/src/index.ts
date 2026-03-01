@@ -65,6 +65,22 @@ app.get('/', (req, res) => {
 app.use('/programs', programRoutes);
 app.use('/workouts', workoutRoutes);
 
+// Database connection middleware for Vercel
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    return next();
+  }
+  
+  try {
+    console.log('Database not connected. Connecting now...');
+    await mongoose.connect(MONGODB_URI!);
+    next();
+  } catch (err) {
+    console.error('Database connection error in middleware:', err);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
+
 // Export the app for Vercel
 export default app;
 
@@ -83,7 +99,10 @@ if (process.env.NODE_ENV !== 'production') {
 } else {
   // In production (Vercel), we still need to connect to MongoDB
   // Mongoose handles buffering, but top-level await or a middleware check is better for serverless
-  mongoose.connect(MONGODB_URI)
+  console.log('Attempting MongoDB connection (Production)...');
+  mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  })
     .then(() => console.log('Connected to MongoDB (Serverless)'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => console.error('MongoDB connection error (Production):', err.message));
 }

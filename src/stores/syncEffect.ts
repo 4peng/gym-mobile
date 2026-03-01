@@ -9,20 +9,28 @@ import { useSyncStore } from "./syncStore";
 export function initSyncEffect() {
   // Listen for program changes
   useProgramStore.subscribe((state, prevState) => {
-    // If it became dirty, or a new program was added, trigger sync
-    if (state.isDirty && !prevState.isDirty) {
-      useSyncStore.getState().runFullSync();
-    }
-    
-    // If a deletion occurred
-    if (state.deletedProgramIds.length > prevState.deletedProgramIds.length) {
+    // Trigger sync if it's dirty and EITHER:
+    // 1. It just transitioned from clean to dirty
+    // 2. Something changed (programs or deletions) while already dirty
+    const justBecameDirty = state.isDirty && !prevState.isDirty;
+    const changedWhileDirty = state.isDirty && (
+      state.programs !== prevState.programs || 
+      state.deletedProgramIds !== prevState.deletedProgramIds
+    );
+
+    if (justBecameDirty || changedWhileDirty) {
       useSyncStore.getState().runFullSync();
     }
   });
 
   // Listen for workout history changes
   useWorkoutSessionStore.subscribe((state, prevState) => {
-    if (state.isDirty && !prevState.isDirty) {
+    const justBecameDirty = state.isDirty && !prevState.isDirty;
+    const changedWhileDirty = state.isDirty && (
+      state.history !== prevState.history
+    );
+
+    if (justBecameDirty || changedWhileDirty) {
       useSyncStore.getState().runFullSync();
     }
   });
