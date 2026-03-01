@@ -40,6 +40,27 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Root endpoint: list available endpoints
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Welcome to the Gym Tracker API',
+    endpoints: {
+      health: 'GET /health',
+      programs: [
+        'GET /programs?userId=...',
+        'PUT /programs (Upsert)',
+        'DELETE /programs/:id',
+        'PUT /programs/batch (Batch Upsert)'
+      ],
+      workouts: [
+        'GET /workouts?userId=...',
+        'PUT /workouts (Upsert)',
+        'PUT /workouts/batch (Batch Upsert)'
+      ]
+    }
+  });
+});
+
 // Routes
 app.use('/programs', programRoutes);
 app.use('/workouts', workoutRoutes);
