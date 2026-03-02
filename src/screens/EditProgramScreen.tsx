@@ -13,7 +13,7 @@ import {
   Platform,
   Modal,
 } from "react-native";
-import { X, Check, Plus, Layout, Play, Save } from "lucide-react-native";
+import { X, Check, Plus, Layout, Play, Save, Trash2 } from "lucide-react-native";
 import { useAppRouter, useAppParams } from "@/utils/navigation";
 import { showAlert, showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
@@ -37,6 +37,7 @@ function createEmptyExercise(): ExerciseFormData {
     defaultSets: 3,
     restSeconds: 90,
     notes: "",
+    weightUnit: "kg",
   };
 }
 
@@ -52,6 +53,7 @@ export default function EditProgramScreen() {
     s.programs.find((p) => p._id === id)
   );
   const updateProgram = useProgramStore((s) => s.updateProgram);
+  const deleteProgram = useProgramStore((s) => s.deleteProgram);
   const activeSession = useWorkoutSessionStore((s) => s.activeSession);
   const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
 
@@ -62,13 +64,14 @@ export default function EditProgramScreen() {
 
   useEffect(() => {
     if (program) {
-      setLocalName(program.name);
-      setLocalExercises(program.exercises.map(e => ({
+      setLocalName(program.name || "");
+      setLocalExercises((program.exercises || []).map(e => ({
         id: e.id,
-        name: e.name,
-        defaultSets: e.defaultSets,
-        restSeconds: e.restSeconds,
-        notes: e.notes,
+        name: e.name || "",
+        defaultSets: e.defaultSets || 3,
+        restSeconds: e.restSeconds || 90,
+        notes: e.notes || "",
+        weightUnit: e.weightUnit || "kg",
       })));
     }
   }, [program?._id]);
@@ -96,7 +99,7 @@ export default function EditProgramScreen() {
 
   const validate = (): boolean => {
     if (!id) return false;
-    const trimmedName = localName.trim();
+    const trimmedName = (localName || "").trim();
     if (trimmedName === "") {
       showAlert("Error", "Please enter a program name.");
       return false;
@@ -107,7 +110,7 @@ export default function EditProgramScreen() {
       return false;
     }
 
-    const emptyNameIdx = localExercises.findIndex((e) => e.name.trim() === "");
+    const emptyNameIdx = localExercises.findIndex((e) => (e.name || "").trim() === "");
     if (emptyNameIdx !== -1) {
       showAlert("Error", `Exercise ${emptyNameIdx + 1} needs a name.`);
       return false;
@@ -116,47 +119,87 @@ export default function EditProgramScreen() {
   };
 
   const performUpdate = () => {
-    if (!id) return null;
-    const updates: Partial<Program> = {
-      name: localName.trim(),
-      exercises: localExercises.map(e => ({
-        id: e.id,
-        name: e.name.trim(),
-        defaultSets: e.defaultSets,
-        restSeconds: e.restSeconds,
-        notes: e.notes.trim(),
-      })),
-    };
-    updateProgram(id, updates);
-    return { ...program, ...updates } as Program;
+    if (!id || !program) return null;
+    
+    try {
+      // Handle renames in history before updating template
+      const renameExerciseInHistory = useWorkoutSessionStore.getState().renameExerciseInHistory;
+      localExercises.forEach(newEx => {
+        const oldEx = (program.exercises || []).find(e => e.id === newEx.id);
+        if (oldEx && oldEx.name && newEx.name && oldEx.name.toLowerCase() !== newEx.name.toLowerCase()) {
+          renameExerciseInHistory(oldEx.name, newEx.name);
+        }
+      });
+
+      const updates: any = {
+        name: (localName || "").trim(),
+        exercises: localExercises.map(e => ({
+          id: e.id,
+          name: (e.name || "").trim(),
+          defaultSets: e.defaultSets || 3,
+          restSeconds: e.restSeconds || 90,
+          notes: (e.notes || "").trim(),
+          weightUnit: e.weightUnit || "kg",
+        })),
+      };
+      updateProgram(id, updates);
+      return { ...program, ...updates };
+    } catch (err) {
+      console.error("performUpdate failed:", err);
+      throw err;
+    }
   };
 
   const handleJustSave = () => {
     if (!validate()) return;
-    performUpdate();
-    setShowOptions(false);
-    router.back();
+    try {
+      performUpdate();
+      setShowOptions(false);
+      // Give UI a moment to settle before navigating back
+      setTimeout(() => {
+        router.back();
+      }, 100);
+    } catch (err) {
+      showAlert("Error", "An unexpected error occurred while saving.");
+    }
   };
 
   const handleSaveAndStart = () => {
     if (!validate()) return;
-    const updatedProgram = performUpdate();
-    setShowOptions(false);
+    try {
+      const updatedProgram = performUpdate();
+      setShowOptions(false);
 
-    if (activeSession) {
-      showConfirm(
-        "Active Workout",
-        "You already have a workout in progress. Discard it and start this one?",
-        () => {
-          if (updatedProgram) startFromProgram(updatedProgram as any);
-          router.push("/workout");
-        }
-      );
-    } else {
-      if (updatedProgram) startFromProgram(updatedProgram as any);
-      router.push("/workout");
+      if (activeSession) {
+        showConfirm(
+          "Active Workout",
+          "You already have a workout in progress. Discard it and start this one?",
+          () => {
+            if (updatedProgram) startFromProgram(updatedProgram as any);
+            router.push("/workout");
+          }
+        );
+      } else {
+        if (updatedProgram) startFromProgram(updatedProgram as any);
+        router.push("/workout");
+      }
+    } catch (err) {
+      showAlert("Error", "An unexpected error occurred while saving.");
     }
   };
+
+  const handleDeleteRoutine = useCallback(() => {
+    if (!id) return;
+    setShowOptions(false);
+    showConfirm(
+      "Delete Routine",
+      `Are you sure you want to delete "${localName}"? This cannot be undone.`,
+      () => {
+        deleteProgram(id);
+        router.push("/programs/");
+      }
+    );
+  }, [id, localName, deleteProgram, router]);
 
   const handleCancel = useCallback(() => {
     showConfirm(
@@ -299,6 +342,21 @@ export default function EditProgramScreen() {
               <View>
                 <Text style={styles.optionLabel}>Save & Start Training</Text>
                 <Text style={styles.optionDesc}>Update and launch live session</Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.modalDivider} />
+
+            <Pressable 
+              style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]} 
+              onPress={handleDeleteRoutine}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                <Trash2 size={20} color={COLORS.DANGER} />
+              </View>
+              <View>
+                <Text style={[styles.optionLabel, { color: COLORS.DANGER }]}>Delete Routine</Text>
+                <Text style={styles.optionDesc}>Permanently remove this program</Text>
               </View>
             </Pressable>
 
@@ -458,5 +516,10 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_TERTIARY,
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 12,
   }
 });

@@ -41,7 +41,7 @@ router.put('/', async (req, res) => {
   try {
     const workout = await Workout.findOneAndUpdate(
       { _id: workoutData._id },
-      { ...workoutData, deletedAt: null }, // Ensure it's not marked deleted if re-uploaded
+      { ...workoutData }, // Respect deletedAt if provided
       { upsert: true, new: true }
     );
     res.json(workout);
@@ -61,7 +61,7 @@ router.put('/batch', async (req, res) => {
     const ops = workouts.map((w) => ({
       updateOne: {
         filter: { _id: w._id },
-        update: { ...w, deletedAt: null },
+        update: { ...w },
         upsert: true,
       },
     }));

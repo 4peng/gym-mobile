@@ -12,6 +12,7 @@ export interface ProgramExerciseServer {
   defaultSets: number;
   restSeconds: number;
   notes: string;
+  weightUnit?: string;
 }
 
 export interface ProgramServer {
@@ -21,6 +22,7 @@ export interface ProgramServer {
   exercises: ProgramExerciseServer[];
   createdAt: string; // ISO-8601
   updatedAt: number; // epoch-ms
+  deletedAt?: number | null;
 }
 
 export interface WorkoutSetServer {
@@ -36,6 +38,7 @@ export interface WorkoutExerciseServer {
   restSeconds: number;
   notes: string;
   sets: WorkoutSetServer[];
+  weightUnit?: string;
 }
 
 export interface WorkoutServer {
@@ -45,5 +48,6 @@ export interface WorkoutServer {
   startedAt: string;
   completedAt?: string;
   updatedAt: number; // epoch-ms
+  deletedAt?: number | null;
   exercises: WorkoutExerciseServer[];
 }

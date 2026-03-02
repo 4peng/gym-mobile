@@ -45,6 +45,8 @@ interface WorkoutSessionState {
   hasMoreHistory: boolean;
   /** Background-safe rest timer (persisted via MMKV). */
   activeRestTimer: ActiveRestTimer | null;
+  /** List of exercise names pinned on the insights page. */
+  pinnedExerciseNames: string[];
   /** True when completed workouts have un-synced changes. */
   isDirty: boolean;
   /** Epoch-ms of the last successful sync. */
@@ -58,6 +60,7 @@ interface WorkoutSessionActions {
   completeSession: () => void;
   discardSession: () => void;
   deleteHistorySession: (sessionId: string) => void;
+  updateSessionDate: (sessionId: string, newDate: string) => void;
 
   // ── Exercise mutations ─────────────────────
   addExercise: (name: string) => void;
@@ -100,6 +103,9 @@ interface WorkoutSessionActions {
   ) => Promise<void>;
   cancelRestTimer: () => Promise<void>;
   clearExpiredTimer: () => void;
+
+  // ── Stats ──────────────────────────────────
+  togglePinExercise: (name: string) => void;
 
   // ── Sync metadata ─────────────────────────
   markDirty: () => void;
@@ -144,6 +150,7 @@ export const useWorkoutSessionStore = create<
       deletedWorkoutIds: [],
       hasMoreHistory: true,
       activeRestTimer: null,
+      pinnedExerciseNames: [],
       isDirty: false,
       lastSyncedAt: null,
 
@@ -164,7 +171,7 @@ export const useWorkoutSessionStore = create<
 
       startFromProgram: (program) => {
         // Deep-copy program exercises into an independent session.
-        const exercises: WorkoutExercise[] = program.exercises.map((pe) => ({
+        const exercises: WorkoutExercise[] = (program.exercises || []).map((pe) => ({
           id: generateId(),
           name: pe.name,
           restSeconds: pe.restSeconds,
@@ -231,6 +238,24 @@ export const useWorkoutSessionStore = create<
             state.deletedWorkoutIds.push(sessionId);
           }
           state.isDirty = true;
+        });
+      },
+
+      updateSessionDate: (sessionId, newDate) => {
+        set((state) => {
+          const session = state.history.find(s => s._id === sessionId);
+          if (session) {
+            session.completedAt = newDate;
+            session.updatedAt = Date.now();
+            state.isDirty = true;
+            
+            // Re-sort history by completedAt date
+            state.history.sort((a, b) => {
+              const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+              const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+              return bTime - aTime;
+            });
+          }
         });
       },
 
@@ -435,6 +460,23 @@ export const useWorkoutSessionStore = create<
         }
       },
 
+      // ── Stats ─────────────────────────────────
+
+      togglePinExercise: (name) => {
+        set((state) => {
+          if (!state.pinnedExerciseNames) {
+            state.pinnedExerciseNames = [];
+          }
+          const lowerName = name.toLowerCase();
+          if (state.pinnedExerciseNames.includes(lowerName)) {
+            state.pinnedExerciseNames = state.pinnedExerciseNames.filter(n => n !== lowerName);
+          } else {
+            state.pinnedExerciseNames.push(lowerName);
+          }
+          state.isDirty = true;
+        });
+      },
+
       // ── Sync metadata ────────────────────────
 
       markDirty: () => {
@@ -470,36 +512,83 @@ export const useWorkoutSessionStore = create<
 
       applySyncMerge: (remote, syncStartTime) => {
         set((state) => {
-          const remoteMap = new Map(remote.map((w) => [w._id, w]));
-          const merged = new Map<string, WorkoutSession>();
-          const lastSync = state.lastSyncedAt || 0;
+          if (remote.length === 0) {
+            state.lastSyncedAt = syncStartTime;
+            state.isDirty = state.history.some(w => w.updatedAt > syncStartTime) || state.deletedWorkoutIds.length > 0;
+            return;
+          }
 
-          for (const lw of state.history) {
-            const rw = remoteMap.get(lw._id);
-            if (!rw) {
-              if (lw.updatedAt > lastSync || !lw.deletedAt) {
-                merged.set(lw._id, lw);
+          const remoteMap = new Map(remote.map((w) => [w._id, w]));
+          let historyChanged = false;
+
+          // Helper to deep merge two sessions
+          const deepMergeSessions = (local: WorkoutSession, remote: WorkoutSession): WorkoutSession => {
+            const winner = local.updatedAt >= remote.updatedAt ? local : remote;
+            const loser = local.updatedAt >= remote.updatedAt ? remote : local;
+
+            // Merge exercises
+            const exerciseMap = new Map<string, WorkoutExercise>();
+            // Start with loser's exercises
+            loser.exercises.forEach(ex => exerciseMap.set(ex.id, ex));
+            // Overwrite/merge with winner's
+            winner.exercises.forEach(winEx => {
+              const loseEx = exerciseMap.get(winEx.id);
+              if (!loseEx) {
+                exerciseMap.set(winEx.id, winEx);
+              } else {
+                // If exercise exists in both, merge their sets
+                const setMap = new Map<string, WorkoutSet>();
+                loseEx.sets.forEach(s => setMap.set(s.id, s));
+                winEx.sets.forEach(s => setMap.set(s.id, s)); // Winner sets take priority
+                
+                exerciseMap.set(winEx.id, {
+                  ...winEx, // Take most fields from winner (notes, rest timer etc)
+                  sets: Array.from(setMap.values())
+                });
               }
-            } else {
-              const winner = lw.updatedAt >= rw.updatedAt ? lw : rw;
-              if (!winner.deletedAt) {
-                merged.set(lw._id, winner);
+            });
+
+            return {
+              ...winner,
+              exercises: Array.from(exerciseMap.values())
+            };
+          };
+
+          for (let i = 0; i < state.history.length; i++) {
+            const lw = state.history[i];
+            const rw = remoteMap.get(lw._id);
+            
+            if (rw) {
+              if (lw.deletedAt || rw.deletedAt) {
+                const winner = lw.updatedAt >= rw.updatedAt ? lw : rw;
+                state.history[i] = winner;
+              } else {
+                state.history[i] = deepMergeSessions(lw, rw);
               }
               remoteMap.delete(lw._id);
+              historyChanged = true;
             }
           }
 
-          for (const rw of remoteMap.values()) {
-            if (!rw.deletedAt) {
-              merged.set(rw._id, rw);
+          // Remaining remotes are new additions
+          if (remoteMap.size > 0) {
+            for (const rw of remoteMap.values()) {
+              if (!rw.deletedAt) {
+                state.history.push(rw);
+                historyChanged = true;
+              }
             }
           }
 
-          state.history = Array.from(merged.values()).sort((a, b) => {
-            const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
-            const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
-            return bTime - aTime;
-          });
+          // Clean up any that ended up deleted
+          if (historyChanged) {
+            state.history = state.history.filter(w => !w.deletedAt);
+            state.history.sort((a, b) => {
+              const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+              const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+              return bTime - aTime;
+            });
+          }
 
           state.lastSyncedAt = syncStartTime;
           state.isDirty = state.history.some(w => w.updatedAt > syncStartTime) || state.deletedWorkoutIds.length > 0;

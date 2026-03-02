@@ -57,7 +57,22 @@ export default function RootLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="programs" />
       <Stack.Screen name="workout/index" />
-      <Stack.Screen name="exercises/[name]/volume" />
+      <Stack.Screen 
+        name="exercises/[name]/index" 
+        options={{ 
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+          gestureEnabled: true,
+        }} 
+      />
+      <Stack.Screen 
+        name="exercises/[name]/volume" 
+        options={{ 
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+          gestureEnabled: true,
+        }} 
+      />
       <Stack.Screen name="stats/index" />
     </Stack>
   );

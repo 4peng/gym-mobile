@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,9 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
+  LayoutAnimation,
 } from "react-native";
-import { ChevronLeft, ChevronRight, Search, BarChart2 } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Search, BarChart2, Pin } from "lucide-react-native";
 import Svg, { Rect } from "react-native-svg";
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -17,6 +18,7 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { toTitleCase } from "@/utils/string";
+import { Swipeable } from "@/src/components/Swipeable";
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -59,7 +61,10 @@ const MiniChart = ({ data }: { data: number[] }) => {
 export default function ExerciseListStatsScreen() {
   const router = useAppRouter();
   const history = useWorkoutSessionStore((s) => s.history);
+  const pinnedExerciseNames = useWorkoutSessionStore((s) => s.pinnedExerciseNames || []);
+  const togglePinExercise = useWorkoutSessionStore((s) => s.togglePinExercise);
   const [search, setSearch] = React.useState("");
+  const [scrollEnabled, setScrollEnabled] = React.useState(true);
 
   const exerciseStats = useMemo(() => {
     const exerciseMap = new Map<string, number[]>();
@@ -86,13 +91,25 @@ export default function ExerciseListStatsScreen() {
     });
 
     return Array.from(exerciseMap.keys())
-      .sort()
       .filter(lowerName => lowerName.includes(search.toLowerCase()))
+      .sort((a, b) => {
+        const aPinned = pinnedExerciseNames.includes(a);
+        const bPinned = pinnedExerciseNames.includes(b);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return a.localeCompare(b);
+      })
       .map(lowerName => ({
         name: originalNameMap.get(lowerName) || lowerName,
+        isPinned: pinnedExerciseNames.includes(lowerName),
         recentVolume: exerciseMap.get(lowerName) || []
       }));
-  }, [history, search]);
+  }, [history, search, pinnedExerciseNames]);
+
+  const handlePin = useCallback((name: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    togglePinExercise(name);
+  }, [togglePinExercise]);
 
   return (
     <View style={styles.container}>
@@ -121,6 +138,7 @@ export default function ExerciseListStatsScreen() {
         data={exerciseStats}
         keyExtractor={(item) => item.name}
         contentContainerStyle={styles.listContent}
+        scrollEnabled={scrollEnabled}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <BarChart2 size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
@@ -130,23 +148,34 @@ export default function ExerciseListStatsScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [
-              UI.SHARED.card,
-              { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-              pressed && { backgroundColor: COLORS.CARD_HOVER }
-            ]}
-            onPress={() => router.push(`/exercises/${encodeURIComponent(item.name)}/volume`)}
+          <Swipeable 
+            onDelete={() => {}} // No delete on insights page
+            onPin={() => handlePin(item.name)} 
+            onToggleScroll={setScrollEnabled}
           >
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{toTitleCase(item.name)}</Text>
-              <Text style={styles.itemSub}>View full trends</Text>
-            </View>
-            
-            <MiniChart data={item.recentVolume} />
-            
-            <ChevronRight size={20} color={COLORS.BORDER_LIGHT} style={{ marginLeft: 16 }} />
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                UI.SHARED.card,
+                { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 0, borderRadius: 0 },
+                pressed && { backgroundColor: COLORS.CARD_HOVER }
+              ]}
+              onPress={() => router.push(`/exercises/${encodeURIComponent(item.name)}/volume`)}
+            >
+              <View style={styles.itemInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.itemName}>{toTitleCase(item.name)}</Text>
+                  {item.isPinned && (
+                    <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+                  )}
+                </View>
+                <Text style={styles.itemSub}>View full trends</Text>
+              </View>
+              
+              <MiniChart data={item.recentVolume} />
+              
+              <ChevronRight size={20} color={COLORS.BORDER_LIGHT} style={{ marginLeft: 16 }} />
+            </Pressable>
+          </Swipeable>
         )}
       />
     </View>

@@ -23,7 +23,6 @@ export async function syncPrograms(): Promise<boolean> {
   const store = useProgramStore.getState();
   const syncStartTime = Date.now();
 
-  // 0. Handle local pending hard-deletes (legacy support)
   if (store.deletedProgramIds.length > 0) {
     const deletedSuccessfully = [];
     for (const id of store.deletedProgramIds) {
@@ -35,24 +34,21 @@ export async function syncPrograms(): Promise<boolean> {
     }
   }
 
-  // 1. Push un-synced programs.
+  // Find programs that were updated since or at the last sync time
   const dirtyPrograms = store.programs.filter(
-    (p) => p.updatedAt > (store.lastSyncedAt || 0)
+    (p) => p.updatedAt >= (store.lastSyncedAt || 0) && !p.deletedAt
   );
+  
   if (dirtyPrograms.length > 0) {
     const result = await batchUpsertPrograms(dirtyPrograms);
     if (!result) return false;
   }
 
-  // 2. Fetch remote data (Delta Sync using 'since')
-  // We use lastSyncedAt - 10 seconds to account for slight clock drifts.
   const since = store.lastSyncedAt ? Math.max(0, store.lastSyncedAt - 10000) : undefined;
   const remote = await fetchPrograms(since);
   if (!remote) return false;
 
-  // 3 & 4. Merge logic (applySyncMerge handles tombstones via deletedAt)
   useProgramStore.getState().applySyncMerge(remote, syncStartTime);
-
   return true;
 }
 
@@ -64,7 +60,6 @@ export async function syncWorkouts(): Promise<boolean> {
   const store = useWorkoutSessionStore.getState();
   const syncStartTime = Date.now();
 
-  // 0. Handle local pending hard-deletes (legacy support)
   if (store.deletedWorkoutIds.length > 0) {
     const deletedSuccessfully = [];
     for (const id of store.deletedWorkoutIds) {
@@ -76,26 +71,21 @@ export async function syncWorkouts(): Promise<boolean> {
     }
   }
 
-  // Only sync completed workouts. Never touch activeSession.
   const completedLocal = store.history.filter((w) => !!w.completedAt);
   const dirtyWorkouts = completedLocal.filter(
-    (w) => w.updatedAt > (store.lastSyncedAt || 0)
+    (w) => w.updatedAt >= (store.lastSyncedAt || 0) && !w.deletedAt
   );
 
-  // 1. Push un-synced completed workouts.
   if (dirtyWorkouts.length > 0) {
     const result = await batchUpsertWorkouts(dirtyWorkouts);
     if (!result) return false;
   }
 
-  // 2. Fetch backend workouts (Delta Sync)
   const since = store.lastSyncedAt ? Math.max(0, store.lastSyncedAt - 10000) : undefined;
   const remote = await fetchWorkouts(undefined, undefined, since);
   if (!remote) return false;
 
-  // 3 & 4. Merge inside the state lock.
   useWorkoutSessionStore.getState().applySyncMerge(remote, syncStartTime);
-
   return true;
 }
 
@@ -118,7 +108,6 @@ export async function runFullSync(): Promise<boolean> {
   }
 }
 
-/** Check if a sync is currently in progress. */
 export function isSyncing(): boolean {
   return _syncing;
 }

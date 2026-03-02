@@ -17,6 +17,7 @@ interface ProgramActions {
   addProgram: (name: string, exercises: ProgramExercise[]) => void;
   updateProgram: (id: string, updates: Partial<Program>) => void;
   deleteProgram: (id: string) => void;
+  togglePin: (id: string) => void;
   getProgramById: (id: string) => Program | undefined;
   markDirty: () => void;
   clearDeletedPrograms: (ids: string[]) => void;
@@ -35,7 +36,6 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       repairCorruptedData: () => {
         set((state) => {
           state.programs.forEach((p) => {
-            // Fix case where 'name' accidentally became an object during a bad update
             if (typeof p.name === "object" && p.name !== null) {
               const corrupted = p.name as any;
               p.name = corrupted.name || "Untitled Program";
@@ -43,7 +43,6 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
                 p.exercises = corrupted.exercises;
               }
             }
-            // Ensure exercises is always an array
             if (!p.exercises) {
               p.exercises = [];
             }
@@ -67,21 +66,6 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       },
 
       updateProgram: (id, updates) => {
-        const oldProgram = get().programs.find(p => p._id === id);
-        if (!oldProgram) return;
-
-        if (updates.exercises) {
-          const { useWorkoutSessionStore } = require("./workoutSessionStore");
-          const workoutStore = useWorkoutSessionStore.getState();
-
-          updates.exercises.forEach(newEx => {
-            const oldEx = oldProgram.exercises.find(e => e.id === newEx.id);
-            if (oldEx && oldEx.name.toLowerCase() !== newEx.name.toLowerCase()) {
-              workoutStore.renameExerciseInHistory(oldEx.name, newEx.name);
-            }
-          });
-        }
-
         set((state) => {
           const index = state.programs.findIndex((p) => p._id === id);
           if (index !== -1) {
@@ -108,6 +92,17 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
         });
       },
 
+      togglePin: (id) => {
+        set((state) => {
+          const program = state.programs.find(p => p._id === id);
+          if (program) {
+            program.pinned = !program.pinned;
+            program.updatedAt = Date.now();
+            state.isDirty = true;
+          }
+        });
+      },
+
       getProgramById: (id) => {
         return get().programs.find((p) => p._id === id && !p.deletedAt);
       },
@@ -127,32 +122,40 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
 
       applySyncMerge: (remote, syncStartTime) => {
         set((state) => {
+          if (remote.length === 0) {
+            state.lastSyncedAt = syncStartTime;
+            state.isDirty = state.programs.some(p => p.updatedAt > syncStartTime) || state.deletedProgramIds.length > 0;
+            return;
+          }
+
           const remoteMap = new Map(remote.map((p) => [p._id, p]));
-          const merged = new Map<string, Program>();
-          const lastSync = state.lastSyncedAt || 0;
+          let historyChanged = false;
 
-          for (const lp of state.programs) {
+          for (let i = 0; i < state.programs.length; i++) {
+            const lp = state.programs[i];
             const rp = remoteMap.get(lp._id);
-            if (!rp) {
-              if (lp.updatedAt > lastSync || !lp.deletedAt) {
-                merged.set(lp._id, lp);
-              }
-            } else {
+            
+            if (rp) {
               const winner = lp.updatedAt >= rp.updatedAt ? lp : rp;
-              if (!winner.deletedAt) {
-                merged.set(lp._id, winner);
-              }
+              state.programs[i] = winner;
               remoteMap.delete(lp._id);
+              historyChanged = true;
             }
           }
 
-          for (const rp of remoteMap.values()) {
-            if (!rp.deletedAt) {
-              merged.set(rp._id, rp);
+          if (remoteMap.size > 0) {
+            for (const rp of remoteMap.values()) {
+              if (!rp.deletedAt) {
+                state.programs.push(rp);
+                historyChanged = true;
+              }
             }
           }
 
-          state.programs = Array.from(merged.values());
+          if (historyChanged) {
+            state.programs = state.programs.filter(p => !p.deletedAt);
+          }
+
           state.lastSyncedAt = syncStartTime;
           state.isDirty = state.programs.some(p => p.updatedAt > syncStartTime) || state.deletedProgramIds.length > 0;
         });

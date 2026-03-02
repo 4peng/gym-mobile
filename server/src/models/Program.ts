@@ -6,6 +6,7 @@ export interface IProgramExercise {
   defaultSets: number;
   restSeconds: number;
   notes: string;
+  weightUnit?: 'kg' | 'lbs';
 }
 
 export interface IProgram extends Document<string> {
@@ -23,7 +24,8 @@ const ProgramExerciseSchema = new Schema({
   defaultSets: { type: Number, required: true },
   restSeconds: { type: Number, required: true },
   notes: { type: String, default: '' },
-});
+  weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
+}, { _id: false });
 
 const ProgramSchema = new Schema({
   _id: { type: String, required: true }, // Using client-side UUID
@@ -35,4 +37,8 @@ const ProgramSchema = new Schema({
   deletedAt: { type: Number, default: null },
 }, { _id: false });
 
+// Export the model (resetting it to ensure schema update)
+if (mongoose.models.Program) {
+  delete (mongoose.models as any).Program;
+}
 export default mongoose.model<IProgram>('Program', ProgramSchema);

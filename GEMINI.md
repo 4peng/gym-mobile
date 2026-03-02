@@ -3,39 +3,28 @@
 ## Project Overview
 This project is an offline-first gym and workout tracking application. It is built as a hybrid Next.js application that leverages `react-native-web` to share UI logic and components between web and potentially native platforms.
 
-The core functionality includes:
-- **Program Management:** Creating and managing workout templates (Programs).
-- **Workout Tracking:** Logging active workout sessions, sets, reps, and weights.
-- **Offline-First Sync:** A custom sync engine that uses a "last-write-wins" strategy based on `updatedAt` timestamps to synchronize local data (stored in MMKV) with a backend.
-- **Notifications:** Integration with Expo Notifications for rest timers and other alerts.
+## Recent Architectural Changes (March 2026)
+- **High-Performance Component Architecture:** Broke down complex screens into specialized, memoized components (`ProgramTile`, `ExerciseCard`, `SetRow`) to minimize re-renders.
+- **Optimized Sync Engine:** Refactored "Last-Write-Wins" merge logic to mutate state arrays in-place, drastically reducing memory usage as workout history grows.
+- **Silent Background Sync:** Introduced `backgroundSync` for automatic data updates (pinning, completing sets) to prevent UI flickering, reserving the loading spinner for manual pull-to-refresh.
+- **Daily Data Aggregation:** Analytics and history now consolidate multiple sessions on the same date into a single daily volume total using local timezone keys (`YYYY-MM-DD`).
+- **Tactile UX:** Integrated `expo-haptics` for physical feedback on swipe gestures, set completion, and workout finishing.
 
 ## Tech Stack
-- **Framework:** [Next.js](https://nextjs.org/) with [react-native-web](https://necolas.github.io/react-native-web/) for cross-platform UI.
-- **State Management:** [Zustand](https://github.com/pmndrs/zustand) with [Immer](https://immerjs.github.io/immer/) for immutable state updates.
-- **Storage:** [MMKV](https://github.com/mrousavy/react-native-mmkv) (via `react-native-mmkv`) for high-performance key-value storage.
-- **UI Components:** [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/), and standard React Native primitives (`View`, `Text`, `Pressable`, `TextInput`).
-- **Styling:** [Tailwind CSS](https://tailwindcss.com/) for web-level layout and `StyleSheet` for React Native components.
-- **Validation:** [Zod](https://zod.dev/) and [React Hook Form](https://react-hook-form.com/).
+- **Framework:** [Next.js](https://nextjs.org/) with [react-native-web](https://necolas.github.io/react-native-web/) / [Expo](https://expo.dev/).
+- **State Management:** [Zustand](https://github.com/pmndrs/zustand) with [Immer](https://immerjs.github.io/immer/).
+- **Storage:** [AsyncStorage](https://react-native-async-storage.github.io/async-storage/) (migrated for wider compatibility).
+- **Feedback:** [Expo Haptics](https://docs.expo.dev/versions/latest/sdk/haptics/).
+- **API:** REST API with Delta Sync support.
 
-## Project Structure
-- `app/`: Next.js App Router directory. Routes often serve as thin wrappers around screens located in `src/screens/`.
-- `src/screens/`: The primary UI screens of the application (e.g., `WorkoutSessionScreen`, `EditProgramScreen`).
-- `src/components/`: Domain-specific UI components (e.g., `ExerciseEditor`, `FloatingRestTimer`).
-- `src/stores/`: Zustand stores managing `programStore`, `workoutSessionStore`, and `syncStore`.
-- `src/lib/api/`: API client implementations (`client.ts`), converters, and the core `sync.ts` engine.
-- `src/types/`: TypeScript definitions for Programs, Workouts, and Exercises.
-- `src/storage/`: MMKV configuration for Zustand persistence.
-- `components/ui/`: A collection of reusable base UI components (Shadcn/UI style).
-
-## Key Commands
-- **Start Development Server:** `npm run dev` or `pnpm dev`
-- **Build for Production:** `npm run build` or `pnpm build`
-- **Start Production Server:** `npm run start` or `pnpm start`
-- **Linting:** `npm run lint` or `pnpm lint`
+## Environment Configuration
+- **Server Switching:** Managed in `src/lib/api/client.ts` via the `ENV` constant.
+- **Production:** Points to Vercel backend.
+- **Local:** Automatically detects host machine IP for physical device testing (iPhone/Android on same Wi-Fi).
 
 ## Development Conventions
-- **Hybrid UI:** Be mindful that many components use React Native primitives. When adding new UI, check if it should be a standard web component or a React Native component for cross-platform compatibility.
-- **Offline-First:** All data mutations should happen in the Zustand stores first. The sync engine will handle propagation to the backend.
-- **Type Safety:** Ensure all data models follow the interfaces defined in `src/types/index.ts`.
-- **Sync Strategy:** Use the `updatedAt` (epoch-ms) field for conflict resolution. Tie-breaks favor local changes.
-- **ID Generation:** Use `generateId()` from `@/utils/id` which uses `uuid v4`.
+- **Haptics:** Always use the `HapticFeedback` utility from `@/utils/haptics` for consistent tactile patterns.
+- **Analytics:** Data grouping must always use local date strings (`YYYY-MM-DD`) to ensure sessions aren't split by UTC offsets.
+- **Offline-First:** All mutations happen in Zustand first; sync engine handles propagation silently in the background.
+- **Schema Updates:** Ensure `weightUnit` is preserved in all converters and backend Mongoose schemas.
+- **Performance:** Keep screen-level components lean; delegate complex UI to memoized sub-components.

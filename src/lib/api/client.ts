@@ -5,20 +5,30 @@
 // The base URL can be swapped per environment.
 
 import { USER_ID } from "@/constants/user";
-
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
 /**
- * For development, "localhost" differs by platform:
- * - Web: localhost
- * - Android Emulator: 10.0.2.2
- * - iOS Simulator: localhost
- * - Physical Device: Your machine's local IP (provided by expo-constants)
+ * QUICK TOGGLE FOR SERVER ADDRESS
+ * Set this to "prod" to use Vercel, or "local" for local machine IP.
  */
+const ENV: "local" | "prod" = "prod";
+
+const PROD_URL = "https://apen-gym.vercel.app"; // Update with your actual Vercel URL
+const LOCAL_PORT = "4000";
+
 const getBaseUrl = () => {
-  // Always use the Vercel backend
-  return "https://apen-gym.vercel.app";
+  if (ENV === "prod") return PROD_URL;
+
+  // Local logic
+  if (Platform.OS === 'web') return `http://localhost:${LOCAL_PORT}`;
+
+  // If we are on a physical device, we must use the machine's local IP
+  // instead of "localhost" (which would refer to the phone itself).
+  const debuggerHost = Constants.expoConfig?.hostUri;
+  const localhost = debuggerHost ? debuggerHost.split(':')[0] : '192.168.1.104';
+  
+  return `http://${localhost}:${LOCAL_PORT}`;
 };
 
 const BASE_URL = getBaseUrl();

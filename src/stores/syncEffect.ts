@@ -19,7 +19,8 @@ export function initSyncEffect() {
     );
 
     if (justBecameDirty || changedWhileDirty) {
-      useSyncStore.getState().runFullSync();
+      // Use silent background sync for automatic updates
+      useSyncStore.getState().backgroundSync();
     }
   });
 
@@ -31,7 +32,8 @@ export function initSyncEffect() {
     );
 
     if (justBecameDirty || changedWhileDirty) {
-      useSyncStore.getState().runFullSync();
+      // Use silent background sync for automatic updates
+      useSyncStore.getState().backgroundSync();
     }
   });
 }

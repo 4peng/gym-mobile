@@ -14,6 +14,7 @@ export interface IWorkoutExercise {
   timerStartedAt?: string;
   notes: string;
   sets: IWorkoutSet[];
+  weightUnit?: 'kg' | 'lbs';
 }
 
 export interface IWorkout extends Document<string> {
@@ -31,7 +32,7 @@ const WorkoutSetSchema = new Schema({
   weight: { type: Number, default: null },
   reps: { type: Number, default: null },
   completedAt: { type: String },
-});
+}, { _id: false });
 
 const WorkoutExerciseSchema = new Schema({
   id: { type: String, required: true },
@@ -40,7 +41,8 @@ const WorkoutExerciseSchema = new Schema({
   timerStartedAt: { type: String },
   notes: { type: String, default: '' },
   sets: [WorkoutSetSchema],
-});
+  weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
+}, { _id: false });
 
 const WorkoutSchema = new Schema({
   _id: { type: String, required: true }, // Using client-side UUID
@@ -53,4 +55,8 @@ const WorkoutSchema = new Schema({
   exercises: [WorkoutExerciseSchema],
 }, { _id: false });
 
+// Export the model (resetting it to ensure schema update)
+if (mongoose.models.Workout) {
+  delete (mongoose.models as any).Workout;
+}
 export default mongoose.model<IWorkout>('Workout', WorkoutSchema);

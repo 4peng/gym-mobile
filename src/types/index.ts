@@ -18,6 +18,7 @@ export interface Program {
   userId: string;
   name: string;
   exercises: ProgramExercise[];
+  pinned?: boolean;
   createdAt: string; // ISO-8601
   updatedAt: number; // epoch-ms, required for last-write-wins sync
   deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone

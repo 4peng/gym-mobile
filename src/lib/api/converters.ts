@@ -22,6 +22,7 @@ export function mapProgramToBackend(program: Program): ProgramServer {
       defaultSets: e.defaultSets,
       restSeconds: e.restSeconds,
       notes: e.notes,
+      weightUnit: e.weightUnit,
     })),
     createdAt: program.createdAt,
     updatedAt: program.updatedAt,
@@ -44,6 +45,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
       defaultSets: e.defaultSets,
       restSeconds: e.restSeconds,
       notes: e.notes,
+      weightUnit: e.weightUnit as "kg" | "lbs" | undefined,
     })),
     createdAt: server.createdAt,
     updatedAt: server.updatedAt,
@@ -71,6 +73,7 @@ export function mapWorkoutToBackend(
       name: ex.name,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
+      weightUnit: ex.weightUnit,
       sets: ex.sets.map((s) => ({
         id: s.id,
         weight: s.weight,
@@ -101,6 +104,7 @@ export function mapWorkoutFromBackend(
       name: ex.name,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
+      weightUnit: ex.weightUnit as "kg" | "lbs" | undefined,
       sets: ex.sets.map((s) => ({
         id: s.id,
         weight: s.weight,

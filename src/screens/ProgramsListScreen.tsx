@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,88 +9,22 @@ import {
   StyleSheet,
   LayoutAnimation,
   ScrollView,
+  Animated,
+  RefreshControl,
 } from "react-native";
-import { Play, Plus, Trash2, ChevronRight, Activity, BarChart2, Clock } from "lucide-react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Play, Plus, ChevronRight, Activity, BarChart2, Clock, Settings, Pin } from "lucide-react-native";
 import { useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { useSyncStore } from "@/stores/syncStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
+import { Swipeable } from "@/src/components/Swipeable";
+import { ProgramTile } from "@/src/components/ProgramTile";
 import type { Program } from "@/types";
-
-// ──────────────────────────────────────────────
-// ProgramTile (Memoized)
-// ──────────────────────────────────────────────
-
-interface ProgramTileProps {
-  program: Program;
-  onPress: (id: string) => void;
-  onStart: (program: Program) => void;
-  onDelete: (id: string, name: string) => void;
-}
-
-const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
-  program,
-  onPress,
-  onStart,
-  onDelete,
-}) {
-  const handlePress = useCallback(() => onPress(program._id), [program._id, onPress]);
-  const handleStart = useCallback(() => onStart(program), [program, onStart]);
-  const handleDelete = useCallback(() => onDelete(program._id, program.name), [program._id, program.name, onDelete]);
-
-  return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [
-        UI.SHARED.card,
-        { padding: 24 }, // Keeping specific padding for tiles
-        pressed && styles.tilePressed
-      ]}
-    >
-      <View style={styles.tileHeader}>
-        <View style={styles.tileMainInfo}>
-          <Text style={styles.programName} numberOfLines={1}>
-            {typeof program.name === "string" ? program.name : (program.name as any)?.name || "Untitled Routine"}
-          </Text>
-          <View style={styles.metaRow}>
-            <Activity size={12} color={COLORS.TEXT_TERTIARY} />
-            <Text style={styles.metaText}>
-              {(program.exercises?.length || 0)} {(program.exercises?.length === 1) ? "Exercise" : "Exercises"}
-            </Text>
-          </View>
-        </View>
-        <ChevronRight size={20} color={COLORS.BORDER_LIGHT} />
-      </View>
-
-      <View style={styles.tileActions}>
-        <Pressable
-          onPress={handleStart}
-          style={({ pressed }) => [
-            styles.tileStartBtn,
-            pressed && styles.tileStartBtnPressed
-          ]}
-        >
-          <Play size={16} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-          <Text style={styles.tileStartText}>Start Session</Text>
-        </Pressable>
-        
-        <Pressable
-          onPress={handleDelete}
-          hitSlop={12}
-          style={({ pressed }) => [
-            styles.tileDeleteBtn,
-            pressed && { opacity: 0.5 }
-          ]}
-        >
-          <Trash2 size={18} color={COLORS.DANGER} />
-        </Pressable>
-      </View>
-    </Pressable>
-  );
-});
 
 // ──────────────────────────────────────────────
 // ProgramsListScreen
@@ -99,16 +33,30 @@ const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 export default function ProgramsListScreen() {
   const allPrograms = useProgramStore((s) => s.programs);
   const deleteProgram = useProgramStore((s) => s.deleteProgram);
+  const togglePin = useProgramStore((s) => s.togglePin);
   const repairCorruptedData = useProgramStore((s) => s.repairCorruptedData);
+  
+  const isSyncing = useSyncStore((s) => s.isSyncing);
+  const isManualSync = useSyncStore((s) => s.isManualSync);
+  const runFullSync = useSyncStore((s) => s.runFullSync);
+  
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const [scrollEnabled, setScrollEnabled] = React.useState(true);
   
   React.useEffect(() => {
     repairCorruptedData();
   }, [repairCorruptedData]);
 
-  const programs = useMemo(() => 
-    allPrograms.filter(p => !p.deletedAt), 
-    [allPrograms]
-  );
+  const programs = useMemo(() => {
+    return [...allPrograms]
+      .filter(p => !p.deletedAt)
+      .sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return 0;
+      });
+  }, [allPrograms]);
   
   const allHistory = useWorkoutSessionStore((s) => s.history);
   const history = useMemo(() => allHistory.filter(s => !s.deletedAt), [allHistory]);
@@ -167,97 +115,130 @@ export default function ProgramsListScreen() {
 
   const handleCreate = useCallback(() => router.push("/programs/create"), [router]);
 
+  const handlePin = useCallback((id: string) => {
+    // Only animate the layout specifically when pinning/unpinning
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    togglePin(id);
+  }, [togglePin]);
+
   return (
     <View style={styles.container}>
-      {/* Dynamic Header Area */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{todayStr}</Text>
-          <Text style={styles.headerTitle}>My Programs</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <Pressable 
-            onPress={handleQuickStart} 
-            style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
-          >
-            <Play size={24} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-          </Pressable>
-        </View>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Activity Insights Row */}
-        <View style={styles.insightsRow}>
-          <Pressable 
-            onPress={() => router.push("/history")}
-            style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
-          >
-            <View style={[styles.insightIconCircle, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-              <Clock size={20} color={COLORS.ACCENT_BLUE} />
-            </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+        <Animated.ScrollView 
+          showsVerticalScrollIndicator={false}
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          scrollEnabled={scrollEnabled}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={isManualSync}
+              onRefresh={() => runFullSync(true)}
+              tintColor={COLORS.ACCENT_BLUE}
+            />
+          }
+        >
+          {/* Dynamic Header Area */}
+          <View style={styles.header}>
             <View>
-              <Text style={styles.insightLabel}>History</Text>
-              <Text style={styles.insightSublabel}>{history.length} sessions</Text>
+              <Text style={styles.greeting}>{todayStr}</Text>
+              <Text style={styles.headerTitle}>My Programs</Text>
             </View>
-          </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable 
+                onPress={() => router.push("/settings")} 
+                style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Settings size={22} color={COLORS.TEXT_TERTIARY} />
+              </Pressable>
+              <Pressable 
+                onPress={handleQuickStart} 
+                style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Play size={24} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+              </Pressable>
+            </View>
+          </View>
 
-          <Pressable 
-            onPress={() => router.push("/stats")}
-            style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
-          >
-            <View style={[styles.insightIconCircle, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
-              <BarChart2 size={20} color={COLORS.ACCENT_GREEN} />
-            </View>
-            <View>
-              <Text style={styles.insightLabel}>Insights</Text>
-              <Text style={styles.insightSublabel}>Volume & PRs</Text>
-            </View>
-          </Pressable>
-        </View>
-
-        {/* Active Session Card (If exists) */}
-        {activeSession && (
-          <View style={styles.activeContainer}>
-            <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Active Session</Text>
-            <Pressable
-              style={({ pressed }) => [
-                UI.SHARED.card,
-                { paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', borderColor: "rgba(11, 130, 255, 0.2)" },
-                pressed && { opacity: 0.85 }
-              ]}
-              onPress={() => router.push("/workout")}
+          {/* Activity Insights Row */}
+          <View style={styles.insightsRow}>
+            <Pressable 
+              onPress={() => router.push("/history")}
+              style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
             >
-              <View style={styles.activeIndicator} />
-              <Text style={styles.activeBannerText}>Workout in progress—resume now</Text>
-              <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
+              <View style={[styles.insightIconCircle, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
+                <Clock size={20} color={COLORS.ACCENT_BLUE} />
+              </View>
+              <View>
+                <Text style={styles.insightLabel}>History</Text>
+                <Text style={styles.insightSublabel}>{history.length} sessions</Text>
+              </View>
+            </Pressable>
+
+            <Pressable 
+              onPress={() => router.push("/stats")}
+              style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
+            >
+              <View style={[styles.insightIconCircle, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
+                <BarChart2 size={20} color={COLORS.ACCENT_GREEN} />
+              </View>
+              <View>
+                <Text style={styles.insightLabel}>Insights</Text>
+                <Text style={styles.insightSublabel}>Volume & PRs</Text>
+              </View>
             </Pressable>
           </View>
-        )}
 
-        {/* Main List */}
-        <View style={{ flex: 1, paddingHorizontal: UI.LAYOUT_PADDING }}>
-          <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Available Routines</Text>
-          {programs.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Activity size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
-              <Text style={styles.emptyText}>No programs yet.</Text>
-              <Text style={styles.emptySubtext}>Create your first custom workout to get started.</Text>
-            </View>
-          ) : (
-            <View style={{ gap: 0 }}>
-              {programs.map((item) => (
-                <ProgramTile
-                  key={item._id}
-                  program={item}
-                  onPress={handlePress}
-                  onStart={handleStartProgram}
-                  onDelete={handleDelete}
-                />
-              ))}
+          {/* Active Session Card (If exists) */}
+          {activeSession && (
+            <View style={styles.activeContainer}>
+              <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Active Session</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  UI.SHARED.card,
+                  { paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', borderColor: "rgba(11, 130, 255, 0.2)" },
+                  pressed && { opacity: 0.85 }
+                ]}
+                onPress={() => router.push("/workout")}
+              >
+                <View style={styles.activeIndicator} />
+                <Text style={styles.activeBannerText}>Workout in progress—resume now</Text>
+                <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
+              </Pressable>
             </View>
           )}
-        </View>
-      </ScrollView>
+
+          {/* Main List */}
+          <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
+            <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Available Routines</Text>
+            {programs.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Activity size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
+                <Text style={styles.emptyText}>No programs yet.</Text>
+                <Text style={styles.emptySubtext}>Create your first custom workout to get started.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 0 }}>
+                {programs.map((item) => (
+                  <ProgramTile
+                    key={item._id}
+                    program={item}
+                    onPress={handlePress}
+                    onStart={handleStartProgram}
+                    onDelete={handleDelete}
+                    onPin={handlePin}
+                    onToggleScroll={setScrollEnabled}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        </Animated.ScrollView>
+      </SafeAreaView>
 
       {/* Floating Action Button */}
       <Pressable 
@@ -278,9 +259,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BG,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120, // Space for FAB
+  },
   header: {
     paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingTop: UI.HEADER_TOP,
+    paddingTop: 16, // Reduced since SafeAreaView handles the top
     paddingBottom: 24,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -353,70 +338,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
     fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  tilePressed: {
-    backgroundColor: COLORS.CARD_HOVER,
-    transform: [{ scale: 0.99 }],
-  },
-  tileHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  tileMainInfo: {
-    flex: 1,
-  },
-  programName: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -1,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 6,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
-    fontWeight: "600",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  tileActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  tileStartBtn: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "#1D1D21",
-    paddingVertical: 14,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-  },
-  tileStartBtnPressed: {
-    backgroundColor: "#27272A",
-  },
-  tileStartText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 14,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  tileDeleteBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
-    justifyContent: "center",
-    alignItems: "center",
   },
   emptyContainer: {
     flex: 1,

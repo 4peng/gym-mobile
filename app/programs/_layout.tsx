@@ -1,18 +1,19 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
-import { Slot } from "expo-router";
+import { Stack } from "expo-router";
+import { COLORS } from "@/src/constants/colors";
 
 export default function ProgramsLayout() {
   return (
-    <View style={styles.container}>
-      <Slot />
-    </View>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: COLORS.BG },
+        animation: 'slide_from_right',
+      }}
+    >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="create" />
+      <Stack.Screen name="[id]" />
+    </Stack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0B0B0F",
-  },
-});

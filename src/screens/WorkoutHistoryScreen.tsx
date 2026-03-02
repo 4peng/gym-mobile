@@ -13,12 +13,12 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { 
   ChevronLeft, 
   Calendar, 
   Clock, 
-  Trash2, 
   ChevronDown, 
   Dumbbell, 
   ChevronUp,
@@ -28,10 +28,12 @@ import {
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
+import { useSyncStore } from "@/stores/syncStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { toTitleCase } from "@/utils/string";
+import { Swipeable } from "@/src/components/Swipeable";
 import type { WorkoutSession, WorkoutSet } from "@/types";
 
 // ──────────────────────────────────────────────
@@ -65,11 +67,13 @@ interface WorkoutSessionCardProps {
   session: WorkoutSession;
   programName?: string;
   onDelete: (id: string) => void;
+  onToggleScroll: (enabled: boolean) => void;
 }
 
-const WorkoutSessionCard = ({ session, programName, onDelete }: WorkoutSessionCardProps) => {
+const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: WorkoutSessionCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
+  const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
   
   const [editingSet, setEditingSet] = useState<{
     exerciseId: string;
@@ -81,6 +85,38 @@ const WorkoutSessionCard = ({ session, programName, onDelete }: WorkoutSessionCa
   const toggleExpand = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsExpanded(!isExpanded);
+  };
+
+  const handleEditDate = () => {
+    const currentFullDate = session.completedAt || session.startedAt;
+    const currentDate = new Date(currentFullDate).toISOString().split('T')[0];
+    
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        "Edit Date",
+        "Enter new date (YYYY-MM-DD):",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Save", 
+            onPress: (newDate) => {
+              if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                // Keep the time part if possible
+                const oldTime = currentFullDate.split('T')[1] || "12:00:00.000Z";
+                const updatedIso = `${newDate}T${oldTime}`;
+                updateSessionDate(session._id, updatedIso);
+              } else if (newDate) {
+                Alert.alert("Invalid format", "Please use YYYY-MM-DD");
+              }
+            } 
+          }
+        ],
+        "plain-text",
+        currentDate
+      );
+    } else {
+      Alert.alert("Feature limited", "Date editing is currently optimized for iOS. Please ensure you enter YYYY-MM-DD format if available via your system prompt.");
+    }
   };
 
   const handleStartEdit = (exerciseId: string, set: WorkoutSet) => {
@@ -108,104 +144,102 @@ const WorkoutSessionCard = ({ session, programName, onDelete }: WorkoutSessionCa
     .join(", ");
 
   return (
-    <View style={UI.SHARED.card}>
-      <Pressable onPress={toggleExpand}>
-        <View style={styles.cardHeader}>
-          <View style={styles.dateInfo}>
-            <Calendar size={14} color={COLORS.TEXT_TERTIARY} />
-            <Text style={styles.dateText}>{formatDate(session.completedAt || session.startedAt)}</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <Pressable 
-              onPress={() => onDelete(session._id)}
-              hitSlop={12}
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, marginRight: 12 })}
-            >
-              <Trash2 size={18} color={COLORS.DANGER} opacity={0.7} />
+    <Swipeable onDelete={() => onDelete(session._id)} onToggleScroll={onToggleScroll}>
+      <View style={[UI.SHARED.card, { marginBottom: 0, borderRadius: 0 }]}>
+        <View style={{ padding: 12 }}>
+          <View style={styles.cardHeader}>
+            <Pressable onPress={handleEditDate} style={({ pressed }) => [styles.dateInfo, pressed && { opacity: 0.6 }]}>
+              <Calendar size={14} color={COLORS.ACCENT_BLUE} />
+              <Text style={styles.dateText}>{formatDate(session.completedAt || session.startedAt)}</Text>
             </Pressable>
-            {isExpanded ? <ChevronUp size={20} color={COLORS.TEXT_TERTIARY} /> : <ChevronDown size={20} color={COLORS.TEXT_TERTIARY} />}
+            <Pressable onPress={toggleExpand} style={styles.headerRight}>
+              {isExpanded ? <ChevronUp size={20} color={COLORS.TEXT_TERTIARY} /> : <ChevronDown size={20} color={COLORS.TEXT_TERTIARY} />}
+            </Pressable>
           </View>
-        </View>
 
-        <Text style={styles.sessionTitle}>
-          {programName || "Quick Session"}
-        </Text>
+          <Pressable onPress={toggleExpand}>
+            <Text style={styles.sessionTitle}>
+              {programName || "Quick Session"}
+            </Text>
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Clock size={12} color={COLORS.TEXT_TERTIARY} />
-            <Text style={styles.metaText}>{formatDuration(session.startedAt, session.completedAt)}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />
-            <Text style={styles.metaText}>{session.exercises.length} exercises</Text>
-          </View>
-        </View>
-
-        {!isExpanded && (
-          <Text style={styles.summary} numberOfLines={1}>
-            {exerciseSummary}
-          </Text>
-        )}
-      </Pressable>
-
-      {isExpanded && (
-        <View style={styles.detailsContainer}>
-          <View style={styles.divider} />
-          {session.exercises.map((ex) => (
-            <View key={ex.id} style={styles.exerciseDetailItem}>
-              <Text style={styles.exerciseDetailName}>{toTitleCase(ex.name)}</Text>
-              <View style={styles.setsList}>
-                {ex.sets.map((s, sIdx) => {
-                  const isEditing = editingSet?.setId === s.id;
-                  
-                  if (isEditing) {
-                    return (
-                      <View key={s.id} style={styles.editRow}>
-                        <TextInput
-                          style={styles.editInput}
-                          value={editingSet.weight}
-                          onChangeText={(v) => setEditingSet({ ...editingSet, weight: v })}
-                          keyboardType="numeric"
-                          autoFocus
-                        />
-                        <Text style={styles.setTagX}>×</Text>
-                        <TextInput
-                          style={styles.editInput}
-                          value={editingSet.reps}
-                          onChangeText={(v) => setEditingSet({ ...editingSet, reps: v })}
-                          keyboardType="numeric"
-                        />
-                        <Pressable onPress={handleSaveEdit} style={styles.editIcon}>
-                          <Check size={14} color={COLORS.ACCENT_GREEN} />
-                        </Pressable>
-                        <Pressable onPress={() => setEditingSet(null)} style={styles.editIcon}>
-                          <X size={14} color={COLORS.DANGER} />
-                        </Pressable>
-                      </View>
-                    );
-                  }
-
-                  return (
-                    <Pressable 
-                      key={s.id} 
-                      style={styles.setTag}
-                      onPress={() => handleStartEdit(ex.id, s)}
-                    >
-                      <Text style={styles.setTagText}>
-                        {s.weight}<Text style={styles.setTagX}>×</Text>{s.reps}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <Clock size={12} color={COLORS.ACCENT_YELLOW} />
+                <Text style={styles.metaText}>{formatDuration(session.startedAt, session.completedAt)}</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Dumbbell size={12} color={COLORS.ACCENT_GREEN} />
+                <Text style={styles.metaText}>{session.exercises.length} exercises</Text>
               </View>
             </View>
-          ))}
+
+            {!isExpanded && (
+              <Text style={styles.summary} numberOfLines={1}>
+                {exerciseSummary}
+              </Text>
+            )}
+          </Pressable>
         </View>
-      )}
-    </View>
+
+        {isExpanded && (
+          <View style={[styles.detailsContainer, { paddingHorizontal: 12, paddingBottom: 12 }]}>
+            <View style={styles.divider} />
+            {session.exercises.map((ex) => (
+              <View key={ex.id} style={styles.exerciseDetailItem}>
+                <Text style={styles.exerciseDetailName}>{toTitleCase(ex.name)}</Text>
+                <View style={styles.setsList}>
+                  {ex.sets.map((s, sIdx) => {
+                    const isEditing = editingSet?.setId === s.id;
+                    
+                    if (isEditing) {
+                      return (
+                        <View key={s.id} style={styles.editRow}>
+                          <TextInput
+                            style={styles.editInput}
+                            value={editingSet.weight}
+                            onChangeText={(v) => setEditingSet({ ...editingSet, weight: v })}
+                            keyboardType="numeric"
+                            autoFocus
+                          />
+                          <Text style={styles.setTagX}>×</Text>
+                          <TextInput
+                            style={styles.editInput}
+                            value={editingSet.reps}
+                            onChangeText={(v) => setEditingSet({ ...editingSet, reps: v })}
+                            keyboardType="numeric"
+                          />
+                          <Pressable onPress={handleSaveEdit} style={styles.editIcon}>
+                            <Check size={14} color={COLORS.ACCENT_GREEN} />
+                          </Pressable>
+                          <Pressable onPress={() => setEditingSet(null)} style={styles.editIcon}>
+                            <X size={14} color={COLORS.DANGER} />
+                          </Pressable>
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <Pressable 
+                        key={s.id} 
+                        style={styles.setTag}
+                        onPress={() => handleStartEdit(ex.id, s)}
+                      >
+                        <Text style={styles.setTagText}>
+                          {s.weight}<Text style={styles.setTagX}>×</Text>{s.reps}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </Swipeable>
   );
 };
+
 
 // ──────────────────────────────────────────────
 // WorkoutHistoryScreen
@@ -214,6 +248,10 @@ const WorkoutSessionCard = ({ session, programName, onDelete }: WorkoutSessionCa
 export default function WorkoutHistoryScreen() {
   const router = useAppRouter();
   const allHistory = useWorkoutSessionStore((s) => s.history);
+  const isSyncing = useSyncStore((s) => s.isSyncing);
+  const runFullSync = useSyncStore((s) => s.runFullSync);
+  
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   
   const history = useMemo(() => 
     allHistory.filter(s => !s.deletedAt), 
@@ -289,6 +327,18 @@ export default function WorkoutHistoryScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={scrollEnabled}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={isSyncing}
+              onRefresh={() => runFullSync()}
+              tintColor={COLORS.ACCENT_BLUE}
+              colors={[COLORS.ACCENT_BLUE]}
+              progressBackgroundColor={COLORS.CARD_BG}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Clock size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
@@ -301,25 +351,15 @@ export default function WorkoutHistoryScreen() {
               session={item}
               programName={item.programId ? getProgramById(item.programId)?.name : undefined}
               onDelete={handleDelete}
+              onToggleScroll={setScrollEnabled}
             />
           )}
           ListFooterComponent={
-            hasMoreToShow ? (
-              <Pressable 
-                style={[styles.loadMoreBtn, loadingMore && { opacity: 0.5 }]} 
-                onPress={handleLoadMore}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <ActivityIndicator size="small" color={COLORS.TEXT_SECONDARY} />
-                ) : (
-                  <>
-                    <Text style={styles.loadMoreText}>Load More</Text>
-                    <ChevronDown size={16} color={COLORS.TEXT_SECONDARY} />
-                  </>
-                )}
-              </Pressable>
-            ) : <View style={{ height: 40 }} />
+            loadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={COLORS.ACCENT_BLUE} />
+              </View>
+            ) : <View style={{ height: 100 }} />
           }
         />
       </View>
@@ -367,9 +407,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dateText: {
-    color: COLORS.TEXT_TERTIARY,
+    color: COLORS.ACCENT_BLUE,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -413,10 +453,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   exerciseDetailName: {
-    color: COLORS.TEXT_PRIMARY,
+    color: COLORS.ACCENT_BLUE,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
     marginBottom: 8,
+    letterSpacing: -0.3,
   },
   setsList: {
     flexDirection: "row",
@@ -424,17 +465,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   setTag: {
-    backgroundColor: "#1D1D21",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: "rgba(11, 130, 255, 0.05)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(11, 130, 255, 0.1)",
   },
   setTagText: {
-    color: COLORS.TEXT_SECONDARY,
+    color: COLORS.TEXT_PRIMARY,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   setTagX: {
     color: COLORS.TEXT_TERTIARY,
@@ -475,6 +516,11 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_SECONDARY,
     fontSize: 14,
     fontWeight: "700",
+  },
+  footerLoader: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyContainer: {
     alignItems: "center",

@@ -34,6 +34,7 @@ function createEmptyExercise(): ExerciseFormData {
     defaultSets: 3,
     restSeconds: 90,
     notes: "",
+    weightUnit: "kg",
   };
 }
 
@@ -97,6 +98,7 @@ export default function CreateProgramScreen() {
         defaultSets: e.defaultSets,
         restSeconds: e.restSeconds,
         notes: e.notes.trim(),
+        weightUnit: e.weightUnit || "kg",
       }))
     );
 

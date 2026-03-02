@@ -36,7 +36,7 @@ router.put('/', async (req, res) => {
   try {
     const program = await Program.findOneAndUpdate(
       { _id: programData._id },
-      { ...programData, deletedAt: null }, // Reset deletedAt if re-uploaded
+      { ...programData }, // Respect deletedAt
       { upsert: true, new: true }
     );
     res.json(program);
@@ -56,7 +56,7 @@ router.put('/batch', async (req, res) => {
     const ops = programs.map((p) => ({
       updateOne: {
         filter: { _id: p._id },
-        update: { ...p, deletedAt: null },
+        update: { ...p },
         upsert: true,
       },
     }));
