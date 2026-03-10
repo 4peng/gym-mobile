@@ -26,7 +26,14 @@ import {
   X 
 } from "lucide-react-native";
 import { useAppRouter } from "@/utils/navigation";
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import {
+  useDeleteHistorySession,
+  useFetchMoreWorkoutHistory,
+  useHasMoreWorkoutHistory,
+  useUpdateHistorySet,
+  useUpdateSessionDate,
+  useWorkoutHistory,
+} from "@/stores/workoutHistoryStore";
 import { useProgramStore } from "@/stores/programStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { COLORS } from "@/constants/colors";
@@ -72,8 +79,8 @@ interface WorkoutSessionCardProps {
 
 const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: WorkoutSessionCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
-  const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
+  const updateHistorySet = useUpdateHistorySet();
+  const updateSessionDate = useUpdateSessionDate();
   
   const [editingSet, setEditingSet] = useState<{
     exerciseId: string;
@@ -99,7 +106,7 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
           { text: "Cancel", style: "cancel" },
           { 
             text: "Save", 
-            onPress: (newDate) => {
+            onPress: (newDate?: string) => {
               if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
                 // Keep the time part if possible
                 const oldTime = currentFullDate.split('T')[1] || "12:00:00.000Z";
@@ -247,7 +254,7 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
 
 export default function WorkoutHistoryScreen() {
   const router = useAppRouter();
-  const allHistory = useWorkoutSessionStore((s) => s.history);
+  const allHistory = useWorkoutHistory();
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const runFullSync = useSyncStore((s) => s.runFullSync);
   
@@ -258,9 +265,9 @@ export default function WorkoutHistoryScreen() {
     [allHistory]
   );
 
-  const hasMoreHistoryOnServer = useWorkoutSessionStore((s) => s.hasMoreHistory);
-  const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);
-  const fetchMoreHistory = useWorkoutSessionStore((s) => s.fetchMoreHistory);
+  const hasMoreHistoryOnServer = useHasMoreWorkoutHistory();
+  const deleteHistorySession = useDeleteHistorySession();
+  const fetchMoreHistory = useFetchMoreWorkoutHistory();
   const getProgramById = useProgramStore((s) => s.getProgramById);
   
   const [displayLimit, setDisplayLimit] = useState(10);

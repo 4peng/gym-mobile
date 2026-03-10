@@ -7,6 +7,10 @@
 
 import { create } from "zustand";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WORKOUT_STATS_KEY } from "@/storage/workoutStatsStorage";
+
+const APP_STORAGE_KEYS = ["program-store", "workout-session-store", WORKOUT_STATS_KEY] as const;
+const APP_STORAGE_PREFIXES = ["workout_"] as const;
 
 interface SyncState {
   isSyncing: boolean;
@@ -78,12 +82,35 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
     set({ isSyncing: true, isManualSync: true, lastSyncAttempt: Date.now() });
 
     try {
-      // 1. Wipe EVERYTHING from local storage (hard reset)
-      await AsyncStorage.clear();
+      // 1. Remove only app-owned keys to avoid wiping unrelated app/SDK state.
+      const allKeys = await AsyncStorage.getAllKeys();
+      const appKeys = allKeys.filter((key) => {
+        if ((APP_STORAGE_KEYS as readonly string[]).includes(key)) return true;
+        return (APP_STORAGE_PREFIXES as readonly string[]).some((prefix) => key.startsWith(prefix));
+      });
+      if (appKeys.length > 0) {
+        await AsyncStorage.multiRemove(appKeys);
+      }
 
       // 2. Reset in-memory state
-      useProgramStore.setState({ lastSyncedAt: null, programs: [] });
-      useWorkoutSessionStore.setState({ lastSyncedAt: null, history: [], deletedWorkoutIds: [] });
+      useProgramStore.setState({
+        programs: [],
+        deletedProgramIds: [],
+        isDirty: false,
+        lastSyncedAt: null,
+      });
+      useWorkoutSessionStore.setState({
+        activeSession: null,
+        history: [],
+        historyIndex: [],
+        deletedWorkoutIds: [],
+        dirtyWorkoutIds: [],
+        hasMoreHistory: true,
+        activeRestTimer: null,
+        pinnedExerciseNames: [],
+        isDirty: false,
+        lastSyncedAt: null,
+      });
 
       // 3. Run sync (it will now be a full sync because local is empty)
       const success = await engineRunFullSync();

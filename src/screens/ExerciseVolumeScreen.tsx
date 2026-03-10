@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,17 +13,23 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  PanResponder,
 } from "react-native";
 import { ChevronLeft, Calendar, Zap, Check, X, ChevronDown, Trophy, Activity, TrendingUp } from "lucide-react-native";
-import Svg, { Rect, Line, Path, Text as SvgText, Circle, G } from "react-native-svg";
+import Svg, { Path, Line, Text as SvgText, Rect, G } from "react-native-svg";
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { workoutStorage } from "@/storage/workoutStorage";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
+import MuscleSelector from "@/src/components/MuscleSelector";
+import { MuscleGroup } from "@/constants/muscles";
 import { toTitleCase } from "@/utils/string";
 import { convertWeight } from "@/utils/conversions";
 import { Swipeable } from "@/src/components/Swipeable";
+import { HapticFeedback } from "@/src/utils/haptics";
+import { WorkoutSession } from "@/src/types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_HEIGHT = 220;
@@ -37,11 +43,15 @@ interface ExerciseVolumeScreenProps {
 
 export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScreenProps) {
   const router = useAppRouter();
-  const allHistory = useWorkoutSessionStore((s) => s.history);
+  const historyCache = useWorkoutSessionStore((s) => s.history);
+  const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
   const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);
   const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
   const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
+  const updateMusclesInHistory = useWorkoutSessionStore((s) => s.updateMusclesInHistory);
   
+  const [loading, setLoading] = useState(true);
+  const [localFullHistory, setLocalFullHistory] = useState<WorkoutSession[]>([]);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [range, setRange] = useState<TimeRange>("30D");
   const [displayLimit, setDisplayLimit] = useState(10);
@@ -54,10 +64,60 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
     reps: string;
   } | null>(null);
 
-  const history = useMemo(() => 
-    allHistory.filter(s => !s.deletedAt), 
-    [allHistory]
-  );
+  /**
+   * Shard Hydration Strategy:
+   * Since the main store only keeps ~15 sessions in RAM, we manually
+   * load ALL relevant shards from disk to ensure the chart is complete.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    const loadShards = async () => {
+      setLoading(true);
+      try {
+        // 1. Identify which IDs we already have in the 15-session RAM cache
+        const cachedIds = new Set(historyCache.map(s => s._id));
+        
+        // 2. Identify missing IDs from the global index
+        const missingIds = historyIndex.filter(id => !cachedIds.has(id));
+        
+        // 3. Load all missing shards from disk (Multi-get is efficient)
+        const shards = await workoutStorage.getBatch(missingIds);
+        
+        // 4. Combine and filter for the target exercise
+        const combined = [...historyCache, ...shards]
+          .filter(s => !s.deletedAt && s.exercises.some(e => e.name.toLowerCase() === exerciseName.toLowerCase()))
+          .sort((a, b) => {
+            const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+            const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+        if (isMounted) {
+          setLocalFullHistory(combined);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Failed to hydrate shards for trends:", err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadShards();
+    return () => { isMounted = false; };
+  }, [exerciseName, historyIndex, historyCache]);
+
+  const history = localFullHistory;
+
+  const currentMuscles = useMemo(() => {
+    // Find the most recent session that has this exercise to get its categories
+    const lastSession = history.find(s => s.exercises.some(e => e.name.toLowerCase() === exerciseName.toLowerCase()));
+    const ex = lastSession?.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase());
+    return ex?.muscles || [];
+  }, [history, exerciseName]);
+
+  const handleMusclesChange = (muscles: MuscleGroup[]) => {
+    updateMusclesInHistory(exerciseName, muscles);
+  };
 
   // ── Data Processing ────────────────────────
   
@@ -80,7 +140,6 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
     }
 
     // High Impact Stats
-    let globalMaxWeight = 0;
     let max1RM = 0;
     let maxDailyVolume = 0;
     let lastVolume = 0;
@@ -90,7 +149,6 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
       s.exercises.forEach(ex => {
         if (ex.name.toLowerCase() === exerciseName.toLowerCase()) {
           ex.sets.forEach(set => {
-            if (set.weight && set.weight > globalMaxWeight) globalMaxWeight = set.weight;
             if (set.weight && set.reps) {
               const current1RM = set.weight * (1 + set.reps / 30);
               if (current1RM > max1RM) max1RM = current1RM;
@@ -146,21 +204,17 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
 
       sessionExercises.forEach(exercise => {
         let totalExerciseVolume = 0;
-        let exerciseMaxWeight = 0;
         const completedSets: any[] = [];
 
         exercise.sets.forEach(s => {
           if (s.completedAt && s.weight !== null && s.reps !== null) {
             const normalizedWeight = convertWeight(s.weight, exercise.weightUnit || "kg", targetUnit) || 0;
             totalExerciseVolume += normalizedWeight * s.reps;
-            if (s.weight > exerciseMaxWeight) exerciseMaxWeight = s.weight;
             completedSets.push({ ...s, sessionId: session._id, exerciseId: exercise.id });
           }
         });
 
         if (completedSets.length > 0) {
-          const isPRSession = exerciseMaxWeight === globalMaxWeight && globalMaxWeight > 0;
-          
           if (!logsByDate[dateKey]) {
             logsByDate[dateKey] = {
               id: dateKey,
@@ -175,7 +229,6 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
           logsByDate[dateKey].volume += totalExerciseVolume;
           logsByDate[dateKey].sets = [...logsByDate[dateKey].sets, ...completedSets];
           logsByDate[dateKey].sessionIds.add(session._id);
-          if (isPRSession) logsByDate[dateKey].isPR = true;
 
           // Add to chart buckets
           data.forEach(bucket => {
@@ -187,14 +240,28 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
       });
     });
 
-    const sessionLogs = Object.values(logsByDate).sort((a: any, b: any) => b.rawDate - a.rawDate);
-    
-    // Calculate final stats from grouped data
-    if (sessionLogs.length > 0) {
-      lastVolume = sessionLogs[0].volume;
-      maxDailyVolume = Math.max(...sessionLogs.map((log: any) => log.volume));
+    const rawLogs = Object.values(logsByDate) as any[];
+
+    if (rawLogs.length > 0) {
+      maxDailyVolume = Math.max(...rawLogs.map((log: any) => log.volume));
+      rawLogs.forEach((log: any) => {
+        log.isPR = maxDailyVolume > 0 && log.volume === maxDailyVolume;
+      });
+
+      const latestLog = rawLogs.reduce((latest: any, log: any) =>
+        log.rawDate > latest.rawDate ? log : latest
+      );
+      lastVolume = latestLog.volume;
     }
 
+    const sessionLogs = rawLogs.sort((a: any, b: any) => {
+      // Pin PRs to the top
+      if (a.isPR && !b.isPR) return -1;
+      if (!a.isPR && b.isPR) return 1;
+      // Otherwise reverse chronological
+      return b.rawDate - a.rawDate;
+    });
+    
     // Set PR star to the highest volume bar in the CURRENT chart view
     const chartMaxVolume = Math.max(...data.map(d => d.value));
     if (chartMaxVolume > 0) {
@@ -255,10 +322,10 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
         { text: "Cancel", style: "cancel" },
         { 
           text: "Save", 
-          onPress: (newDate) => {
+          onPress: (newDate?: string) => {
             if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
               ids.forEach(id => {
-                const session = allHistory.find(s => s._id === id);
+                const session = history.find(s => s._id === id);
                 if (session) {
                   const oldTime = (session.completedAt || session.startedAt).split('T')[1] || "12:00:00.000Z";
                   updateSessionDate(id, `${newDate}T${oldTime}`);
@@ -296,6 +363,72 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
   const handleBucketPress = (idx: number) => setActiveBucketIdx(activeBucketIdx === idx ? null : idx);
   const selectedBucket = activeBucketIdx !== null ? buckets[activeBucketIdx] : null;
 
+  const chartPanResponder = useMemo(
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        // Expand touch area by accounting for the expanded overlay offset
+        const x = evt.nativeEvent.locationX - 60; 
+        const step = barWidth + gap;
+        const rawIndex = Math.max(0, Math.min(buckets.length - 1, Math.round(x / step)));
+        
+        // Find nearest bucket with data
+        let resolvedIndex = -1;
+        let minDistance = Infinity;
+        buckets.forEach((b, i) => {
+          if (b.value > 0) {
+            const dist = Math.abs(i - rawIndex);
+            if (dist < minDistance) {
+              minDistance = dist;
+              resolvedIndex = i;
+            }
+          }
+        });
+
+        if (resolvedIndex !== -1) {
+          setActiveBucketIdx(prev => {
+            if (prev === resolvedIndex) {
+              HapticFeedback.light();
+              return null;
+            }
+            HapticFeedback.selection();
+            return resolvedIndex;
+          });
+        }
+      },
+      onPanResponderMove: (evt) => {
+        const x = evt.nativeEvent.locationX - 60;
+        const step = barWidth + gap;
+        const rawIndex = Math.max(0, Math.min(buckets.length - 1, Math.round(x / step)));
+
+        // Find nearest bucket with data
+        let resolvedIndex = -1;
+        let minDistance = Infinity;
+        buckets.forEach((b, i) => {
+          if (b.value > 0) {
+            const dist = Math.abs(i - rawIndex);
+            if (dist < minDistance) {
+              minDistance = dist;
+              resolvedIndex = i;
+            }
+          }
+        });
+
+        if (resolvedIndex !== -1) {
+          setActiveBucketIdx(prev => {
+            if (prev !== resolvedIndex) {
+              HapticFeedback.selection();
+              return resolvedIndex;
+            }
+            return prev;
+          });
+        }
+      },
+    }),
+    [chartWidth, buckets, barWidth, gap]
+  );
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
       <View style={styles.container}>
@@ -314,6 +447,15 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} scrollEnabled={scrollEnabled} onScroll={handleScroll} scrollEventThrottle={16}>
           <Text style={styles.title}>Volume Trends:{"\n"}<Text style={{ color: COLORS.ACCENT_GREEN }}>{toTitleCase(exerciseName)}</Text></Text>
+
+          {/* Muscle Category Editor */}
+          <View style={styles.categorySection}>
+            <MuscleSelector 
+              selectedMuscles={currentMuscles}
+              onSelect={handleMusclesChange}
+              label="Exercise Categories"
+            />
+          </View>
 
           {/* Strong Minimal Stats Row */}
           <View style={styles.statsRow}>
@@ -346,45 +488,64 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
               )}
             </View>
 
-            <Svg width={chartWidth + 60} height={CHART_HEIGHT + 40}>
-              <SvgText x="35" y="10" fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" fontFamily={FONT_FAMILIES.MEDIUM} textAnchor="start" letterSpacing="0.5">{yLabel}</SvgText>
+            <View style={{ alignItems: 'center' }}>
+              <Svg width={chartWidth + 60} height={CHART_HEIGHT + 40}>
+                <SvgText x="35" y="10" fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" fontFamily={FONT_FAMILIES.MEDIUM} textAnchor="start" letterSpacing="0.5">{yLabel}</SvgText>
 
-              {[0, 0.5, 1].map((v) => {
-                const y = CHART_HEIGHT - (v * 150 + 20);
-                const label = Math.round(v * maxVolume);
-                return (
-                  <React.Fragment key={v}>
-                    <Line x1="40" y1={y} x2={chartWidth + 40} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                    <SvgText x="32" y={y + 4} fill={COLORS.TEXT_TERTIARY} fontSize="10" fontWeight="800" textAnchor="end" fontFamily={FONT_FAMILIES.MEDIUM}>{label >= 1000 ? `${(label / 1000).toFixed(1)}k` : label}</SvgText>
-                  </React.Fragment>
-                );
-              })}
+                {[0, 0.5, 1].map((v) => {
+                  const y = CHART_HEIGHT - (v * 150 + 20);
+                  const label = Math.round(v * maxVolume);
+                  return (
+                    <React.Fragment key={v}>
+                      <Line x1="40" y1={y} x2={chartWidth + 40} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                      <SvgText x="32" y={y + 4} fill={COLORS.TEXT_TERTIARY} fontSize="10" fontWeight="800" textAnchor="end" fontFamily={FONT_FAMILIES.MEDIUM}>{label >= 1000 ? `${(label / 1000).toFixed(1)}k` : label}</SvgText>
+                    </React.Fragment>
+                  );
+                })}
 
-              {buckets.map((d, i) => {
-                const barHeight = (d.value / maxVolume) * (CHART_HEIGHT - 60);
-                const x = 40 + i * (barWidth + gap);
-                const y = CHART_HEIGHT - barHeight - 20;
-                const isActive = activeBucketIdx === i;
-                const hitWidth = barWidth + gap;
-                const hitX = x - gap / 2;
+                {buckets.map((d, i) => {
+                  const barHeight = (d.value / maxVolume) * (CHART_HEIGHT - 60);
+                  const x = 40 + i * (barWidth + gap);
+                  const y = CHART_HEIGHT - barHeight - 20;
+                  const isActive = activeBucketIdx === i;
 
-                return (
-                  <G key={i}>
-                    <Rect x={hitX} y={0} width={hitWidth} height={CHART_HEIGHT + 20} fill="transparent" onPress={() => { if (d.value > 0) handleBucketPress(i); }} />
-                    <Rect x={x} y={y} width={barWidth} height={Math.max(2, barHeight)} fill={d.value === 0 ? "rgba(255,255,255,0.05)" : (isActive ? COLORS.ACCENT_BLUE : "rgba(11, 130, 255, 0.6)")} rx={barWidth / 2} pointerEvents="none" />
-                    {d.hasPR && <SvgText x={x + barWidth / 2} y={y - 8} fill={isActive ? COLORS.ACCENT_YELLOW : "rgba(250, 204, 0, 0.8)"} fontSize="10" fontWeight="900" textAnchor="middle" pointerEvents="none">★</SvgText>}
-                  </G>
-                );
-              })}
+                  return (
+                    <G key={i}>
+                      <Rect 
+                        x={x} 
+                        y={y} 
+                        width={barWidth} 
+                        height={Math.max(2, barHeight)} 
+                        fill={d.value === 0 ? "rgba(255,255,255,0.05)" : (isActive ? COLORS.ACCENT_BLUE : "rgba(11, 130, 255, 0.6)")} 
+                        rx={barWidth / 2} 
+                      />
+                      {d.hasPR && <SvgText x={x + barWidth / 2} y={y - 8} fill={isActive ? COLORS.ACCENT_YELLOW : "rgba(250, 204, 0, 0.8)"} fontSize="10" fontWeight="900" textAnchor="middle" pointerEvents="none">★</SvgText>}
+                    </G>
+                  );
+                })}
 
-              {buckets.map((d, i) => {
-                if (!d.label) return null;
-                return <SvgText key={`date-${i}`} x={40 + i * (barWidth + gap) + barWidth / 2} y={CHART_HEIGHT + 10} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="800" textAnchor="middle" fontFamily={FONT_FAMILIES.MEDIUM}>{d.label}</SvgText>;
-              })}
+                {buckets.map((d, i) => {
+                  if (!d.label) return null;
+                  return <SvgText key={`date-${i}`} x={40 + i * (barWidth + gap) + barWidth / 2} y={CHART_HEIGHT + 10} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="800" textAnchor="middle" fontFamily={FONT_FAMILIES.MEDIUM}>{d.label}</SvgText>;
+                })}
 
-              <SvgText x={chartWidth / 2 + 40} y={CHART_HEIGHT + 30} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" textAnchor="middle" fontFamily={FONT_FAMILIES.MEDIUM} letterSpacing="1">DATE</SvgText>
-              {linePath ? <Path d={linePath} fill="none" stroke={COLORS.ACCENT_GREEN} strokeWidth={2.5} opacity={0.8} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" /> : null}
-            </Svg>
+                <SvgText x={chartWidth / 2 + 40} y={CHART_HEIGHT + 30} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" textAnchor="middle" fontFamily={FONT_FAMILIES.MEDIUM} letterSpacing="1">DATE</SvgText>
+                {linePath ? <Path d={linePath} fill="none" stroke={COLORS.ACCENT_GREEN} strokeWidth={2.5} opacity={0.8} strokeLinecap="round" strokeLinejoin="round" /> : null}
+              </Svg>
+              
+              {/* Invisible High-Performance Touch Overlay */}
+              <View 
+                {...chartPanResponder.panHandlers}
+                style={{
+                  position: 'absolute',
+                  left: -20,
+                  top: 0,
+                  width: chartWidth + 100,
+                  height: CHART_HEIGHT + 40,
+                  backgroundColor: 'transparent',
+                }} 
+              />
+            </View>
           </View>
 
           <View style={styles.logsSection}>
@@ -401,16 +562,20 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
               <View style={{ gap: 0 }}>
                 {sessionLogs.slice(0, displayLimit).map((log) => (
                   <Swipeable key={log.id} onDelete={() => handleDeleteSession(log.sessionIds)} onToggleScroll={setScrollEnabled}>
-                    <View style={[UI.SHARED.card, { marginBottom: 0, borderRadius: 0 }]}>
+                    <View style={[
+                      UI.SHARED.card, 
+                      { marginBottom: 0, borderRadius: 32 },
+                      log.isPR && { borderColor: COLORS.ACCENT_YELLOW, borderWidth: 3 }
+                    ]}>
                       <View style={styles.logCardHeader}>
                         <Pressable onPress={() => handleEditDate(log.sessionIds, log.rawDate.toISOString())} style={({ pressed }) => [styles.dateRow, pressed && { opacity: 0.6 }]}><Calendar size={14} color={COLORS.TEXT_TERTIARY} /><Text style={styles.logDate}>{log.date}</Text></Pressable>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                           {log.isPR && (
-                            <View style={styles.prBadge}>
+                            <View style={[styles.prBadge, { backgroundColor: "rgba(250, 204, 0, 0.2)" }]}>
                               <Text style={styles.prBadgeText}>PR</Text>
                             </View>
                           )}
-                          <Text style={styles.logVolume}>{Math.round(log.volume)} {unit}</Text>
+                          <Text style={[styles.logVolume, log.isPR && { color: COLORS.ACCENT_YELLOW }]}>{Math.round(log.volume)} {unit}</Text>
                         </View>
                       </View>
                       <View style={styles.setsList}>
@@ -419,9 +584,9 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
                           if (isEditing) {
                             return (
                               <View key={s.id} style={styles.editRow}>
-                                <TextInput style={styles.editInput} value={editingSet.weight} onChangeText={(v) => setEditingSet({ ...editingSet, weight: v })} keyboardType="numeric" autoFocus />
+                                <TextInput style={styles.editInput} value={editingSet?.weight ?? ""} onChangeText={(v) => setEditingSet((prev) => (prev ? { ...prev, weight: v } : prev))} keyboardType="numeric" autoFocus />
                                 <Text style={styles.setTagX}>×</Text>
-                                <TextInput style={styles.editInput} value={editingSet.reps} onChangeText={(v) => setEditingSet({ ...editingSet, reps: v })} keyboardType="numeric" />
+                                <TextInput style={styles.editInput} value={editingSet?.reps ?? ""} onChangeText={(v) => setEditingSet((prev) => (prev ? { ...prev, reps: v } : prev))} keyboardType="numeric" />
                                 <Pressable onPress={handleSaveEdit} style={styles.editIcon}><Check size={16} color={COLORS.ACCENT_GREEN} /></Pressable>
                                 <Pressable onPress={() => setEditingSet(null)} style={styles.editIcon}><X size={16} color={COLORS.DANGER} /></Pressable>
                               </View>
@@ -452,7 +617,10 @@ const styles = StyleSheet.create({
   rangeText: { color: COLORS.TEXT_TERTIARY, fontSize: 12, fontWeight: "800" },
   rangeTextActive: { color: COLORS.TEXT_PRIMARY },
   content: { paddingHorizontal: UI.LAYOUT_PADDING, paddingBottom: 120 },
-  title: { color: COLORS.TEXT_PRIMARY, fontSize: 32, fontWeight: "900", letterSpacing: -1, lineHeight: 38, fontFamily: FONT_FAMILIES.MEDIUM, marginTop: 20, marginBottom: 32 },
+  title: { color: COLORS.TEXT_PRIMARY, fontSize: 32, fontWeight: "900", letterSpacing: -1, lineHeight: 38, fontFamily: FONT_FAMILIES.MEDIUM, marginTop: 20, marginBottom: 24 },
+  categorySection: {
+    marginBottom: 32,
+  },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
   statItem: { flex: 1 },
   statLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },

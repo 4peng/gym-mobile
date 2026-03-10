@@ -11,9 +11,11 @@ import {
   ScrollView,
   Animated,
   RefreshControl,
+  Modal,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Play, Plus, ChevronRight, Activity, BarChart2, Clock, Settings, Pin } from "lucide-react-native";
+import { Play, Plus, ChevronRight, Activity, BarChart2, Clock, Settings, Pin, Zap, X } from "lucide-react-native";
 import { useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
@@ -43,10 +45,25 @@ export default function ProgramsListScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const [scrollEnabled, setScrollEnabled] = React.useState(true);
-  
-  React.useEffect(() => {
-    repairCorruptedData();
-  }, [repairCorruptedData]);
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const animation = useRef(new Animated.Value(0)).current;
+
+  const toggleMenu = useCallback(() => {
+    const toValue = isExpanded ? 0 : 1;
+    Animated.spring(animation, {
+      toValue,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+    setIsExpanded(!isExpanded);
+  }, [isExpanded, animation]);
+
+  const activeSession = useWorkoutSessionStore((s) => s.activeSession);
+  const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
+  const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
+  const allHistory = useWorkoutSessionStore((s) => s.history);
+  const history = useMemo(() => allHistory.filter(s => !s.deletedAt), [allHistory]);
 
   const programs = useMemo(() => {
     return [...allPrograms]
@@ -57,14 +74,7 @@ export default function ProgramsListScreen() {
         return 0;
       });
   }, [allPrograms]);
-  
-  const allHistory = useWorkoutSessionStore((s) => s.history);
-  const history = useMemo(() => allHistory.filter(s => !s.deletedAt), [allHistory]);
-  
-  const activeSession = useWorkoutSessionStore((s) => s.activeSession);
-  const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
-  const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
-  
+
   const router = useAppRouter();
 
   const todayStr = useMemo(() => {
@@ -84,23 +94,29 @@ export default function ProgramsListScreen() {
         "You already have a workout in progress. Discard it and start this one?",
         () => {
           startFromProgram(program);
-          router.push("/workout");
+          router.replace("/workout");
         }
       );
     } else {
       startFromProgram(program);
-      router.push("/workout");
+      router.replace("/workout");
     }
   }, [activeSession, startFromProgram, router]);
 
-  const handleQuickStart = useCallback(() => {
+  const handleQuickStartAction = useCallback(() => {
+    if (isExpanded) toggleMenu();
     if (activeSession) {
-      router.push("/workout");
+      router.replace("/workout");
     } else {
       startQuickSession();
-      router.push("/workout");
+      router.replace("/workout");
     }
-  }, [activeSession, startQuickSession, router]);
+  }, [activeSession, startQuickSession, router, isExpanded, toggleMenu]);
+
+  const handleSelectProgramAction = useCallback((program: Program) => {
+    if (isExpanded) toggleMenu();
+    handleStartProgram(program);
+  }, [handleStartProgram, isExpanded, toggleMenu]);
 
   const handleDelete = useCallback((id: string, name: string) => {
     showConfirm(
@@ -156,10 +172,10 @@ export default function ProgramsListScreen() {
                 <Settings size={22} color={COLORS.TEXT_TERTIARY} />
               </Pressable>
               <Pressable 
-                onPress={handleQuickStart} 
+                onPress={handleCreate} 
                 style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
               >
-                <Play size={24} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+                <Plus size={24} color={COLORS.ACCENT_BLUE} strokeWidth={2.5} />
               </Pressable>
             </View>
           </View>
@@ -240,16 +256,102 @@ export default function ProgramsListScreen() {
         </Animated.ScrollView>
       </SafeAreaView>
 
-      {/* Floating Action Button */}
-      <Pressable 
-        onPress={handleCreate} 
-        style={({ pressed }) => [
-          styles.fab,
-          pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 }
-        ]}
-      >
-        <Plus size={28} color={COLORS.TEXT_PRIMARY} strokeWidth={3} />
-      </Pressable>
+      {/* Speed Dial Menu Overlay */}
+      {isExpanded && (
+        <Pressable 
+          style={StyleSheet.absoluteFill} 
+          onPress={toggleMenu}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+        </Pressable>
+      )}
+
+      <View style={styles.fabContainer}>
+        {/* Sub-buttons (Routines) */}
+        {programs.slice(0, 3).map((p, i) => {
+          const translateY = animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, -70 * (i + 2)],
+          });
+          const opacity = animation.interpolate({
+            inputRange: [0, 0.5, 1],
+            outputRange: [0, 0, 1],
+          });
+
+          return (
+            <Animated.View
+              key={p._id}
+              style={[
+                styles.subFabWrapper,
+                { transform: [{ translateY }], opacity }
+              ]}
+            >
+              <Text style={styles.subFabLabel}>{p.name}</Text>
+              <Pressable
+                onPress={() => handleSelectProgramAction(p)}
+                style={({ pressed }) => [
+                  styles.subFab,
+                  pressed && { opacity: 0.8 }
+                ]}
+              >
+                <Activity size={20} color={COLORS.ACCENT_BLUE} />
+              </Pressable>
+            </Animated.View>
+          );
+        })}
+
+        {/* Empty Workout Button */}
+        <Animated.View
+          style={[
+            styles.subFabWrapper,
+            {
+              transform: [{
+                translateY: animation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -70],
+                })
+              }],
+              opacity: animation
+            }
+          ]}
+        >
+          <Text style={styles.subFabLabel}>Empty Workout</Text>
+          <Pressable
+            onPress={handleQuickStartAction}
+            style={({ pressed }) => [
+              styles.subFab,
+              { backgroundColor: 'rgba(11, 130, 255, 0.1)', borderColor: 'rgba(11, 130, 255, 0.2)' },
+              pressed && { opacity: 0.8 }
+            ]}
+          >
+            <Zap size={20} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+          </Pressable>
+        </Animated.View>
+
+        {/* Main FAB */}
+        <Pressable 
+          onPress={toggleMenu} 
+          style={({ pressed }) => [
+            styles.fab,
+            pressed && { transform: [{ scale: 0.95 }] }
+          ]}
+        >
+          <Animated.View style={{
+            transform: [{
+              rotate: animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0deg', '45deg']
+              })
+            }]
+          }}>
+            {isExpanded ? (
+              <X size={28} color="#FFFFFF" strokeWidth={3} />
+            ) : (
+              <Play size={28} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 4 }} />
+            )}
+          </Animated.View>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -361,10 +463,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
-  fab: {
+  fabContainer: {
     position: "absolute",
     bottom: 40,
     right: 30,
+    alignItems: 'flex-end',
+  },
+  fab: {
     width: 68,
     height: 68,
     borderRadius: 34,
@@ -376,5 +481,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
+    zIndex: 10,
+  },
+  subFabWrapper: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    width: 250,
+    right: 0,
+    paddingRight: 8,
+  },
+  subFab: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.CARD_BG,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  subFabLabel: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 14,
+    fontWeight: '800',
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    marginRight: 16,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });

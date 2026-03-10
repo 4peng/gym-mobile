@@ -13,6 +13,7 @@ export interface ProgramExerciseServer {
   restSeconds: number;
   notes: string;
   weightUnit?: string;
+  muscles: string[];
 }
 
 export interface ProgramServer {
@@ -39,6 +40,7 @@ export interface WorkoutExerciseServer {
   notes: string;
   sets: WorkoutSetServer[];
   weightUnit?: string;
+  muscles: string[];
 }
 
 export interface WorkoutServer {

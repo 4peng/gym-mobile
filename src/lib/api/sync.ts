@@ -9,11 +9,13 @@
 
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { workoutStorage } from "@/storage/workoutStorage";
+import type { WorkoutSession } from "@/types";
 import { batchUpsertPrograms, fetchPrograms, deleteRemoteProgram } from "./programs";
 import { batchUpsertWorkouts, fetchWorkouts, deleteRemoteWorkout } from "./workouts";
-import type { Program, WorkoutSession } from "@/types";
 
 let _syncing = false;
+let _pendingSync = false;
 
 // ──────────────────────────────────────────────
 // Program sync
@@ -71,14 +73,39 @@ export async function syncWorkouts(): Promise<boolean> {
     }
   }
 
-  const completedLocal = store.history.filter((w) => !!w.completedAt);
-  const dirtyWorkouts = completedLocal.filter(
-    (w) => w.updatedAt >= (store.lastSyncedAt || 0) && !w.deletedAt
-  );
+  const dirtyIdSet = new Set(store.dirtyWorkoutIds);
+  const inMemoryById = new Map(store.history.map((workout) => [workout._id, workout]));
+  const dirtyWorkoutsById = new Map<string, WorkoutSession>();
+  const shardLoadIds: string[] = [];
+
+  for (const workoutId of dirtyIdSet) {
+    const inMemory = inMemoryById.get(workoutId);
+    if (inMemory) {
+      if (inMemory.completedAt && !inMemory.deletedAt) {
+        dirtyWorkoutsById.set(workoutId, inMemory);
+      }
+      continue;
+    }
+    shardLoadIds.push(workoutId);
+  }
+
+  if (shardLoadIds.length > 0) {
+    const fromShards = await workoutStorage.getBatch(shardLoadIds);
+    fromShards.forEach((workout) => {
+      if (workout.completedAt && !workout.deletedAt) {
+        dirtyWorkoutsById.set(workout._id, workout);
+      }
+    });
+  }
+
+  const dirtyWorkouts = Array.from(dirtyWorkoutsById.values());
 
   if (dirtyWorkouts.length > 0) {
     const result = await batchUpsertWorkouts(dirtyWorkouts);
     if (!result) return false;
+    useWorkoutSessionStore
+      .getState()
+      .clearDirtyWorkouts(dirtyWorkouts.map((workout) => workout._id));
   }
 
   const since = store.lastSyncedAt ? Math.max(0, store.lastSyncedAt - 10000) : undefined;
@@ -94,15 +121,24 @@ export async function syncWorkouts(): Promise<boolean> {
 // ──────────────────────────────────────────────
 
 export async function runFullSync(): Promise<boolean> {
-  if (_syncing) return false;
+  if (_syncing) {
+    _pendingSync = true;
+    return true;
+  }
   _syncing = true;
+  let allSuccessful = true;
 
   try {
-    const [programsOk, workoutsOk] = await Promise.all([
-      syncPrograms(),
-      syncWorkouts(),
-    ]);
-    return programsOk && workoutsOk;
+    do {
+      _pendingSync = false;
+      const [programsOk, workoutsOk] = await Promise.all([
+        syncPrograms(),
+        syncWorkouts(),
+      ]);
+      allSuccessful = allSuccessful && programsOk && workoutsOk;
+    } while (_pendingSync);
+
+    return allSuccessful;
   } finally {
     _syncing = false;
   }

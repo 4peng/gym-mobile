@@ -12,11 +12,12 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { ChevronLeft, Database, Download, ShieldAlert, Share2, RefreshCw } from "lucide-react-native";
+import { ChevronLeft, Database, Download, ShieldAlert, Share2, RefreshCw, Tags } from "lucide-react-native";
 import { useAppRouter } from "@/utils/navigation";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
+import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -29,6 +30,12 @@ export default function SettingsScreen() {
   const forceResync = useSyncStore((s) => s.forceResync);
   const programs = useProgramStore((s) => s.programs);
   const history = useWorkoutSessionStore((s) => s.history);
+  const showDetailedMuscleGroups = useUiPreferencesStore(
+    (s) => s.showDetailedMuscleGroups
+  );
+  const toggleDetailedMuscleGroups = useUiPreferencesStore(
+    (s) => s.toggleDetailedMuscleGroups
+  );
 
   const spinValue = useRef(new Animated.Value(0)).current;
 
@@ -131,6 +138,27 @@ export default function SettingsScreen() {
             <View style={styles.optionText}>
               <Text style={styles.optionLabel}>{isSyncing ? "Syncing..." : "Sync with Cloud"}</Text>
               <Text style={styles.optionDesc}>Push local changes and fetch updates</Text>
+            </View>
+          </Pressable>
+        </View>
+
+        <Text style={styles.sectionLabel}>Display</Text>
+        <View style={[UI.SHARED.card, { padding: 0, marginBottom: 24 }]}>
+          <Pressable
+            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
+            onPress={toggleDetailedMuscleGroups}
+          >
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
+              <Tags size={20} color={COLORS.ACCENT_BLUE} />
+            </View>
+            <View style={styles.optionText}>
+              <Text style={styles.optionLabel}>Detailed Muscle Groups</Text>
+              <Text style={styles.optionDesc}>Show advanced tags in muscle picker</Text>
+            </View>
+            <View style={[styles.togglePill, showDetailedMuscleGroups && styles.togglePillActive]}>
+              <Text style={[styles.toggleText, showDetailedMuscleGroups && styles.toggleTextActive]}>
+                {showDetailedMuscleGroups ? "ON" : "OFF"}
+              </Text>
             </View>
           </Pressable>
         </View>
@@ -246,6 +274,30 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "rgba(255,255,255,0.05)",
     marginHorizontal: 12,
+  },
+  togglePill: {
+    minWidth: 46,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  togglePillActive: {
+    backgroundColor: "rgba(11, 130, 255, 0.2)",
+    borderColor: "rgba(11, 130, 255, 0.4)",
+  },
+  toggleText: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  toggleTextActive: {
+    color: COLORS.ACCENT_BLUE,
   },
   infoText: {
     color: COLORS.TEXT_TERTIARY,

@@ -27,8 +27,23 @@ interface RestTimerPickerProps {
   onSave: (seconds: number) => void;
 }
 
-const MINUTES = Array.from({ length: 11 }, (_, i) => i); // 0-10 min
+const MINUTES = Array.from({ length: 21 }, (_, i) => i); // 0-20 min
 const SECONDS = Array.from({ length: 12 }, (_, i) => i * 5); // 0, 5, 10... 55 sec
+
+function getPickerSelection(totalSeconds: number) {
+  const safeTotal = Math.max(0, totalSeconds);
+  const minuteMax = MINUTES[MINUTES.length - 1];
+  const secondMax = SECONDS[SECONDS.length - 1];
+
+  const minuteValue = Math.min(Math.floor(safeTotal / 60), minuteMax);
+  const snappedSeconds = Math.round((safeTotal % 60) / 5) * 5;
+  const secondValue = Math.min(Math.max(snappedSeconds, 0), secondMax);
+
+  const minuteIndex = Math.max(0, MINUTES.indexOf(minuteValue));
+  const secondIndex = Math.max(0, SECONDS.indexOf(secondValue));
+
+  return { minuteValue, secondValue, minuteIndex, secondIndex };
+}
 
 export default function RestTimerPicker({
   visible,
@@ -36,31 +51,43 @@ export default function RestTimerPicker({
   onClose,
   onSave,
 }: RestTimerPickerProps) {
-  const [selectedMin, setSelectedMin] = useState(Math.floor(initialSeconds / 60));
-  const [selectedSec, setSelectedSec] = useState(initialSeconds % 60);
+  const initialSelection = getPickerSelection(initialSeconds);
+  const [selectedMin, setSelectedMin] = useState(initialSelection.minuteValue);
+  const [selectedSec, setSelectedSec] = useState(initialSelection.secondValue);
 
   const minListRef = useRef<FlatList>(null);
   const secListRef = useRef<FlatList>(null);
+  const isInitializingScroll = useRef(false);
 
-  // Initial scroll to position
+  // Sync wheel position to the current value every time the modal opens.
   useEffect(() => {
-    if (visible) {
-      const m = Math.floor(initialSeconds / 60);
-      const s = initialSeconds % 60;
-      setSelectedMin(m);
-      setSelectedSec(s);
-      
-      // Small delay to ensure list is rendered before scrolling
-      setTimeout(() => {
-        minListRef.current?.scrollToOffset({
-          offset: MINUTES.indexOf(m) * ITEM_HEIGHT,
-          animated: false,
-        });
-        secListRef.current?.scrollToOffset({
-          offset: SECONDS.indexOf(s) * ITEM_HEIGHT,
-          animated: false,
-        });
-      }, 100);
+    if (!visible) return;
+
+    const { minuteValue, secondValue, minuteIndex, secondIndex } = getPickerSelection(initialSeconds);
+    setSelectedMin(minuteValue);
+    setSelectedSec(secondValue);
+
+    isInitializingScroll.current = true;
+
+    const frame = requestAnimationFrame(() => {
+      minListRef.current?.scrollToOffset({
+        offset: minuteIndex * ITEM_HEIGHT,
+        animated: false,
+      });
+      secListRef.current?.scrollToOffset({
+        offset: secondIndex * ITEM_HEIGHT,
+        animated: false,
+      });
+    });
+
+    const doneTimer = setTimeout(() => {
+      isInitializingScroll.current = false;
+    }, 80);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(doneTimer);
+      isInitializingScroll.current = false;
     }
   }, [visible, initialSeconds]);
 
@@ -70,6 +97,7 @@ export default function RestTimerPicker({
   };
 
   const handleMinScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isInitializingScroll.current) return;
     const y = event.nativeEvent.contentOffset.y;
     const index = Math.round(y / ITEM_HEIGHT);
     if (index >= 0 && index < MINUTES.length) {
@@ -78,6 +106,7 @@ export default function RestTimerPicker({
   };
 
   const handleSecScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isInitializingScroll.current) return;
     const y = event.nativeEvent.contentOffset.y;
     const index = Math.round(y / ITEM_HEIGHT);
     if (index >= 0 && index < SECONDS.length) {
@@ -93,6 +122,8 @@ export default function RestTimerPicker({
     </View>
   );
 
+  const Spacer = () => <View style={{ height: ITEM_HEIGHT }} />;
+
   return (
     <Modal
       visible={visible}
@@ -101,6 +132,12 @@ export default function RestTimerPicker({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
+        {/* Sibling backdrop for closing on tap outside */}
+        <Pressable 
+          style={StyleSheet.absoluteFill} 
+          onPress={onClose} 
+        />
+        
         <View style={styles.container}>
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -130,10 +167,12 @@ export default function RestTimerPicker({
                   onMomentumScrollEnd={handleMinScroll}
                   onScrollEndDrag={handleMinScroll}
                   renderItem={({ item }) => renderItem(item)}
-                  contentContainerStyle={styles.listContent}
+                  ListHeaderComponent={Spacer}
+                  ListFooterComponent={Spacer}
                   getItemLayout={(_, index) => (
                     { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
                   )}
+                  scrollEventThrottle={16}
                 />
               </View>
 
@@ -152,10 +191,12 @@ export default function RestTimerPicker({
                   onMomentumScrollEnd={handleSecScroll}
                   onScrollEndDrag={handleSecScroll}
                   renderItem={({ item }) => renderItem(item)}
-                  contentContainerStyle={styles.listContent}
+                  ListHeaderComponent={Spacer}
+                  ListFooterComponent={Spacer}
                   getItemLayout={(_, index) => (
                     { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
                   )}
+                  scrollEventThrottle={16}
                 />
               </View>
             </View>
@@ -244,10 +285,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginHorizontal: 15,
   },
-  listContent: {
-    // Add padding to top and bottom so first/last items can be centered
-    paddingVertical: ITEM_HEIGHT, 
-  },
   item: {
     height: ITEM_HEIGHT,
     justifyContent: 'center',
@@ -257,8 +294,8 @@ const styles = StyleSheet.create({
   itemText: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 28,
-    fontWeight: '700',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontWeight: '800',
+    fontFamily: FONT_FAMILIES.MEDIUM,
   },
   footer: {
     alignItems: 'center',

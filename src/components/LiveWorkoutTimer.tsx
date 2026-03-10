@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     color: COLORS.ACCENT_GREEN,
     fontSize: 14,
     fontWeight: "900",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontFamily: FONT_FAMILIES.MEDIUM,
     letterSpacing: 1,
   },
 });

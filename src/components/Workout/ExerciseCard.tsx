@@ -14,6 +14,9 @@ import { showConfirm } from "@/utils/alerts";
 import { HapticFeedback } from "@/utils/haptics";
 import { SetRow } from "./SetRow";
 
+import MuscleSelector from "@/src/components/MuscleSelector";
+import { MuscleGroup } from "@/src/constants/muscles";
+
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
 }
@@ -63,6 +66,11 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
     toggleExerciseUnit(exercise.id);
   }, [exercise.id, toggleExerciseUnit]);
 
+  const handleMusclesChange = useCallback((muscles: MuscleGroup[]) => {
+    updateExerciseField(exercise.id, "muscles", muscles);
+    HapticFeedback.selection();
+  }, [exercise.id, updateExerciseField]);
+
   return (
     <View style={UI.SHARED.card}>
       <View style={styles.cardHeader}>
@@ -76,18 +84,23 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
             multiline={false}
           />
           <View style={styles.exerciseMetaRow}>
+            <MuscleSelector 
+              selectedMuscles={exercise.muscles || []}
+              onSelect={handleMusclesChange}
+            />
+            <View style={{ width: '100%', height: 12 }} />
             <Pressable 
               style={({ pressed }) => [styles.unitPill, pressed && { opacity: 0.7 }]}
               onPress={handleUnitToggle}
             >
-              <Dumbbell size={10} color={COLORS.ACCENT_YELLOW} />
+              <Dumbbell size={10} color={COLORS.ACCENT_BLUE} />
               <Text style={styles.unitPillText}>{exercise.weightUnit || "kg"}</Text>
             </Pressable>
             <Pressable 
               style={({ pressed }) => [styles.restPill, pressed && { opacity: 0.7 }]}
               onPress={() => setPickerVisible(true)}
             >
-              <Clock size={10} color={COLORS.ACCENT_YELLOW} />
+              <Clock size={10} color={COLORS.ACCENT_BLUE} />
               <Text style={styles.restPillText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
             </Pressable>
           </View>
@@ -167,19 +180,22 @@ const styles = StyleSheet.create({
   exerciseMetaRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: 'wrap',
   },
   unitPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1D1D21",
+    backgroundColor: COLORS.CARD_HOVER,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
     gap: 6,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.03)",
   },
   unitPillText: {
-    color: COLORS.ACCENT_YELLOW,
+    color: COLORS.TEXT_SECONDARY,
     fontSize: 11,
     fontWeight: "900",
     textTransform: "uppercase",
@@ -187,14 +203,16 @@ const styles = StyleSheet.create({
   restPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1D1D21",
+    backgroundColor: COLORS.CARD_HOVER,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
     gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.03)",
   },
   restPillText: {
-    color: COLORS.ACCENT_YELLOW,
+    color: COLORS.TEXT_SECONDARY,
     fontSize: 12,
     fontWeight: "900",
     fontFamily: FONT_FAMILIES.MEDIUM,
@@ -243,14 +261,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: "#1D1D21",
-    borderWidth: 1.5,
+    backgroundColor: "rgba(11, 130, 255, 0.05)",
+    borderWidth: 1,
     borderColor: "rgba(11, 130, 255, 0.2)",
   },
   addSetBtnText: {
-    color: COLORS.TEXT_PRIMARY,
+    color: COLORS.ACCENT_BLUE,
     fontWeight: "800",
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
 });

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, Pressable, StyleSheet, Platform, Vibration } from "react-native";
 import { COLORS } from "@/constants/colors";
+import { FONT_FAMILIES } from "@/constants/fonts";
 import { useWorkoutSessionStore, type ActiveRestTimer } from "@/stores/workoutSessionStore";
 import { cancelScheduledNotification } from "@/utils/notifications";
 
@@ -135,8 +136,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   countdown: {
-    color: COLORS.ACCENT_YELLOW,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    color: COLORS.ACCENT_BLUE,
+    fontFamily: FONT_FAMILIES.MEDIUM,
     fontSize: 36,
     fontWeight: "900",
     letterSpacing: 2,

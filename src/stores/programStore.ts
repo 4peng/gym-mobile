@@ -6,6 +6,8 @@ import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import type { Program, ProgramExercise } from "@/types";
 
+const PROGRAM_STORE_VERSION = 2;
+
 interface ProgramState {
   programs: Program[];
   deletedProgramIds: string[];
@@ -23,6 +25,26 @@ interface ProgramActions {
   clearDeletedPrograms: (ids: string[]) => void;
   applySyncMerge: (remote: Program[], syncStartTime: number) => void;
   repairCorruptedData: () => void;
+}
+
+function normalizeProgram(raw: any): Program {
+  return {
+    _id: String(raw?._id ?? generateId()),
+    userId: String(raw?.userId ?? USER_ID),
+    name: typeof raw?.name === "string" ? raw.name : "Untitled Program",
+    exercises: Array.isArray(raw?.exercises) ? raw.exercises : [],
+    pinned: typeof raw?.pinned === "boolean" ? raw.pinned : undefined,
+    createdAt:
+      typeof raw?.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
+    updatedAt:
+      typeof raw?.updatedAt === "number" && Number.isFinite(raw.updatedAt)
+        ? raw.updatedAt
+        : Date.now(),
+    deletedAt:
+      typeof raw?.deletedAt === "number" || raw?.deletedAt === null
+        ? raw.deletedAt
+        : undefined,
+  };
 }
 
 export const useProgramStore = create<ProgramState & ProgramActions>()(
@@ -164,10 +186,24 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
     {
       name: "program-store",
       storage: createJSONStorage(() => zustandAsyncStorage),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.repairCorruptedData();
-        }
+      version: PROGRAM_STORE_VERSION,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<ProgramState> | undefined;
+        return {
+          programs: Array.isArray(state?.programs)
+            ? state!.programs.map(normalizeProgram)
+            : [],
+          deletedProgramIds: Array.isArray(state?.deletedProgramIds)
+            ? state!.deletedProgramIds
+                .map((id) => String(id))
+                .filter((id) => id.length > 0)
+            : [],
+          isDirty: !!state?.isDirty,
+          lastSyncedAt:
+            typeof state?.lastSyncedAt === "number" && Number.isFinite(state.lastSyncedAt)
+              ? state.lastSyncedAt
+              : null,
+        } as ProgramState;
       },
     }
   )

@@ -2,38 +2,61 @@ import { useProgramStore } from "./programStore";
 import { useWorkoutSessionStore } from "./workoutSessionStore";
 import { useSyncStore } from "./syncStore";
 
+const SYNC_DEBOUNCE_MS = 750;
+let _cleanupSyncEffect: (() => void) | null = null;
+
 /**
  * Initializes listeners that trigger background syncs when local data changes.
  * This avoids circular dependencies by using a one-way subscription.
  */
 export function initSyncEffect() {
-  // Listen for program changes
-  useProgramStore.subscribe((state, prevState) => {
-    // Trigger sync if it's dirty and EITHER:
-    // 1. It just transitioned from clean to dirty
-    // 2. Something changed (programs or deletions) while already dirty
+  // Idempotent init to avoid duplicate subscriptions across remounts/hot reload.
+  if (_cleanupSyncEffect) return _cleanupSyncEffect;
+
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleBackgroundSync = () => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      void useSyncStore.getState().backgroundSync();
+    }, SYNC_DEBOUNCE_MS);
+  };
+
+  const unsubscribePrograms = useProgramStore.subscribe((state, prevState) => {
     const justBecameDirty = state.isDirty && !prevState.isDirty;
     const changedWhileDirty = state.isDirty && (
-      state.programs !== prevState.programs || 
+      state.programs !== prevState.programs ||
       state.deletedProgramIds !== prevState.deletedProgramIds
     );
 
     if (justBecameDirty || changedWhileDirty) {
-      // Use silent background sync for automatic updates
-      useSyncStore.getState().backgroundSync();
+      scheduleBackgroundSync();
     }
   });
 
-  // Listen for workout history changes
-  useWorkoutSessionStore.subscribe((state, prevState) => {
+  const unsubscribeWorkouts = useWorkoutSessionStore.subscribe((state, prevState) => {
     const justBecameDirty = state.isDirty && !prevState.isDirty;
     const changedWhileDirty = state.isDirty && (
-      state.history !== prevState.history
+      state.history !== prevState.history ||
+      state.deletedWorkoutIds !== prevState.deletedWorkoutIds
     );
 
     if (justBecameDirty || changedWhileDirty) {
-      // Use silent background sync for automatic updates
-      useSyncStore.getState().backgroundSync();
+      scheduleBackgroundSync();
     }
   });
+
+  _cleanupSyncEffect = () => {
+    unsubscribePrograms();
+    unsubscribeWorkouts();
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    _cleanupSyncEffect = null;
+  };
+
+  return _cleanupSyncEffect;
 }

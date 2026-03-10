@@ -59,10 +59,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
               </Text>
             </View>
           </View>
-          <ChevronRight size={20} color={COLORS.BORDER_LIGHT} />
-        </View>
-
-        <View style={styles.tileActions}>
+          
           <Pressable
             onPress={handleStart}
             style={({ pressed }) => [
@@ -70,8 +67,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
               pressed && styles.tileStartBtnPressed
             ]}
           >
-            <Play size={16} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-            <Text style={styles.tileStartText}>Start Session</Text>
+            <Play size={18} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
           </Pressable>
         </View>
       </Pressable>
@@ -87,18 +83,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
   },
   tileMainInfo: {
     flex: 1,
+    marginRight: 16,
   },
   programName: {
     color: COLORS.TEXT_PRIMARY,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
-    letterSpacing: -1,
+    letterSpacing: -0.5,
     fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   metaRow: {
     flexDirection: "row",
@@ -111,28 +107,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
-  tileActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
   tileStartBtn: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "#1D1D21",
-    paddingVertical: 14,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.ACCENT_BLUE,
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
+    shadowColor: COLORS.ACCENT_BLUE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tileStartBtnPressed: {
-    backgroundColor: "#27272A",
-  },
-  tileStartText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 14,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
+    transform: [{ scale: 0.95 }],
+    opacity: 0.9,
   },
 });

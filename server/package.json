@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "seed:year": "tsx scripts/seed_year_training.ts",
+    "seed:year:remove": "tsx scripts/remove_seed_year_training.ts"
   },
   "dependencies": {
     "body-parser": "^1.20.2",

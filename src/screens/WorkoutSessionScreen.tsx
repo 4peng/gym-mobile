@@ -21,7 +21,13 @@ import {
 } from "lucide-react-native";
 import { useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import {
+  useActiveSession,
+  useAddExercise,
+  useCompleteSession,
+  useDiscardSession,
+  useClearExpiredTimer,
+} from "@/stores/activeSessionStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -46,11 +52,11 @@ const SUGGESTED_EXERCISES = [
 ];
 
 export default function WorkoutSessionScreen() {
-  const activeSession = useWorkoutSessionStore((s) => s.activeSession);
-  const addExercise = useWorkoutSessionStore((s) => s.addExercise);
-  const completeSession = useWorkoutSessionStore((s) => s.completeSession);
-  const discardSession = useWorkoutSessionStore((s) => s.discardSession);
-  const clearExpiredTimer = useWorkoutSessionStore((s) => s.clearExpiredTimer);
+  const activeSession = useActiveSession();
+  const addExercise = useAddExercise();
+  const completeSession = useCompleteSession();
+  const discardSession = useDiscardSession();
+  const clearExpiredTimer = useClearExpiredTimer();
 
   const router = useAppRouter();
   const [newExerciseName, setNewExerciseName] = React.useState("");
@@ -175,7 +181,7 @@ export default function WorkoutSessionScreen() {
                     pressed && { transform: [{scale: 0.96}], opacity: 0.9 }
                   ]}
                 >
-                  <Plus size={24} color={COLORS.TEXT_PRIMARY} strokeWidth={3} />
+                  <Plus size={24} color="#FFFFFF" strokeWidth={3} />
                 </Pressable>
               </View>
             </View>
@@ -263,6 +269,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.ACCENT_BLUE,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: COLORS.ACCENT_BLUE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   emptyContainer: {
     flex: 1,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,15 +10,23 @@ import {
   TextInput,
   LayoutAnimation,
 } from "react-native";
-import { ChevronLeft, ChevronRight, Search, BarChart2, Pin } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Search, BarChart2, Pin, Filter } from "lucide-react-native";
 import Svg, { Rect } from "react-native-svg";
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/src/components/Swipeable";
+import {
+  DETAILED_MODE_MUSCLE_GROUPS,
+  expandPrimaryMusclesForDetailedMode,
+  MUSCLE_GROUPS,
+  MUSCLE_LABELS,
+  MuscleGroup,
+} from "@/constants/muscles";
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -60,15 +68,45 @@ const MiniChart = ({ data }: { data: number[] }) => {
 
 export default function ExerciseListStatsScreen() {
   const router = useAppRouter();
-  const history = useWorkoutSessionStore((s) => s.history);
+  const rawHistory = useWorkoutSessionStore((s) => s.history);
   const pinnedExerciseNames = useWorkoutSessionStore((s) => s.pinnedExerciseNames || []);
   const togglePinExercise = useWorkoutSessionStore((s) => s.togglePinExercise);
+  const showDetailedMuscleGroups = useUiPreferencesStore(
+    (s) => s.showDetailedMuscleGroups
+  );
   const [search, setSearch] = React.useState("");
+  const [selectedMuscles, setSelectedMuscles] = React.useState<MuscleGroup[]>([]);
   const [scrollEnabled, setScrollEnabled] = React.useState(true);
+  const selectableMuscles: readonly MuscleGroup[] = showDetailedMuscleGroups
+    ? (DETAILED_MODE_MUSCLE_GROUPS as readonly MuscleGroup[])
+    : (MUSCLE_GROUPS as readonly MuscleGroup[]);
+  const history = useMemo(
+    () => rawHistory.filter((session) => !session.deletedAt),
+    [rawHistory]
+  );
+
+  useEffect(() => {
+    const allowed = new Set(selectableMuscles);
+    setSelectedMuscles((prev) => prev.filter((m) => allowed.has(m)));
+  }, [selectableMuscles]);
+
+  const toggleMuscleFilter = useCallback((muscle: MuscleGroup | "all") => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (muscle === "all") {
+      setSelectedMuscles([]);
+      return;
+    }
+    setSelectedMuscles((prev) =>
+      prev.includes(muscle)
+        ? prev.filter((m) => m !== muscle)
+        : [...prev, muscle]
+    );
+  }, []);
 
   const exerciseStats = useMemo(() => {
     const exerciseMap = new Map<string, number[]>();
     const originalNameMap = new Map<string, string>();
+    const musclesMap = new Map<string, MuscleGroup[]>();
     
     history.forEach(session => {
       session.exercises.forEach(ex => {
@@ -76,6 +114,12 @@ export default function ExerciseListStatsScreen() {
         if (!exerciseMap.has(lowerName)) {
           exerciseMap.set(lowerName, []);
           originalNameMap.set(lowerName, ex.name);
+          musclesMap.set(
+            lowerName,
+            showDetailedMuscleGroups
+              ? expandPrimaryMusclesForDetailedMode(ex.muscles || [])
+              : ex.muscles || []
+          );
         }
         
         let vol = 0;
@@ -91,7 +135,14 @@ export default function ExerciseListStatsScreen() {
     });
 
     return Array.from(exerciseMap.keys())
-      .filter(lowerName => lowerName.includes(search.toLowerCase()))
+      .filter(lowerName => {
+        const matchesSearch = lowerName.includes(search.toLowerCase());
+        const muscles = musclesMap.get(lowerName) || [];
+        const matchesMuscle =
+          selectedMuscles.length === 0 ||
+          selectedMuscles.some((selected) => muscles.includes(selected));
+        return matchesSearch && matchesMuscle;
+      })
       .sort((a, b) => {
         const aPinned = pinnedExerciseNames.includes(a);
         const bPinned = pinnedExerciseNames.includes(b);
@@ -102,9 +153,10 @@ export default function ExerciseListStatsScreen() {
       .map(lowerName => ({
         name: originalNameMap.get(lowerName) || lowerName,
         isPinned: pinnedExerciseNames.includes(lowerName),
-        recentVolume: exerciseMap.get(lowerName) || []
+        recentVolume: exerciseMap.get(lowerName) || [],
+        muscles: musclesMap.get(lowerName) || []
       }));
-  }, [history, search, pinnedExerciseNames]);
+  }, [history, search, pinnedExerciseNames, selectedMuscles, showDetailedMuscleGroups]);
 
   const handlePin = useCallback((name: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -133,6 +185,39 @@ export default function ExerciseListStatsScreen() {
         />
       </View>
 
+      {/* Muscle Filter */}
+      <View style={styles.filterWrapper}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={["all", ...selectableMuscles]}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.filterContainer}
+          renderItem={({ item }) => {
+            const isAllChip = item === "all";
+            const isActive = isAllChip
+              ? selectedMuscles.length === 0
+              : selectedMuscles.includes(item as MuscleGroup);
+            return (
+              <Pressable
+                onPress={() => toggleMuscleFilter(item as MuscleGroup | "all")}
+                style={[
+                  styles.filterPill,
+                  isActive && styles.filterPillActive
+                ]}
+              >
+                <Text style={[
+                  styles.filterText,
+                  isActive && styles.filterTextActive
+                ]}>
+                  {isAllChip ? "All" : MUSCLE_LABELS[item as MuscleGroup]}
+                </Text>
+              </Pressable>
+            );
+          }}
+        />
+      </View>
+
       {/* List */}
       <FlatList
         data={exerciseStats}
@@ -143,7 +228,7 @@ export default function ExerciseListStatsScreen() {
           <View style={styles.emptyContainer}>
             <BarChart2 size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
             <Text style={styles.emptyText}>
-              {search ? "No matches found" : "Complete a workout first to see stats"}
+              {search || selectedMuscles.length > 0 ? "No matches found" : "Complete a workout first to see stats"}
             </Text>
           </View>
         }
@@ -168,7 +253,17 @@ export default function ExerciseListStatsScreen() {
                     <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
                   )}
                 </View>
-                <Text style={styles.itemSub}>View full trends</Text>
+                <View style={styles.muscleRow}>
+                  {item.muscles.length > 0 ? (
+                    item.muscles.map((m, i) => (
+                      <Text key={m} style={styles.muscleLabel}>
+                        {MUSCLE_LABELS[m]}{i < item.muscles.length - 1 ? " • " : ""}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={styles.itemSub}>No category</Text>
+                  )}
+                </View>
               </View>
               
               <MiniChart data={item.recentVolume} />
@@ -209,7 +304,7 @@ const styles = StyleSheet.create({
     marginHorizontal: UI.LAYOUT_PADDING,
     paddingHorizontal: 16,
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
   },
@@ -222,6 +317,34 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
     includeFontPadding: false,
     textAlignVertical: 'center',
+  },
+  filterWrapper: {
+    marginBottom: 20,
+  },
+  filterContainer: {
+    paddingHorizontal: UI.LAYOUT_PADDING,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  filterPillActive: {
+    backgroundColor: 'rgba(11, 130, 255, 0.15)',
+    borderColor: 'rgba(11, 130, 255, 0.3)',
+  },
+  filterText: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 13,
+    fontWeight: '800',
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  filterTextActive: {
+    color: COLORS.ACCENT_BLUE,
   },
   listContent: {
     paddingHorizontal: UI.LAYOUT_PADDING,
@@ -241,6 +364,17 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_TERTIARY,
     fontSize: 12,
     fontWeight: "600",
+  },
+  muscleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  muscleLabel: {
+    color: COLORS.ACCENT_BLUE,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   miniChart: {
     backgroundColor: "rgba(74, 222, 128, 0.05)",

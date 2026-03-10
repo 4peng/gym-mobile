@@ -2,6 +2,8 @@
 // Client-side types (string IDs, no ObjectId)
 // ──────────────────────────────────────────────
 
+import { MuscleGroup } from "@/src/constants/muscles";
+
 /** A single exercise definition inside a Program template. */
 export interface ProgramExercise {
   id: string;
@@ -10,6 +12,7 @@ export interface ProgramExercise {
   restSeconds: number;
   notes: string;
   weightUnit?: "kg" | "lbs";
+  muscles: MuscleGroup[];
 }
 
 /** A saved program / template. */
@@ -43,6 +46,7 @@ export interface WorkoutExercise {
   notes: string;
   sets: WorkoutSet[];
   weightUnit?: "kg" | "lbs";
+  muscles: MuscleGroup[];
 }
 
 /** A workout session document. */

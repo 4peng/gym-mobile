@@ -7,6 +7,8 @@ import { generateId } from '@/src/utils/id';
 import { USER_ID } from '@/src/constants/user';
 import { COLORS } from '@/src/constants/colors';
 import { useRouter } from 'expo-router';
+import { MuscleGroup } from '@/src/constants/muscles';
+import type { WorkoutSession } from '@/src/types';
 
 export default function MockDataInjector() {
   const router = useRouter();
@@ -15,14 +17,35 @@ export default function MockDataInjector() {
   const injectData = () => {
     setStatus('Injecting...');
     
-    const history = [];
+    const history: WorkoutSession[] = [];
     const now = new Date();
     
     // Create 3 routine types
     const routines = [
-      { name: 'Push Day', exercises: ['Bench Press', 'Overhead Press', 'Tricep Pushdowns'] },
-      { name: 'Pull Day', exercises: ['Deadlift', 'Pullups', 'Bicep Curls'] },
-      { name: 'Legs', exercises: ['Squat', 'Leg Press', 'Calf Raises'] }
+      { 
+        name: 'Push Day', 
+        exercises: [
+          { name: 'Bench Press', muscles: ['chest', 'shoulder'] as MuscleGroup[] },
+          { name: 'Overhead Press', muscles: ['shoulder'] as MuscleGroup[] },
+          { name: 'Tricep Pushdowns', muscles: ['arms'] as MuscleGroup[] }
+        ] 
+      },
+      { 
+        name: 'Pull Day', 
+        exercises: [
+          { name: 'Deadlift', muscles: ['back', 'hamstrings', 'glutes'] as MuscleGroup[] },
+          { name: 'Pullups', muscles: ['back'] as MuscleGroup[] },
+          { name: 'Bicep Curls', muscles: ['arms'] as MuscleGroup[] }
+        ] 
+      },
+      { 
+        name: 'Legs', 
+        exercises: [
+          { name: 'Squat', muscles: ['quads', 'glutes'] as MuscleGroup[] },
+          { name: 'Leg Press', muscles: ['quads'] as MuscleGroup[] },
+          { name: 'Calf Raises', muscles: ['calves'] as MuscleGroup[] }
+        ] 
+      }
     ];
 
     // Inject every ~2 days for 90 days
@@ -35,15 +58,18 @@ export default function MockDataInjector() {
       // Simulate progressive overload (weights go up over time)
       const progressFactor = (90 - i) / 10; // weight increases by ~1kg every session
       
-      const session = {
+      const session: WorkoutSession = {
         _id: generateId(),
         userId: USER_ID,
         startedAt: date.toISOString(),
         completedAt: new Date(date.getTime() + 3600000).toISOString(),
         updatedAt: Date.now(),
-        exercises: routine.exercises.map(exName => ({
+        exercises: routine.exercises.map(ex => ({
           id: generateId(),
-          name: exName,
+          name: ex.name,
+          restSeconds: 90,
+          notes: "",
+          muscles: ex.muscles,
           sets: [
             { id: generateId(), weight: 40 + progressFactor, reps: 10, completedAt: date.toISOString() },
             { id: generateId(), weight: 40 + progressFactor, reps: 10, completedAt: date.toISOString() },

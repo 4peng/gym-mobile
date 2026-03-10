@@ -13,7 +13,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Break circular dependencies by initializing sync listeners here
-    initSyncEffect();
+    const stopSyncEffect = initSyncEffect();
     
     // Start the network sync listener on mount and cleanup on unmount
     const unsubscribe = startNetworkSyncListener();
@@ -35,6 +35,7 @@ export default function RootLayout() {
     
     return () => {
       unsubscribe();
+      stopSyncEffect();
     };
   }, []);
 

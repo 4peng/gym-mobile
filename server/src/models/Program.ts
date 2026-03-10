@@ -7,6 +7,7 @@ export interface IProgramExercise {
   restSeconds: number;
   notes: string;
   weightUnit?: 'kg' | 'lbs';
+  muscles: string[];
 }
 
 export interface IProgram extends Document<string> {
@@ -25,6 +26,7 @@ const ProgramExerciseSchema = new Schema({
   restSeconds: { type: Number, required: true },
   notes: { type: String, default: '' },
   weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
+  muscles: { type: [String], default: [] },
 }, { _id: false });
 
 const ProgramSchema = new Schema({

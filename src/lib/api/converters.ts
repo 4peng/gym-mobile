@@ -6,6 +6,7 @@
 
 import type { Program, WorkoutSession } from "@/types";
 import type { ProgramServer, WorkoutServer } from "./serverTypes";
+import type { MuscleGroup } from "@/constants/muscles";
 
 // ──────────────────────────────────────────────
 // Program: Client → Server
@@ -23,6 +24,7 @@ export function mapProgramToBackend(program: Program): ProgramServer {
       restSeconds: e.restSeconds,
       notes: e.notes,
       weightUnit: e.weightUnit,
+      muscles: e.muscles,
     })),
     createdAt: program.createdAt,
     updatedAt: program.updatedAt,
@@ -46,6 +48,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
       restSeconds: e.restSeconds,
       notes: e.notes,
       weightUnit: e.weightUnit as "kg" | "lbs" | undefined,
+      muscles: (e.muscles || []) as MuscleGroup[],
     })),
     createdAt: server.createdAt,
     updatedAt: server.updatedAt,
@@ -74,6 +77,7 @@ export function mapWorkoutToBackend(
       restSeconds: ex.restSeconds,
       notes: ex.notes,
       weightUnit: ex.weightUnit,
+      muscles: ex.muscles,
       sets: ex.sets.map((s) => ({
         id: s.id,
         weight: s.weight,
@@ -105,6 +109,7 @@ export function mapWorkoutFromBackend(
       restSeconds: ex.restSeconds,
       notes: ex.notes,
       weightUnit: ex.weightUnit as "kg" | "lbs" | undefined,
+      muscles: (ex.muscles || []) as MuscleGroup[],
       sets: ex.sets.map((s) => ({
         id: s.id,
         weight: s.weight,

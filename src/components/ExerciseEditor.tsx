@@ -15,6 +15,9 @@ import { UI } from "@/constants/ui";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "./RestTimerPicker";
 
+import MuscleSelector from "@/src/components/MuscleSelector";
+import { MuscleGroup } from "@/src/constants/muscles";
+
 // ──────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────
@@ -26,6 +29,7 @@ export interface ExerciseFormData {
   restSeconds: number;
   notes: string;
   weightUnit?: "kg" | "lbs";
+  muscles: MuscleGroup[];
 }
 
 interface ExerciseEditorProps {
@@ -79,6 +83,10 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     (text: string) => onUpdate(exercise.id, { notes: text }),
     [exercise.id, onUpdate]
   );
+
+  const handleMusclesChange = useCallback((muscles: MuscleGroup[]) => {
+    onUpdate(exercise.id, { muscles });
+  }, [exercise.id, onUpdate]);
 
   const handleRemove = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -171,6 +179,14 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
         />
       </View>
 
+      {/* Muscle Selector */}
+      <View style={styles.muscleSection}>
+        <MuscleSelector 
+          selectedMuscles={exercise.muscles || []}
+          onSelect={handleMusclesChange}
+        />
+      </View>
+
       <RestTimerPicker 
         visible={pickerVisible}
         initialSeconds={exercise.restSeconds}
@@ -195,7 +211,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   indexBadge: {
-    backgroundColor: "#1D1D21",
+    backgroundColor: "rgba(11, 130, 255, 0.1)",
     width: 32,
     height: 32,
     borderRadius: 10,
@@ -203,7 +219,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   indexLabel: {
-    color: COLORS.ACCENT_YELLOW,
+    color: COLORS.ACCENT_BLUE,
     fontSize: 12,
     fontWeight: "900",
     fontFamily: FONT_FAMILIES.MEDIUM,
@@ -262,7 +278,7 @@ const styles = StyleSheet.create({
   numericInput: {
     backgroundColor: COLORS.BG,
     color: COLORS.TEXT_PRIMARY,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontFamily: FONT_FAMILIES.MEDIUM,
     fontSize: 18,
     fontWeight: "800",
     textAlign: "center",
@@ -282,7 +298,7 @@ const styles = StyleSheet.create({
   },
   pickerText: {
     color: COLORS.TEXT_PRIMARY,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontFamily: FONT_FAMILIES.MEDIUM,
     fontSize: 18,
     fontWeight: "800",
   },
@@ -296,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   unitText: {
-    color: COLORS.ACCENT_YELLOW,
+    color: COLORS.ACCENT_BLUE,
     fontSize: 16,
     fontWeight: "900",
     textTransform: "uppercase",
@@ -319,5 +335,8 @@ const styles = StyleSheet.create({
     minHeight: 80,
     fontFamily: FONT_FAMILIES.MEDIUM,
     lineHeight: 22,
+  },
+  muscleSection: {
+    marginTop: 24,
   },
 });

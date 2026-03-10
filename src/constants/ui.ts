@@ -20,7 +20,7 @@ export const UI = {
       width: 52,
       height: 52,
       borderRadius: 26,
-      backgroundColor: "#1D1D21",
+      backgroundColor: COLORS.CARD_HOVER,
       justifyContent: "center",
       alignItems: "center",
     },

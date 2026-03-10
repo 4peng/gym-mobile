@@ -15,6 +15,7 @@ export interface IWorkoutExercise {
   notes: string;
   sets: IWorkoutSet[];
   weightUnit?: 'kg' | 'lbs';
+  muscles: string[];
 }
 
 export interface IWorkout extends Document<string> {
@@ -42,6 +43,7 @@ const WorkoutExerciseSchema = new Schema({
   notes: { type: String, default: '' },
   sets: [WorkoutSetSchema],
   weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
+  muscles: { type: [String], default: [] },
 }, { _id: false });
 
 const WorkoutSchema = new Schema({

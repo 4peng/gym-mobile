@@ -1,6 +1,6 @@
 
-import { useWorkoutSessionStore } from './src/stores/workoutSessionStore';
-import { generateId } from './src/utils/id';
+import { useWorkoutSessionStore } from '@/stores/workoutSessionStore';
+import { generateId } from '@/utils/id';
 
 // This is a test script to be run in a simulated environment or via a temporary test route.
 // Since I cannot run the React Native environment directly here, 

@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet, LayoutAnimation } from "r
 import { Check, X } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";
+import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { toTitleCase } from "@/utils/string";
 import type { WorkoutSet } from "@/types";
@@ -79,16 +80,20 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
     <View style={styles.setRow}>
       {/* Index Column (15%) */}
       <View style={styles.indexCol}>
-        <View style={[styles.setIndexContainer, isCompleted ? { backgroundColor: "rgba(16, 217, 75, 0.1)" } : { backgroundColor: "rgba(250, 204, 0, 0.1)" }]}>
-          <Text style={[styles.setIndex, isCompleted ? { color: COLORS.ACCENT_GREEN } : { color: COLORS.ACCENT_YELLOW }]}>{index + 1}</Text>
+        <View style={[styles.setIndexContainer, isCompleted ? { backgroundColor: "rgba(16, 217, 75, 0.1)" } : { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
+          <Text style={[styles.setIndex, isCompleted ? { color: COLORS.ACCENT_GREEN } : { color: COLORS.ACCENT_BLUE }]}>{index + 1}</Text>
         </View>
       </View>
 
       {/* Weight Column (30%) */}
       <View style={styles.weightCol}>
-        <View style={[styles.setInputGroup, isCompleted ? { borderColor: "rgba(16, 217, 75, 0.2)" } : { borderColor: "rgba(250, 204, 0, 0.2)" }]}>
+        <View style={[styles.setInputGroup, isCompleted ? { borderColor: "rgba(16, 217, 75, 0.2)" } : { borderColor: "rgba(255, 255, 255, 0.05)" }]}>
           <TextInput
-            style={[UI.SHARED.numericInput, isCompleted ? { color: COLORS.ACCENT_GREEN } : { color: COLORS.ACCENT_YELLOW }]}
+            style={[
+              UI.SHARED.numericInput, 
+              isCompleted ? { color: COLORS.ACCENT_GREEN } : { color: COLORS.TEXT_PRIMARY },
+              { fontFamily: FONT_FAMILIES.MEDIUM, fontWeight: '800' }
+            ]}
             keyboardType="decimal-pad"
             value={set.weight !== null ? String(set.weight) : ""}
             placeholder={placeholder.weight !== null ? String(placeholder.weight) : "—"}
@@ -101,9 +106,13 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
 
       {/* Reps Column (30%) */}
       <View style={styles.repsCol}>
-        <View style={[styles.setInputGroup, isCompleted ? { borderColor: "rgba(16, 217, 75, 0.2)" } : { borderColor: "rgba(250, 204, 0, 0.2)" }]}>
+        <View style={[styles.setInputGroup, isCompleted ? { borderColor: "rgba(16, 217, 75, 0.2)" } : { borderColor: "rgba(255, 255, 255, 0.05)" }]}>
           <TextInput
-            style={[UI.SHARED.numericInput, isCompleted ? { color: COLORS.ACCENT_GREEN } : { color: COLORS.ACCENT_YELLOW }]}
+            style={[
+              UI.SHARED.numericInput, 
+              isCompleted ? { color: COLORS.ACCENT_GREEN } : { color: COLORS.TEXT_PRIMARY },
+              { fontFamily: FONT_FAMILIES.MEDIUM, fontWeight: '800' }
+            ]}
             keyboardType="number-pad"
             value={set.reps !== null ? String(set.reps) : ""}
             placeholder={placeholder.reps !== null ? String(placeholder.reps) : "—"}
@@ -154,7 +163,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: "#1D1D21",
+    backgroundColor: COLORS.CARD_HOVER,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -180,7 +189,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -194,6 +203,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: COLORS.BORDER_LIGHT,
+    borderColor: "rgba(16, 217, 75, 0.2)",
   },
 });

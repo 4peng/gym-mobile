@@ -54,7 +54,7 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: Swipeab
       onMoveShouldSetPanResponder: (_, gestureState) => {
         const { dx, dy } = gestureState;
         const isAlreadyOpen = Math.abs(lastOffset.current) > 5;
-        const isCorrectDirection = isAlreadyOpen ? true : (dx < -12 || (onPin && dx > 12));
+        const isCorrectDirection = isAlreadyOpen ? true : (dx < -12 || (!!onPin && dx > 12));
         const isHorizontal = Math.abs(dx) > Math.abs(dy) * 2;
         const reachedThreshold = Math.abs(dx) > 12;
         return isHorizontal && reachedThreshold && isCorrectDirection;
