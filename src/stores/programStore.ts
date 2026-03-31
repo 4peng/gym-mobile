@@ -6,7 +6,7 @@ import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import type { Program, ProgramExercise } from "@/types";
 
-const PROGRAM_STORE_VERSION = 2;
+const PROGRAM_STORE_VERSION = 3;
 
 interface ProgramState {
   programs: Program[];
@@ -25,6 +25,11 @@ interface ProgramActions {
   clearDeletedPrograms: (ids: string[]) => void;
   applySyncMerge: (remote: Program[], syncStartTime: number) => void;
   repairCorruptedData: () => void;
+}
+
+function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
+  const now = Date.now();
+  return typeof lastSyncedAt === "number" ? Math.max(now, lastSyncedAt + 1) : now;
 }
 
 function normalizeProgram(raw: any): Program {
@@ -73,13 +78,14 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       },
 
       addProgram: (name, exercises) => {
+        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
         const newProgram: Program = {
           _id: generateId(),
           userId: USER_ID,
           name,
           exercises,
           createdAt: new Date().toISOString(),
-          updatedAt: Date.now(),
+          updatedAt,
         };
         set((state) => {
           state.programs.push(newProgram);
@@ -88,24 +94,26 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       },
 
       updateProgram: (id, updates) => {
+        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
         set((state) => {
           const index = state.programs.findIndex((p) => p._id === id);
           if (index !== -1) {
             const current = state.programs[index];
             if (updates.name !== undefined) current.name = updates.name;
             if (updates.exercises !== undefined) current.exercises = updates.exercises;
-            current.updatedAt = Date.now();
+            current.updatedAt = updatedAt;
             state.isDirty = true;
           }
         });
       },
 
       deleteProgram: (id) => {
+        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
         set((state) => {
-          const program = state.programs.find(p => p._id === id);
+          const program = state.programs.find((p) => p._id === id);
           if (program) {
-            program.deletedAt = Date.now();
-            program.updatedAt = Date.now();
+            program.deletedAt = updatedAt;
+            program.updatedAt = updatedAt;
           }
           if (!state.deletedProgramIds.includes(id)) {
             state.deletedProgramIds.push(id);
@@ -115,11 +123,12 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       },
 
       togglePin: (id) => {
+        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
         set((state) => {
-          const program = state.programs.find(p => p._id === id);
+          const program = state.programs.find((p) => p._id === id);
           if (program) {
             program.pinned = !program.pinned;
-            program.updatedAt = Date.now();
+            program.updatedAt = updatedAt;
             state.isDirty = true;
           }
         });
@@ -137,8 +146,8 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
 
       clearDeletedPrograms: (ids) => {
         set((state) => {
-          state.deletedProgramIds = state.deletedProgramIds.filter(id => !ids.includes(id));
-          state.programs = state.programs.filter(p => !ids.includes(p._id) || !p.deletedAt);
+          state.deletedProgramIds = state.deletedProgramIds.filter((id) => !ids.includes(id));
+          state.programs = state.programs.filter((p) => !ids.includes(p._id) || !p.deletedAt);
         });
       },
 
@@ -146,7 +155,9 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
         set((state) => {
           if (remote.length === 0) {
             state.lastSyncedAt = syncStartTime;
-            state.isDirty = state.programs.some(p => p.updatedAt > syncStartTime) || state.deletedProgramIds.length > 0;
+            state.isDirty =
+              state.programs.some((p) => p.updatedAt > syncStartTime) ||
+              state.deletedProgramIds.length > 0;
             return;
           }
 
@@ -156,7 +167,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           for (let i = 0; i < state.programs.length; i++) {
             const lp = state.programs[i];
             const rp = remoteMap.get(lp._id);
-            
+
             if (rp) {
               const winner = lp.updatedAt >= rp.updatedAt ? lp : rp;
               state.programs[i] = winner;
@@ -175,11 +186,13 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           }
 
           if (historyChanged) {
-            state.programs = state.programs.filter(p => !p.deletedAt);
+            state.programs = state.programs.filter((p) => !p.deletedAt);
           }
 
           state.lastSyncedAt = syncStartTime;
-          state.isDirty = state.programs.some(p => p.updatedAt > syncStartTime) || state.deletedProgramIds.length > 0;
+          state.isDirty =
+            state.programs.some((p) => p.updatedAt > syncStartTime) ||
+            state.deletedProgramIds.length > 0;
         });
       },
     })),

@@ -18,6 +18,12 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import ExerciseEditor, { type ExerciseFormData } from "@/components/ExerciseEditor";
+import {
+  buildRoutineDraft,
+  createEmptyExercise,
+  createRoutineSnapshot,
+  validateRoutineDraft,
+} from "@/shared/programs.js";
 import { generateId } from "@/utils/id";
 
 type Mode = "create" | "edit" | "duplicate";
@@ -35,48 +41,6 @@ interface RoutineEditorScreenProps {
   onSave: (draft: RoutineDraft) => void;
   onSaveAndStart?: (draft: RoutineDraft) => void;
   onDelete?: (draft: RoutineDraft) => void;
-}
-
-function createEmptyExercise(): ExerciseFormData {
-  return {
-    id: generateId(),
-    name: "",
-    defaultSets: 3,
-    restSeconds: 90,
-    notes: "",
-    weightUnit: "kg",
-    muscles: [],
-  };
-}
-
-function normalizeDraftSnapshot(name: string, exercises: ExerciseFormData[]): string {
-  return JSON.stringify({
-    name: name.trim(),
-    exercises: exercises.map((e) => ({
-      id: e.id,
-      name: (e.name || "").trim(),
-      defaultSets: e.defaultSets || 3,
-      restSeconds: e.restSeconds || 90,
-      notes: (e.notes || "").trim(),
-      weightUnit: e.weightUnit || "kg",
-      muscles: e.muscles || [],
-    })),
-  });
-}
-
-function buildDraft(name: string, exercises: ExerciseFormData[]): RoutineDraft {
-  return {
-    name: name.trim(),
-    exercises: exercises.map((e) => ({
-      ...e,
-      name: (e.name || "").trim(),
-      defaultSets: e.defaultSets || 3,
-      restSeconds: e.restSeconds || 90,
-      notes: (e.notes || "").trim(),
-      weightUnit: e.weightUnit || "kg",
-      muscles: e.muscles || [],
-    })),
-  };
 }
 
 export default function RoutineEditorScreen({
@@ -100,11 +64,11 @@ export default function RoutineEditorScreen({
   }, [initialName, initialExercises]);
 
   const initialSnapshot = useMemo(
-    () => normalizeDraftSnapshot(initialName, initialExercises),
+    () => createRoutineSnapshot(initialName, initialExercises),
     [initialName, initialExercises]
   );
   const currentSnapshot = useMemo(
-    () => normalizeDraftSnapshot(name, exercises),
+    () => createRoutineSnapshot(name, exercises),
     [name, exercises]
   );
   const hasChanges = currentSnapshot !== initialSnapshot;
@@ -121,40 +85,32 @@ export default function RoutineEditorScreen({
   }, []);
 
   const handleAddExercise = useCallback(() => {
-    setExercises((prev) => [...prev, createEmptyExercise()]);
+    setExercises((prev) => [...prev, createEmptyExercise(generateId)]);
   }, []);
 
   const validate = useCallback((): boolean => {
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      showAlert("Error", "Please enter a program name.");
-      return false;
+    const error = validateRoutineDraft(name, exercises);
+    if (!error) {
+      return true;
     }
-    if (exercises.length === 0) {
-      showAlert("Error", "Add at least one exercise before saving.");
-      return false;
-    }
-    const emptyNameIdx = exercises.findIndex((e) => (e.name || "").trim() === "");
-    if (emptyNameIdx !== -1) {
-      showAlert("Error", `Exercise ${emptyNameIdx + 1} needs a name.`);
-      return false;
-    }
-    return true;
+
+    showAlert("Error", error);
+    return false;
   }, [name, exercises]);
 
   const doSave = useCallback(() => {
     if (!validate()) return;
-    onSave(buildDraft(name, exercises));
+    onSave(buildRoutineDraft(name, exercises) as RoutineDraft);
   }, [validate, onSave, name, exercises]);
 
   const doSaveAndStart = useCallback(() => {
     if (!validate() || !onSaveAndStart) return;
-    onSaveAndStart(buildDraft(name, exercises));
+    onSaveAndStart(buildRoutineDraft(name, exercises) as RoutineDraft);
   }, [validate, onSaveAndStart, name, exercises]);
 
   const doDelete = useCallback(() => {
     if (!onDelete) return;
-    onDelete(buildDraft(name, exercises));
+    onDelete(buildRoutineDraft(name, exercises) as RoutineDraft);
   }, [onDelete, name, exercises]);
 
   const handlePrimaryAction = useCallback(() => {
@@ -166,7 +122,7 @@ export default function RoutineEditorScreen({
   }, [isCreateLike, doSave]);
 
   const handleCancel = useCallback(() => {
-    onCancel(buildDraft(name, exercises), hasChanges);
+    onCancel(buildRoutineDraft(name, exercises) as RoutineDraft, hasChanges);
   }, [onCancel, name, exercises, hasChanges]);
 
   const renderExercise = useCallback(

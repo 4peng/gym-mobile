@@ -1,16 +1,12 @@
-// ──────────────────────────────────────────────
 // ID Conversion Boundary
-// ──────────────────────────────────────────────
-// All ObjectId ↔ string conversions live here.
+// All ObjectId <-> string conversions live here.
 // No other file should import or mention ObjectId.
 
 import type { Program, WorkoutSession } from "@/types";
 import type { ProgramServer, WorkoutServer } from "./serverTypes";
 import type { MuscleGroup } from "@/constants/muscles";
 
-// ──────────────────────────────────────────────
-// Program: Client → Server
-// ──────────────────────────────────────────────
+// Program: Client -> Server
 
 export function mapProgramToBackend(program: Program): ProgramServer {
   return {
@@ -24,6 +20,7 @@ export function mapProgramToBackend(program: Program): ProgramServer {
       restSeconds: e.restSeconds,
       notes: e.notes,
       weightUnit: e.weightUnit,
+      initialWeight: e.initialWeight,
       muscles: e.muscles,
     })),
     createdAt: program.createdAt,
@@ -32,9 +29,7 @@ export function mapProgramToBackend(program: Program): ProgramServer {
   };
 }
 
-// ──────────────────────────────────────────────
-// Program: Server → Client
-// ──────────────────────────────────────────────
+// Program: Server -> Client
 
 export function mapProgramFromBackend(server: ProgramServer): Program {
   return {
@@ -48,6 +43,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
       restSeconds: e.restSeconds,
       notes: e.notes,
       weightUnit: e.weightUnit as "kg" | "lbs" | undefined,
+      initialWeight: typeof e.initialWeight === "number" ? e.initialWeight : null,
       muscles: (e.muscles || []) as MuscleGroup[],
     })),
     createdAt: server.createdAt,
@@ -56,9 +52,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
   };
 }
 
-// ──────────────────────────────────────────────
-// Workout: Client → Server
-// ──────────────────────────────────────────────
+// Workout: Client -> Server
 
 export function mapWorkoutToBackend(
   session: WorkoutSession
@@ -88,9 +82,7 @@ export function mapWorkoutToBackend(
   };
 }
 
-// ──────────────────────────────────────────────
-// Workout: Server → Client
-// ──────────────────────────────────────────────
+// Workout: Server -> Client
 
 export function mapWorkoutFromBackend(
   server: WorkoutServer

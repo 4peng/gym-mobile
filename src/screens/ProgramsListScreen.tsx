@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -36,8 +36,7 @@ export default function ProgramsListScreen() {
   const allPrograms = useProgramStore((s) => s.programs);
   const deleteProgram = useProgramStore((s) => s.deleteProgram);
   const togglePin = useProgramStore((s) => s.togglePin);
-  const repairCorruptedData = useProgramStore((s) => s.repairCorruptedData);
-  
+
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const isManualSync = useSyncStore((s) => s.isManualSync);
   const runFullSync = useSyncStore((s) => s.runFullSync);

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Routine Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <p class="eyebrow">Standalone Routine Manager</p>
+          <h1>Routine Lab</h1>
+          <p class="subtle">
+            Directly edits your live routine collection for <code>default-user</code>.
+          </p>
+        </div>
+
+        <button id="new-routine-btn" class="primary-button sidebar-button" type="button">
+          New routine
+        </button>
+
+        <div class="sidebar-section">
+          <div class="section-heading">
+            <h2>Saved routines</h2>
+            <span id="routine-count" class="count-pill">0</span>
+          </div>
+          <div id="routine-list" class="routine-list"></div>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Database status</p>
+            <div class="status-row">
+              <span id="connection-dot" class="status-dot"></span>
+              <span id="status-text">Connecting...</span>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button id="import-btn" class="ghost-button" type="button">Import file</button>
+            <input id="import-input" type="file" accept="application/json,.json" hidden />
+            <button id="refresh-btn" class="ghost-button" type="button">Refresh</button>
+            <button id="duplicate-btn" class="ghost-button" type="button">Duplicate</button>
+            <button id="delete-btn" class="danger-button" type="button">Delete</button>
+            <button id="save-btn" class="primary-button" type="button">Save routine</button>
+          </div>
+        </header>
+
+        <section class="editor-card">
+          <div class="editor-heading">
+            <div>
+              <p class="eyebrow">Editor</p>
+              <h2 id="editor-title">New routine</h2>
+            </div>
+            <span id="dirty-indicator" class="draft-state">All changes saved</span>
+          </div>
+
+          <label class="field">
+            <span>Routine name</span>
+            <input
+              id="routine-name"
+              type="text"
+              maxlength="120"
+              placeholder="Upper / Lower Split"
+              autocomplete="off"
+            />
+          </label>
+
+          <section class="exercise-section">
+            <div class="section-heading">
+              <div>
+                <h3>Exercises</h3>
+                <p class="section-copy">Drag cards to reorder the routine.</p>
+              </div>
+              <div class="section-controls">
+                <label class="mode-select-label" for="muscle-mode-select">
+                  <span>Muscle groups</span>
+                  <select id="muscle-mode-select" class="mode-select">
+                    <option value="primary">Primary</option>
+                    <option value="detailed">Detailed</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div id="empty-state" class="empty-state" hidden>
+              <strong>No exercises yet.</strong>
+              <span>Add the first movement to start shaping the routine.</span>
+              <button id="empty-add-exercise-btn" class="primary-button" type="button">Add first exercise</button>
+            </div>
+
+            <div id="exercise-list" class="exercise-list"></div>
+
+            <div class="exercise-actions">
+              <button id="add-exercise-btn" class="primary-button add-exercise-button" type="button">
+                Add exercise
+              </button>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <template id="routine-item-template">
+      <button class="routine-item" type="button">
+        <span class="routine-item-name"></span>
+        <span class="routine-item-meta"></span>
+      </button>
+    </template>
+
+    <template id="exercise-template">
+      <article class="exercise-card" draggable="true">
+        <div class="exercise-card-top">
+          <button class="drag-handle" type="button" title="Drag to reorder" aria-label="Drag to reorder">
+            <span></span><span></span><span></span>
+          </button>
+
+          <div class="exercise-header-main">
+            <input class="exercise-title-input" type="text" maxlength="120" placeholder="Exercise name" />
+            <div class="exercise-slot-label"></div>
+          </div>
+
+          <button class="remove-exercise-btn icon-button" type="button" aria-label="Remove exercise">Remove</button>
+        </div>
+
+        <div class="exercise-grid compact-grid">
+          <label class="field compact-field">
+            <span>Sets</span>
+            <input class="exercise-sets-input" type="number" min="1" max="20" step="1" />
+          </label>
+
+          <label class="field compact-field">
+            <span>Rest (sec)</span>
+            <input class="exercise-rest-input" type="number" min="0" max="900" step="5" />
+          </label>
+
+          <label class="field compact-field">
+            <span>Unit</span>
+            <select class="exercise-unit-input">
+              <option value="kg">kg</option>
+              <option value="lbs">lbs</option>
+            </select>
+          </label>
+
+          <label class="field compact-field">
+            <span>Weight</span>
+            <input
+              class="exercise-weight-input"
+              type="number"
+              min="0"
+              step="0.5"
+              placeholder="Optional"
+            />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Notes</span>
+          <textarea class="exercise-notes-input" rows="3" maxlength="400" placeholder="Optional cues, targets, or setup notes"></textarea>
+        </label>
+
+        <div class="field">
+          <div class="field-heading">
+            <span>Muscles</span>
+            <small class="field-badge muscle-mode-badge">Primary groups</small>
+          </div>
+          <div class="muscle-chip-group"></div>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

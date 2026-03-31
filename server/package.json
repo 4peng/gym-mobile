@@ -9,7 +9,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed:year": "tsx scripts/seed_year_training.ts",
-    "seed:year:remove": "tsx scripts/remove_seed_year_training.ts"
+    "seed:year:remove": "tsx scripts/remove_seed_year_training.ts",
+    "seed:4day-split": "tsx scripts/seed_4_day_split.ts",
+    "seed:4day-split:remove": "tsx scripts/remove_seed_4_day_split.ts"
   },
   "dependencies": {
     "body-parser": "^1.20.2",

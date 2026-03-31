@@ -8,21 +8,14 @@ import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { normalizeExercises } from "@/shared/programs.js";
 import RoutineEditorScreen, { type RoutineDraft } from "@/components/RoutineEditorScreen";
 import type { Program } from "@/types";
 
 function toProgramUpdates(draft: RoutineDraft): Partial<Program> {
   return {
     name: draft.name,
-    exercises: draft.exercises.map((e) => ({
-      id: e.id,
-      name: e.name,
-      defaultSets: e.defaultSets || 3,
-      restSeconds: e.restSeconds || 90,
-      notes: e.notes || "",
-      weightUnit: e.weightUnit || "kg",
-      muscles: e.muscles || [],
-    })),
+    exercises: normalizeExercises(draft.exercises),
   };
 }
 
@@ -37,16 +30,7 @@ export default function EditProgramScreen() {
   const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
 
   const initialExercises = useMemo(
-    () =>
-      (program?.exercises || []).map((e) => ({
-        id: e.id,
-        name: e.name || "",
-        defaultSets: e.defaultSets || 3,
-        restSeconds: e.restSeconds || 90,
-        notes: e.notes || "",
-        weightUnit: e.weightUnit || "kg",
-        muscles: e.muscles || [],
-      })),
+    () => normalizeExercises(program?.exercises || []),
     [program]
   );
 

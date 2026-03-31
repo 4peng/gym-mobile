@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "expo start",
     "android": "expo start --android",
-    "ios": "expo start --ios"
+    "ios": "expo start --ios",
+    "routine-web": "powershell -ExecutionPolicy Bypass -File ./Start-RoutineLab.ps1"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

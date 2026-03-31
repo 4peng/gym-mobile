@@ -7,6 +7,7 @@ export interface IProgramExercise {
   restSeconds: number;
   notes: string;
   weightUnit?: 'kg' | 'lbs';
+  initialWeight?: number | null;
   muscles: string[];
 }
 
@@ -26,6 +27,7 @@ const ProgramExerciseSchema = new Schema({
   restSeconds: { type: Number, required: true },
   notes: { type: String, default: '' },
   weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
+  initialWeight: { type: Number, default: null },
   muscles: { type: [String], default: [] },
 }, { _id: false });
 
@@ -38,6 +40,35 @@ const ProgramSchema = new Schema({
   updatedAt: { type: Number, required: true, index: true },
   deletedAt: { type: Number, default: null },
 }, { _id: false });
+
+function applyUpdatedAt(update: Record<string, any>, updatedAt: number) {
+  const hasMongoOperators = Object.keys(update).some((key) => key.startsWith('$'));
+  if (hasMongoOperators) {
+    update.$set = {
+      ...(update.$set ?? {}),
+      updatedAt,
+    };
+    return;
+  }
+
+  update.updatedAt = updatedAt;
+}
+
+ProgramSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
+for (const operation of ['findOneAndUpdate', 'updateOne', 'updateMany', 'replaceOne'] as const) {
+  ProgramSchema.pre(operation, function(next) {
+    const update = this.getUpdate();
+    if (update && typeof update === 'object' && !Array.isArray(update)) {
+      applyUpdatedAt(update as Record<string, any>, Date.now());
+      this.setUpdate(update);
+    }
+    next();
+  });
+}
 
 // Export the model (resetting it to ensure schema update)
 if (mongoose.models.Program) {

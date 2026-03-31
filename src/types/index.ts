@@ -1,6 +1,4 @@
-// ──────────────────────────────────────────────
 // Client-side types (string IDs, no ObjectId)
-// ──────────────────────────────────────────────
 
 import { MuscleGroup } from "@/src/constants/muscles";
 
@@ -12,6 +10,7 @@ export interface ProgramExercise {
   restSeconds: number;
   notes: string;
   weightUnit?: "kg" | "lbs";
+  initialWeight?: number | null;
   muscles: MuscleGroup[];
 }
 
@@ -26,8 +25,6 @@ export interface Program {
   updatedAt: number; // epoch-ms, required for last-write-wins sync
   deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
 }
-
-// ──────────────────────────────────────────────
 
 /** A single logged set inside a workout exercise. */
 export interface WorkoutSet {
@@ -61,9 +58,7 @@ export interface WorkoutSession {
   exercises: WorkoutExercise[];
 }
 
-// ──────────────────────────────────────────────
-// Backend ↔ Client conversion helpers
-// ──────────────────────────────────────────────
+// Backend <-> Client conversion helpers
 // The canonical conversion boundary now lives in lib/api/converters.ts.
 // The helpers below are kept for backward compatibility but delegate to
 // the same logic: stringify _id / programId.

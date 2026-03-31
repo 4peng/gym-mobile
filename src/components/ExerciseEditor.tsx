@@ -29,6 +29,7 @@ export interface ExerciseFormData {
   restSeconds: number;
   notes: string;
   weightUnit?: "kg" | "lbs";
+  initialWeight?: number | null;
   muscles: MuscleGroup[];
 }
 

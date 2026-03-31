@@ -23,7 +23,6 @@ let _pendingSync = false;
 
 export async function syncPrograms(): Promise<boolean> {
   const store = useProgramStore.getState();
-  const syncStartTime = Date.now();
 
   if (store.deletedProgramIds.length > 0) {
     const deletedSuccessfully = [];
@@ -38,19 +37,28 @@ export async function syncPrograms(): Promise<boolean> {
 
   // Find programs that were updated since or at the last sync time
   const dirtyPrograms = store.programs.filter(
-    (p) => p.updatedAt >= (store.lastSyncedAt || 0) && !p.deletedAt
+    (p) => p.updatedAt > (store.lastSyncedAt || 0) && !p.deletedAt
   );
-  
+
+  let pushedPrograms = [] as typeof dirtyPrograms;
   if (dirtyPrograms.length > 0) {
     const result = await batchUpsertPrograms(dirtyPrograms);
     if (!result) return false;
+    pushedPrograms = result;
   }
 
   const since = store.lastSyncedAt ? Math.max(0, store.lastSyncedAt - 10000) : undefined;
   const remote = await fetchPrograms(since);
   if (!remote) return false;
 
-  useProgramStore.getState().applySyncMerge(remote, syncStartTime);
+  const mergedById = new Map([...pushedPrograms, ...remote].map((program) => [program._id, program]));
+  const merged = Array.from(mergedById.values());
+  const syncWatermark = Math.max(
+    Date.now(),
+    ...merged.map((program) => program.updatedAt)
+  );
+
+  useProgramStore.getState().applySyncMerge(merged, syncWatermark);
   return true;
 }
 
@@ -60,7 +68,6 @@ export async function syncPrograms(): Promise<boolean> {
 
 export async function syncWorkouts(): Promise<boolean> {
   const store = useWorkoutSessionStore.getState();
-  const syncStartTime = Date.now();
 
   if (store.deletedWorkoutIds.length > 0) {
     const deletedSuccessfully = [];
@@ -100,9 +107,11 @@ export async function syncWorkouts(): Promise<boolean> {
 
   const dirtyWorkouts = Array.from(dirtyWorkoutsById.values());
 
+  let pushedWorkouts: WorkoutSession[] = [];
   if (dirtyWorkouts.length > 0) {
     const result = await batchUpsertWorkouts(dirtyWorkouts);
     if (!result) return false;
+    pushedWorkouts = result;
     useWorkoutSessionStore
       .getState()
       .clearDirtyWorkouts(dirtyWorkouts.map((workout) => workout._id));
@@ -112,7 +121,14 @@ export async function syncWorkouts(): Promise<boolean> {
   const remote = await fetchWorkouts(undefined, undefined, since);
   if (!remote) return false;
 
-  useWorkoutSessionStore.getState().applySyncMerge(remote, syncStartTime);
+  const mergedById = new Map([...pushedWorkouts, ...remote].map((workout) => [workout._id, workout]));
+  const merged = Array.from(mergedById.values());
+  const syncWatermark = Math.max(
+    Date.now(),
+    ...merged.map((workout) => workout.updatedAt)
+  );
+
+  useWorkoutSessionStore.getState().applySyncMerge(merged, syncWatermark);
   return true;
 }
 

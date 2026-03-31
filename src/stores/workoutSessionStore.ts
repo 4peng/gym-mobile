@@ -151,12 +151,12 @@ interface WorkoutSessionActions {
 // Helpers
 // ──────────────────────────────────────────────
 
-function createEmptySet(): WorkoutSet {
-  return { id: generateId(), weight: null, reps: null };
+function createEmptySet(initialWeight: number | null = null): WorkoutSet {
+  return { id: generateId(), weight: initialWeight, reps: null };
 }
 
-function createEmptySets(count: number): WorkoutSet[] {
-  return Array.from({ length: count }, () => createEmptySet());
+function createEmptySets(count: number, initialWeight: number | null = null): WorkoutSet[] {
+  return Array.from({ length: count }, () => createEmptySet(initialWeight));
 }
 
 function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
@@ -305,7 +305,7 @@ export const useWorkoutSessionStore = create<
           name: pe.name,
           restSeconds: pe.restSeconds,
           notes: pe.notes,
-          sets: createEmptySets(pe.defaultSets),
+          sets: createEmptySets(pe.defaultSets, pe.initialWeight ?? null),
           weightUnit: pe.weightUnit || "kg",
           muscles: pe.muscles || [],
         }));
@@ -807,6 +807,7 @@ export const useWorkoutSessionStore = create<
 
       applySyncMerge: (remote, syncStartTime) => {
         let syncedSessions: WorkoutSession[] = [];
+        let deletedSessionIds: string[] = [];
         set((state) => {
           if (remote.length === 0) {
             state.lastSyncedAt = syncStartTime;
@@ -820,6 +821,7 @@ export const useWorkoutSessionStore = create<
           const remoteMap = new Map(remote.map((w) => [w._id, w]));
           let historyChanged = false;
           const shardsToSave: WorkoutSession[] = [];
+          const deletedIds = new Set<string>();
 
           for (let i = 0; i < state.history.length; i++) {
             const lw = state.history[i];
@@ -828,27 +830,49 @@ export const useWorkoutSessionStore = create<
             if (rw) {
               const winner = lw.updatedAt >= rw.updatedAt ? lw : rw;
               state.history[i] = winner;
-              shardsToSave.push(safeClone(winner));
+              if (winner.deletedAt) {
+                deletedIds.add(winner._id);
+              } else {
+                shardsToSave.push(safeClone(winner));
+              }
               remoteMap.delete(lw._id);
               historyChanged = true;
             }
           }
 
-          // Remaining remotes are new additions
+          // Remaining remotes are either new additions or tombstones for shard-only sessions.
           if (remoteMap.size > 0) {
             for (const rw of remoteMap.values()) {
-              if (!rw.deletedAt) {
-                state.history.push(rw);
-                if (!state.historyIndex.includes(rw._id)) {
-                  state.historyIndex.unshift(rw._id);
-                }
-                shardsToSave.push(safeClone(rw));
-                historyChanged = true;
+              if (rw.deletedAt) {
+                deletedIds.add(rw._id);
+                historyChanged = historyChanged || state.historyIndex.includes(rw._id);
+                continue;
               }
+
+              state.history.push(rw);
+              if (!state.historyIndex.includes(rw._id)) {
+                state.historyIndex.unshift(rw._id);
+              }
+              shardsToSave.push(safeClone(rw));
+              historyChanged = true;
             }
           }
 
-          // Clean up any that ended up deleted
+          if (deletedIds.size > 0) {
+            const shouldFilterHistory = state.history.some((session) =>
+              deletedIds.has(session._id)
+            );
+            if (shouldFilterHistory) {
+              historyChanged = true;
+            }
+
+            state.history = state.history.filter((session) => !deletedIds.has(session._id));
+            state.historyIndex = state.historyIndex.filter((id) => !deletedIds.has(id));
+            state.deletedWorkoutIds = state.deletedWorkoutIds.filter((id) => !deletedIds.has(id));
+            state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => !deletedIds.has(id));
+            deletedSessionIds = Array.from(deletedIds);
+          }
+
           if (historyChanged) {
             state.history = state.history.filter(w => !w.deletedAt);
             state.history.sort((a, b) => {
@@ -878,6 +902,10 @@ export const useWorkoutSessionStore = create<
 
         if (syncedSessions.length > 0) {
           void workoutStatsStorage.upsertBatch(syncedSessions);
+        }
+        if (deletedSessionIds.length > 0) {
+          void workoutStorage.removeBatch(deletedSessionIds);
+          void workoutStatsStorage.removeSessions(deletedSessionIds);
         }
       },
 

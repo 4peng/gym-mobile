@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useAppParams, useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
+import { copyExercises } from "@/shared/programs.js";
 import { generateId } from "@/utils/id";
 import RoutineEditorScreen, { type RoutineDraft } from "@/components/RoutineEditorScreen";
 
@@ -22,33 +23,13 @@ export default function CreateProgramScreen() {
     [sourceProgram]
   );
   const initialExercises = useMemo(
-    () =>
-      (sourceProgram?.exercises || []).map((e) => ({
-        id: generateId(),
-        name: e.name || "",
-        defaultSets: e.defaultSets || 3,
-        restSeconds: e.restSeconds || 90,
-        notes: e.notes || "",
-        weightUnit: e.weightUnit || "kg",
-        muscles: e.muscles || [],
-      })),
+    () => copyExercises(sourceProgram?.exercises || [], generateId),
     [sourceProgram]
   );
 
   const handleSave = useCallback(
     (draft: RoutineDraft) => {
-      addProgram(
-        draft.name,
-        draft.exercises.map((e) => ({
-          id: generateId(),
-          name: e.name,
-          defaultSets: e.defaultSets,
-          restSeconds: e.restSeconds,
-          notes: e.notes,
-          weightUnit: e.weightUnit || "kg",
-          muscles: e.muscles || [],
-        }))
-      );
+      addProgram(draft.name, copyExercises(draft.exercises, generateId));
       router.back();
     },
     [addProgram, router]

@@ -1,9 +1,7 @@
-// ──────────────────────────────────────────────
 // Server-side types (MongoDB document shapes)
-// ──────────────────────────────────────────────
 // These mirror the MongoDB collection schemas.
 // ObjectId is represented as `string` here because the API boundary
-// serializes everything as JSON — actual ObjectId wrapping happens
+// serializes everything as JSON - actual ObjectId wrapping happens
 // only in the fetch body via `converters.ts`.
 
 export interface ProgramExerciseServer {
@@ -13,6 +11,7 @@ export interface ProgramExerciseServer {
   restSeconds: number;
   notes: string;
   weightUnit?: string;
+  initialWeight?: number | null;
   muscles: string[];
 }
 
