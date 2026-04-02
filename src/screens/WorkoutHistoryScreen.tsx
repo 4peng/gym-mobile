@@ -191,6 +191,12 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
         {isExpanded && (
           <View style={[styles.detailsContainer, { paddingHorizontal: 12, paddingBottom: 12 }]}>
             <View style={styles.divider} />
+            {session.notes.trim().length > 0 ? (
+              <View style={styles.sessionNotesBox}>
+                <Text style={styles.sessionNotesLabel}>Workout Notes</Text>
+                <Text style={styles.sessionNotesText}>{session.notes}</Text>
+              </View>
+            ) : null}
             {session.exercises.map((ex) => (
               <View key={ex.id} style={styles.exerciseDetailItem}>
                 <Text style={styles.exerciseDetailName}>{toTitleCase(ex.name)}</Text>
@@ -458,6 +464,28 @@ const styles = StyleSheet.create({
   },
   exerciseDetailItem: {
     marginBottom: 16,
+  },
+  sessionNotesBox: {
+    backgroundColor: "rgba(11, 130, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(11, 130, 255, 0.12)",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 18,
+  },
+  sessionNotesLabel: {
+    color: COLORS.ACCENT_BLUE,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  sessionNotesText: {
+    color: COLORS.TEXT_SECONDARY,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: FONT_FAMILIES.MEDIUM,
   },
   exerciseDetailName: {
     color: COLORS.ACCENT_BLUE,

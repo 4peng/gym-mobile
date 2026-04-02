@@ -64,6 +64,7 @@ export default function MockDataInjector() {
         startedAt: date.toISOString(),
         completedAt: new Date(date.getTime() + 3600000).toISOString(),
         updatedAt: Date.now(),
+        notes: "",
         exercises: routine.exercises.map(ex => ({
           id: generateId(),
           name: ex.name,

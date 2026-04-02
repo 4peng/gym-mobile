@@ -25,6 +25,7 @@ export interface IWorkout extends Document<string> {
   startedAt: string;
   completedAt?: string;
   updatedAt: number;
+  notes: string;
   exercises: IWorkoutExercise[];
 }
 
@@ -54,6 +55,7 @@ const WorkoutSchema = new Schema({
   completedAt: { type: String },
   updatedAt: { type: Number, required: true, index: true },
   deletedAt: { type: Number, default: null },
+  notes: { type: String, default: '' },
   exercises: [WorkoutExerciseSchema],
 }, { _id: false });
 

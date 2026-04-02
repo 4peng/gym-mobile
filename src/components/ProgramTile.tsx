@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Play, ChevronRight, Activity, Pin } from "lucide-react-native";
+import { Play, Activity, Pin } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";

@@ -24,7 +24,7 @@ import {
 // Constants for Optimization
 // ──────────────────────────────────────────────
 const MAX_MEMORY_HISTORY = 15; // Limit in-memory history cache size
-const WORKOUT_SESSION_STORE_VERSION = 3;
+const WORKOUT_SESSION_STORE_VERSION = 4;
 
 // ──────────────────────────────────────────────
 // Rest timer type
@@ -78,6 +78,7 @@ interface WorkoutSessionActions {
   // ── Session lifecycle ──────────────────────
   startQuickSession: () => void;
   startFromProgram: (program: Program) => void;
+  updateWorkoutNotes: (notes: string) => void;
   completeSession: () => void;
   discardSession: () => void;
   deleteHistorySession: (sessionId: string) => void;
@@ -85,6 +86,7 @@ interface WorkoutSessionActions {
 
   // ── Exercise mutations ─────────────────────
   addExercise: (name: string) => void;
+  reorderExercises: (exerciseIds: string[]) => void;
   removeExercise: (exerciseId: string) => void;
   updateExerciseField: (
     exerciseId: string,
@@ -159,6 +161,47 @@ function createEmptySets(count: number, initialWeight: number | null = null): Wo
   return Array.from({ length: count }, () => createEmptySet(initialWeight));
 }
 
+function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
+  const now = Date.now();
+  return typeof lastSyncedAt === "number" ? Math.max(now, lastSyncedAt + 1) : now;
+}
+
+function hasCompletedSets(exercise: WorkoutExercise): boolean {
+  return exercise.sets.some((set) => !!set.completedAt);
+}
+
+function buildCompletedSession(session: WorkoutSession): WorkoutSession {
+  return {
+    ...session,
+    exercises: session.exercises
+      .map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.filter((set) => !!set.completedAt),
+      }))
+      .filter((exercise) => exercise.sets.length > 0),
+  };
+}
+
+function getKnownExerciseNames(sessionHistory: WorkoutSession[], activeSession: WorkoutSession | null) {
+  const names = new Set<string>();
+
+  for (const session of sessionHistory) {
+    for (const exercise of session.exercises) {
+      if (exercise.name.trim().length > 0) {
+        names.add(exercise.name);
+      }
+    }
+  }
+
+  for (const exercise of activeSession?.exercises || []) {
+    if (exercise.name.trim().length > 0) {
+      names.add(exercise.name);
+    }
+  }
+
+  return Array.from(names);
+}
+
 function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
   if (!raw || typeof raw !== "object") return null;
   const id = raw._id ? String(raw._id) : null;
@@ -167,6 +210,8 @@ function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
   const exercises = Array.isArray(raw.exercises)
     ? raw.exercises.map((ex: any) => ({
         id: ex?.id ? String(ex.id) : generateId(),
+        programExerciseId:
+          typeof ex?.programExerciseId === "string" ? ex.programExerciseId : undefined,
         name: typeof ex?.name === "string" ? ex.name : "",
         restSeconds:
           typeof ex?.restSeconds === "number" && Number.isFinite(ex.restSeconds)
@@ -213,6 +258,7 @@ function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
       typeof raw.deletedAt === "number" || raw.deletedAt === null
         ? raw.deletedAt
         : undefined,
+    notes: typeof raw.notes === "string" ? raw.notes : "",
     exercises,
   };
 }
@@ -291,6 +337,7 @@ export const useWorkoutSessionStore = create<
           userId: USER_ID,
           startedAt: new Date().toISOString(),
           updatedAt: Date.now(),
+          notes: "",
           exercises: [],
         };
         set((state) => {
@@ -302,6 +349,7 @@ export const useWorkoutSessionStore = create<
         // Deep-copy program exercises into an independent session.
         const exercises: WorkoutExercise[] = (program.exercises || []).map((pe) => ({
           id: generateId(),
+          programExerciseId: pe.id,
           name: pe.name,
           restSeconds: pe.restSeconds,
           notes: pe.notes,
@@ -316,10 +364,19 @@ export const useWorkoutSessionStore = create<
           programId: program._id,
           startedAt: new Date().toISOString(),
           updatedAt: Date.now(),
+          notes: "",
           exercises,
         };
         set((state) => {
           state.activeSession = session;
+        });
+      },
+
+      updateWorkoutNotes: (notes) => {
+        set((state) => {
+          if (!state.activeSession) return;
+          state.activeSession.notes = notes;
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
@@ -334,8 +391,12 @@ export const useWorkoutSessionStore = create<
         if (!session) return;
 
         const completedAt = new Date().toISOString();
-        const updatedAt = Date.now();
-        const finalSession = { ...session, completedAt, updatedAt };
+        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
+        const finalSession = {
+          ...buildCompletedSession(session),
+          completedAt,
+          updatedAt,
+        };
 
         // Shard the full session to dedicated storage (Async, performance win)
         workoutStorage.save(finalSession);
@@ -429,8 +490,10 @@ export const useWorkoutSessionStore = create<
 
       addExercise: (name) => {
         const history = get().history;
-        const historyIndex = get().historyIndex;
-        const normalizedName = normalizeExerciseName(name, historyIndex);
+        const normalizedName = normalizeExerciseName(
+          name,
+          getKnownExerciseNames(history, get().activeSession)
+        );
         const lowerName = normalizedName.toLowerCase();
 
         // Smart Lookup: Find the most recent session containing this exercise to copy its muscles
@@ -457,6 +520,22 @@ export const useWorkoutSessionStore = create<
             muscles: inferredMuscles,
           };
           state.activeSession.exercises.push(exercise);
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+        });
+      },
+
+      reorderExercises: (exerciseIds) => {
+        set((state) => {
+          if (!state.activeSession) return;
+          const byId = new Map(
+            state.activeSession.exercises.map((exercise) => [exercise.id, exercise])
+          );
+          const reordered = exerciseIds
+            .map((id) => byId.get(id))
+            .filter((exercise): exercise is WorkoutExercise => !!exercise);
+          if (reordered.length !== state.activeSession.exercises.length) return;
+          state.activeSession.exercises = reordered;
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
@@ -465,12 +544,21 @@ export const useWorkoutSessionStore = create<
           if (!state.activeSession) return;
           state.activeSession.exercises =
             state.activeSession.exercises.filter((e) => e.id !== exerciseId);
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
       updateExerciseField: (exerciseId, field, value) => {
-        const oldName = field === "name" ? get().activeSession?.exercises.find(e => e.id === exerciseId)?.name : null;
-        const normalizedValue = field === "name" ? normalizeExerciseName(value as string, get().historyIndex) : value;
+        const currentExercise = get().activeSession?.exercises.find((e) => e.id === exerciseId);
+        const oldName = field === "name" ? currentExercise?.name ?? null : null;
+        const oldRestSeconds = field === "restSeconds" ? currentExercise?.restSeconds ?? null : null;
+        const normalizedValue =
+          field === "name"
+            ? normalizeExerciseName(
+                value as string,
+                getKnownExerciseNames(get().history, get().activeSession)
+              )
+            : value;
 
         set((state) => {
           if (!state.activeSession) return;
@@ -487,11 +575,40 @@ export const useWorkoutSessionStore = create<
           } else {
             (ex[field] as any) = normalizedValue;
           }
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+          if (field === "name" && state.activeRestTimer?.exerciseId === exerciseId) {
+            state.activeRestTimer.exerciseName = normalizedValue as string;
+          }
         });
 
         // Trigger history rename if name changed during active workout
         if (field === "name" && oldName && oldName.toLowerCase() !== (normalizedValue as string).toLowerCase()) {
           get().renameExerciseInHistory(oldName, normalizedValue as string);
+        }
+
+        if (
+          field === "restSeconds" &&
+          typeof oldRestSeconds === "number" &&
+          Number.isFinite(oldRestSeconds) &&
+          typeof normalizedValue === "number" &&
+          Number.isFinite(normalizedValue)
+        ) {
+          const currentTimer = get().activeRestTimer;
+          if (currentTimer?.exerciseId === exerciseId) {
+            const nextRemainingSeconds =
+              Math.ceil((currentTimer.endTime - Date.now()) / 1000) +
+              (normalizedValue - oldRestSeconds);
+
+            if (nextRemainingSeconds <= 0) {
+              void get().cancelRestTimer();
+            } else {
+              void get().startRestTimer(
+                exerciseId,
+                nextRemainingSeconds,
+                currentExercise?.name || currentTimer.exerciseName
+              );
+            }
+          }
         }
       },
 
@@ -503,6 +620,7 @@ export const useWorkoutSessionStore = create<
           );
           if (!ex) return;
           ex.weightUnit = ex.weightUnit === "lbs" ? "kg" : "lbs";
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
@@ -516,6 +634,7 @@ export const useWorkoutSessionStore = create<
           );
           if (!ex) return;
           ex.sets.push(createEmptySet());
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
@@ -527,6 +646,7 @@ export const useWorkoutSessionStore = create<
           );
           if (!ex) return;
           ex.sets = ex.sets.filter((s) => s.id !== setId);
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
@@ -540,6 +660,7 @@ export const useWorkoutSessionStore = create<
           const s = ex.sets.find((s) => s.id === setId);
           if (!s) return;
           s[field] = value;
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 
@@ -586,6 +707,7 @@ export const useWorkoutSessionStore = create<
           } else {
             s.completedAt = new Date().toISOString();
           }
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
 

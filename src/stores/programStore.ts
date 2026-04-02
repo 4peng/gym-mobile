@@ -6,7 +6,7 @@ import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import type { Program, ProgramExercise } from "@/types";
 
-const PROGRAM_STORE_VERSION = 3;
+const PROGRAM_STORE_VERSION = 4;
 
 interface ProgramState {
   programs: Program[];
@@ -101,6 +101,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
             const current = state.programs[index];
             if (updates.name !== undefined) current.name = updates.name;
             if (updates.exercises !== undefined) current.exercises = updates.exercises;
+            if (updates.pinned !== undefined) current.pinned = updates.pinned;
             current.updatedAt = updatedAt;
             state.isDirty = true;
           }

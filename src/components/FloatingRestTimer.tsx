@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, StyleSheet, Platform, Vibration } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { useWorkoutSessionStore, type ActiveRestTimer } from "@/stores/workoutSessionStore";
@@ -61,9 +61,6 @@ const FloatingRestTimer = React.memo(function FloatingRestTimer() {
         useWorkoutSessionStore.getState().clearExpiredTimer();
         // Safety fallback: cancel notification in case it hasn't fired.
         cancelScheduledNotification(timer.notificationId);
-        
-        // Vibrate when the timer hits zero in the foreground
-        Vibration.vibrate([0, 500, 200, 500]); 
       } else {
         setDisplayMs(rem);
       }

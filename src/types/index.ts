@@ -37,6 +37,7 @@ export interface WorkoutSet {
 /** A single exercise inside an active or completed workout session. */
 export interface WorkoutExercise {
   id: string;
+  programExerciseId?: string;
   name: string;
   restSeconds: number;
   timerStartedAt?: string; // ISO-8601, for future expo-notifications
@@ -55,6 +56,7 @@ export interface WorkoutSession {
   completedAt?: string; // ISO-8601
   updatedAt: number; // epoch-ms, required for last-write-wins sync
   deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
+  notes: string;
   exercises: WorkoutExercise[];
 }
 

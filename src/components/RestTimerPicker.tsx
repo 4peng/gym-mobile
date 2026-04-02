@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Modal,
   FlatList,
+  ListRenderItem,
   Pressable,
   Dimensions,
   Platform,
@@ -55,8 +56,8 @@ export default function RestTimerPicker({
   const [selectedMin, setSelectedMin] = useState(initialSelection.minuteValue);
   const [selectedSec, setSelectedSec] = useState(initialSelection.secondValue);
 
-  const minListRef = useRef<FlatList>(null);
-  const secListRef = useRef<FlatList>(null);
+  const minListRef = useRef<FlatList<number>>(null);
+  const secListRef = useRef<FlatList<number>>(null);
   const isInitializingScroll = useRef(false);
 
   // Sync wheel position to the current value every time the modal opens.
@@ -114,15 +115,13 @@ export default function RestTimerPicker({
     }
   };
 
-  const renderItem = (item: number) => (
+  const renderItem: ListRenderItem<number> = ({ item }) => (
     <View style={styles.item}>
       <Text style={styles.itemText}>
         {String(item).padStart(2, '0')}
       </Text>
     </View>
   );
-
-  const Spacer = () => <View style={{ height: ITEM_HEIGHT }} />;
 
   return (
     <Modal
@@ -161,14 +160,17 @@ export default function RestTimerPicker({
                   ref={minListRef}
                   data={MINUTES}
                   keyExtractor={(i) => `min-${i}`}
+                  style={styles.list}
+                  contentContainerStyle={styles.listContent}
                   showsVerticalScrollIndicator={false}
                   snapToInterval={ITEM_HEIGHT}
-                  decelerationRate="fast"
+                  snapToAlignment="center"
+                  decelerationRate="normal"
+                  bounces={false}
+                  onScroll={handleMinScroll}
                   onMomentumScrollEnd={handleMinScroll}
                   onScrollEndDrag={handleMinScroll}
-                  renderItem={({ item }) => renderItem(item)}
-                  ListHeaderComponent={Spacer}
-                  ListFooterComponent={Spacer}
+                  renderItem={renderItem}
                   getItemLayout={(_, index) => (
                     { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
                   )}
@@ -185,14 +187,17 @@ export default function RestTimerPicker({
                   ref={secListRef}
                   data={SECONDS}
                   keyExtractor={(i) => `sec-${i}`}
+                  style={styles.list}
+                  contentContainerStyle={styles.listContent}
                   showsVerticalScrollIndicator={false}
                   snapToInterval={ITEM_HEIGHT}
-                  decelerationRate="fast"
+                  snapToAlignment="center"
+                  decelerationRate="normal"
+                  bounces={false}
+                  onScroll={handleSecScroll}
                   onMomentumScrollEnd={handleSecScroll}
                   onScrollEndDrag={handleSecScroll}
-                  renderItem={({ item }) => renderItem(item)}
-                  ListHeaderComponent={Spacer}
-                  ListFooterComponent={Spacer}
+                  renderItem={renderItem}
                   getItemLayout={(_, index) => (
                     { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
                   )}
@@ -254,7 +259,8 @@ const styles = StyleSheet.create({
   selectionWindow: {
     position: 'absolute',
     height: ITEM_HEIGHT,
-    width: '80%',
+    left: 24,
+    right: 24,
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 16,
     borderWidth: 1,
@@ -265,15 +271,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: PICKER_HEIGHT,
+    width: '100%',
+    paddingHorizontal: 24,
   },
   column: {
-    alignItems: 'center',
-    width: 80,
+    flex: 1,
     height: PICKER_HEIGHT,
+    maxWidth: 140,
   },
   columnLabel: {
     position: 'absolute',
     top: -25,
+    alignSelf: 'center',
     color: COLORS.TEXT_TERTIARY,
     fontSize: 10,
     fontWeight: '900',
@@ -284,6 +293,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
     marginHorizontal: 15,
+  },
+  list: {
+    flex: 1,
+    width: '100%',
+  },
+  listContent: {
+    paddingVertical: ITEM_HEIGHT,
   },
   item: {
     height: ITEM_HEIGHT,

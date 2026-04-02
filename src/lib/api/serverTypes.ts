@@ -50,5 +50,6 @@ export interface WorkoutServer {
   completedAt?: string;
   updatedAt: number; // epoch-ms
   deletedAt?: number | null;
+  notes: string;
   exercises: WorkoutExerciseServer[];
 }

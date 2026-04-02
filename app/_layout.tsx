@@ -1,7 +1,9 @@
+import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import * as Font from 'expo-font';
 import { View, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { COLORS } from '@/src/constants/colors';
 import { useState } from 'react';
 import { startNetworkSyncListener } from '@/src/lib/api/networkListener';
@@ -41,40 +43,44 @@ export default function RootLayout() {
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, backgroundColor: COLORS.BG, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={COLORS.ACCENT_BLUE} />
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: COLORS.BG, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={COLORS.ACCENT_BLUE} />
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: COLORS.BG },
-        animation: 'fade_from_bottom',
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="programs" />
-      <Stack.Screen name="workout/index" />
-      <Stack.Screen 
-        name="exercises/[name]/index" 
-        options={{ 
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-          gestureEnabled: true,
-        }} 
-      />
-      <Stack.Screen 
-        name="exercises/[name]/volume" 
-        options={{ 
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-          gestureEnabled: true,
-        }} 
-      />
-      <Stack.Screen name="stats/index" />
-    </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: COLORS.BG },
+          animation: 'fade_from_bottom',
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="programs" />
+        <Stack.Screen name="workout/index" />
+        <Stack.Screen 
+          name="exercises/[name]/index" 
+          options={{ 
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            gestureEnabled: true,
+          }} 
+        />
+        <Stack.Screen 
+          name="exercises/[name]/volume" 
+          options={{ 
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            gestureEnabled: true,
+          }} 
+        />
+        <Stack.Screen name="stats/index" />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }

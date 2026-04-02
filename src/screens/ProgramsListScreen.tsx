@@ -74,6 +74,38 @@ export default function ProgramsListScreen() {
       });
   }, [allPrograms]);
 
+  const lastUsedByProgramId = useMemo(() => {
+    const usage = new Map<string, number>();
+
+    history.forEach((session) => {
+      if (!session.programId) return;
+      const ts = session.completedAt
+        ? new Date(session.completedAt).getTime()
+        : new Date(session.startedAt).getTime();
+      const current = usage.get(session.programId) ?? 0;
+      if (ts > current) {
+        usage.set(session.programId, ts);
+      }
+    });
+
+    return usage;
+  }, [history]);
+
+  const sortProgramsByRecentUse = useCallback((items: Program[]) => {
+    return [...items].sort((a, b) => {
+      const aLastUsed = lastUsedByProgramId.get(a._id) ?? 0;
+      const bLastUsed = lastUsedByProgramId.get(b._id) ?? 0;
+      if (aLastUsed !== bLastUsed) return bLastUsed - aLastUsed;
+
+      return b.updatedAt - a.updatedAt;
+    });
+  }, [lastUsedByProgramId]);
+
+  const recentPrograms = useMemo(
+    () => sortProgramsByRecentUse(programs),
+    [programs, sortProgramsByRecentUse]
+  );
+
   const router = useAppRouter();
 
   const todayStr = useMemo(() => {
@@ -267,7 +299,7 @@ export default function ProgramsListScreen() {
 
       <View style={styles.fabContainer}>
         {/* Sub-buttons (Routines) */}
-        {programs.slice(0, 3).map((p, i) => {
+        {recentPrograms.slice(0, 3).map((p, i) => {
           const translateY = animation.interpolate({
             inputRange: [0, 1],
             outputRange: [0, -70 * (i + 2)],

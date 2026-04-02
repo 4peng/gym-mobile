@@ -25,6 +25,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   exercise,
 }) {
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
   const addSet = useWorkoutSessionStore((s) => s.addSet);
   const removeExercise = useWorkoutSessionStore((s) => s.removeExercise);
   const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
@@ -37,6 +38,10 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
 
   const handleNameChange = useCallback((text: string) => {
     updateExerciseField(exercise.id, "name", text);
+  }, [exercise.id, updateExerciseField]);
+
+  const handleNotesChange = useCallback((text: string) => {
+    updateExerciseField(exercise.id, "notes", text);
   }, [exercise.id, updateExerciseField]);
 
   const placeholders = useMemo(
@@ -110,12 +115,31 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
         </Pressable>
       </View>
 
-      {exercise.notes !== "" && (
-        <View style={styles.notesContainer}>
-          <StickyNote size={12} color={COLORS.ACCENT_BLUE} style={{marginTop: 2}} />
-          <Text style={styles.notesText}>{exercise.notes}</Text>
-        </View>
-      )}
+      <Pressable
+        onPress={() => setIsEditingNotes(true)}
+        style={({ pressed }) => [
+          styles.notesContainer,
+          pressed && !isEditingNotes && { opacity: 0.85 },
+        ]}
+      >
+        <StickyNote size={12} color={COLORS.ACCENT_BLUE} style={{ marginTop: 2 }} />
+        {isEditingNotes ? (
+          <TextInput
+            style={styles.notesInput}
+            value={exercise.notes}
+            onChangeText={handleNotesChange}
+            onBlur={() => setIsEditingNotes(false)}
+            placeholder="Tap to add notes..."
+            placeholderTextColor={COLORS.TEXT_TERTIARY}
+            autoFocus
+            multiline
+          />
+        ) : (
+          <Text style={[styles.notesText, exercise.notes === "" && styles.notesPlaceholder]}>
+            {exercise.notes === "" ? "Tap to add notes..." : exercise.notes}
+          </Text>
+        )}
+      </Pressable>
 
       <View style={styles.setHeader}>
         <Text style={[styles.setHeaderText, { width: '15%', textAlign: 'center' }]}>Set</Text>
@@ -236,6 +260,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: FONT_FAMILIES.MEDIUM,
     flex: 1,
+  },
+  notesPlaceholder: {
+    color: COLORS.TEXT_TERTIARY,
+  },
+  notesInput: {
+    flex: 1,
+    color: COLORS.TEXT_SECONDARY,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    padding: 0,
+    minHeight: 18,
+    textAlignVertical: "top",
   },
   setHeader: {
     flexDirection: "row",

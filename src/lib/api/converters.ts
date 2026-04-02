@@ -65,6 +65,7 @@ export function mapWorkoutToBackend(
     completedAt: session.completedAt,
     updatedAt: session.updatedAt,
     deletedAt: session.deletedAt,
+    notes: session.notes,
     exercises: session.exercises.map((ex) => ({
       id: ex.id,
       name: ex.name,
@@ -95,6 +96,7 @@ export function mapWorkoutFromBackend(
     completedAt: server.completedAt,
     updatedAt: server.updatedAt,
     deletedAt: server.deletedAt,
+    notes: server.notes ?? "",
     exercises: server.exercises.map((ex) => ({
       id: ex.id,
       name: ex.name,
