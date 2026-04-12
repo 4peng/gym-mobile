@@ -28,6 +28,11 @@ jobs:
       - name: Expo Prebuild
         run: npx expo prebuild --platform ios
 
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+
       - name: Build App with Xcode
         run: |
           echo "--- iOS Directory ---"
@@ -36,18 +41,14 @@ jobs:
           find ios -maxdepth 2 \( -name "*.xcworkspace" -o -name "*.xcodeproj" \) -print || true
 
           WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -print -quit)
-          PROJECT=$(find ios -maxdepth 1 -name "*.xcodeproj" -print -quit)
 
-          if [ -n "$WORKSPACE" ]; then
-            CONTAINER_FLAG="-workspace"
-            CONTAINER_PATH="$WORKSPACE"
-          elif [ -n "$PROJECT" ]; then
-            CONTAINER_FLAG="-project"
-            CONTAINER_PATH="$PROJECT"
-          else
-            echo "Error: Expo prebuild did not produce an iOS workspace or project."
+          if [ -z "$WORKSPACE" ]; then
+            echo "Error: Expected an Xcode workspace after pod install, but none was found."
             exit 1
           fi
+
+          CONTAINER_FLAG="-workspace"
+          CONTAINER_PATH="$WORKSPACE"
 
           echo "--- Available Schemes ---"
           xcodebuild $CONTAINER_FLAG "$CONTAINER_PATH" -list
