@@ -5,6 +5,7 @@
 import type { Program, WorkoutSession } from "@/types";
 import type { ProgramServer, WorkoutServer } from "./serverTypes";
 import type { MuscleGroup } from "@/constants/muscles";
+import { normalizeTrackingMode } from "@/utils/exerciseTracking";
 
 // Program: Client -> Server
 
@@ -15,6 +16,8 @@ export function mapProgramToBackend(program: Program): ProgramServer {
     name: program.name,
     exercises: program.exercises.map((e) => ({
       id: e.id,
+      exerciseDefinitionId: e.exerciseDefinitionId,
+      trackingMode: e.trackingMode,
       name: e.name,
       defaultSets: e.defaultSets,
       restSeconds: e.restSeconds,
@@ -38,6 +41,8 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
     name: server.name,
     exercises: server.exercises.map((e) => ({
       id: e.id,
+      exerciseDefinitionId: e.exerciseDefinitionId,
+      trackingMode: normalizeTrackingMode(e.trackingMode),
       name: e.name,
       defaultSets: e.defaultSets,
       restSeconds: e.restSeconds,
@@ -68,6 +73,8 @@ export function mapWorkoutToBackend(
     notes: session.notes,
     exercises: session.exercises.map((ex) => ({
       id: ex.id,
+      exerciseDefinitionId: ex.exerciseDefinitionId,
+      trackingMode: ex.trackingMode,
       name: ex.name,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
@@ -77,6 +84,8 @@ export function mapWorkoutToBackend(
         id: s.id,
         weight: s.weight,
         reps: s.reps,
+        durationSeconds: s.durationSeconds,
+        distance: s.distance,
         completedAt: s.completedAt,
       })),
     })),
@@ -99,6 +108,8 @@ export function mapWorkoutFromBackend(
     notes: server.notes ?? "",
     exercises: server.exercises.map((ex) => ({
       id: ex.id,
+      exerciseDefinitionId: ex.exerciseDefinitionId,
+      trackingMode: normalizeTrackingMode(ex.trackingMode),
       name: ex.name,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
@@ -108,6 +119,9 @@ export function mapWorkoutFromBackend(
         id: s.id,
         weight: s.weight,
         reps: s.reps,
+        durationSeconds:
+          typeof s.durationSeconds === "number" ? s.durationSeconds : null,
+        distance: typeof s.distance === "number" ? s.distance : null,
         completedAt: s.completedAt,
       })),
     })),

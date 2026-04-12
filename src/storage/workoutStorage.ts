@@ -1,7 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutSession } from '@/src/types';
+import { normalizeSetForTrackingMode, normalizeTrackingMode } from '@/utils/exerciseTracking';
 
 const WORKOUT_PREFIX = 'workout_';
+
+function normalizeWorkoutSession(raw: WorkoutSession | null): WorkoutSession | null {
+  if (!raw) return null;
+
+  return {
+    ...raw,
+    exercises: Array.isArray(raw.exercises)
+      ? raw.exercises.map((exercise) => {
+          const trackingMode = normalizeTrackingMode(exercise?.trackingMode);
+          return {
+            ...exercise,
+            trackingMode,
+            sets: Array.isArray(exercise?.sets)
+              ? exercise.sets.map((set) => normalizeSetForTrackingMode(set, trackingMode))
+              : [],
+          };
+        })
+      : [],
+  };
+}
 
 /**
  * High-performance sharded storage for workouts.
@@ -35,7 +56,7 @@ export const workoutStorage = {
   get: async (id: string): Promise<WorkoutSession | null> => {
     try {
       const data = await AsyncStorage.getItem(`${WORKOUT_PREFIX}${id}`);
-      return data ? JSON.parse(data) : null;
+      return normalizeWorkoutSession(data ? JSON.parse(data) : null);
     } catch (err) {
       console.error(`Failed to load shard ${id}:`, err);
       return null;
@@ -48,7 +69,7 @@ export const workoutStorage = {
       const keys = ids.map(id => `${WORKOUT_PREFIX}${id}`);
       const results = await AsyncStorage.multiGet(keys);
       return results
-        .map(([_, value]) => value ? JSON.parse(value) : null)
+        .map(([_, value]) => normalizeWorkoutSession(value ? JSON.parse(value) : null))
         .filter((v): v is WorkoutSession => v !== null);
     } catch (err) {
       console.error('Failed to batch load shards:', err);

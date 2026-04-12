@@ -7,24 +7,34 @@ import { workoutStatsStorage } from "@/storage/workoutStatsStorage";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import { MuscleGroup } from "@/constants/muscles";
-import { normalizeExerciseName } from "@/utils/string";
 import { safeClone } from "@/utils/clone";
 import type {
+  ExerciseDefinition,
   Program,
   WorkoutSession,
   WorkoutExercise,
   WorkoutSet,
 } from "@/types";
 import {
+  getExerciseIdentityKey,
+  normalizeExerciseIdentityKey,
+} from "@/utils/exerciseIdentity";
+import {
+  inferTrackingModeFromExerciseDefinition,
+  normalizeSetForTrackingMode,
+  normalizeTrackingMode,
+} from "@/utils/exerciseTracking";
+import {
   scheduleRestCompleteNotification,
   cancelScheduledNotification,
 } from "@/utils/notifications";
+import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 
 // ──────────────────────────────────────────────
 // Constants for Optimization
 // ──────────────────────────────────────────────
 const MAX_MEMORY_HISTORY = 15; // Limit in-memory history cache size
-const WORKOUT_SESSION_STORE_VERSION = 4;
+const WORKOUT_SESSION_STORE_VERSION = 5;
 
 // ──────────────────────────────────────────────
 // Rest timer type
@@ -85,12 +95,22 @@ interface WorkoutSessionActions {
   updateSessionDate: (sessionId: string, newDate: string) => void;
 
   // ── Exercise mutations ─────────────────────
-  addExercise: (name: string) => void;
+  addExercise: (exerciseDefinition?: ExerciseDefinition | null) => void;
   reorderExercises: (exerciseIds: string[]) => void;
   removeExercise: (exerciseId: string) => void;
+  selectExerciseDefinition: (exerciseId: string, exerciseDefinition: ExerciseDefinition) => void;
   updateExerciseField: (
     exerciseId: string,
-    field: keyof Pick<WorkoutExercise, "name" | "restSeconds" | "notes" | "weightUnit" | "muscles">,
+    field: keyof Pick<
+      WorkoutExercise,
+      | "name"
+      | "exerciseDefinitionId"
+      | "trackingMode"
+      | "restSeconds"
+      | "notes"
+      | "weightUnit"
+      | "muscles"
+    >,
     value: any
   ) => void;
   toggleExerciseUnit: (exerciseId: string) => void;
@@ -101,14 +121,14 @@ interface WorkoutSessionActions {
   updateSet: (
     exerciseId: string,
     setId: string,
-    field: keyof Pick<WorkoutSet, "weight" | "reps">,
+    field: keyof Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">,
     value: number | null
   ) => void;
   updateHistorySet: (
     sessionId: string,
     exerciseId: string,
     setId: string,
-    field: keyof Pick<WorkoutSet, "weight" | "reps">,
+    field: keyof Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">,
     value: number | null
   ) => void;
   toggleSetCompletion: (exerciseId: string, setId: string) => void;
@@ -128,14 +148,13 @@ interface WorkoutSessionActions {
   clearExpiredTimer: () => void;
 
   // ── Stats ──────────────────────────────────
-  togglePinExercise: (name: string) => void;
+  togglePinExercise: (identityKey: string) => void;
 
   // ── Sync metadata ─────────────────────────
   markDirty: () => void;
   clearDeletedWorkouts: (ids: string[]) => void;
   clearDirtyWorkouts: (ids: string[]) => void;
-  renameExerciseInHistory: (oldName: string, newName: string) => void;
-  updateMusclesInHistory: (exerciseName: string, muscles: MuscleGroup[]) => void;
+  updateMusclesInHistory: (exerciseIdentityKey: string, muscles: MuscleGroup[]) => void;
 
   /**
    * Applies remote data using last-write-wins against the current state.
@@ -153,12 +172,29 @@ interface WorkoutSessionActions {
 // Helpers
 // ──────────────────────────────────────────────
 
-function createEmptySet(initialWeight: number | null = null): WorkoutSet {
-  return { id: generateId(), weight: initialWeight, reps: null };
+function createEmptySet(
+  trackingMode: WorkoutExercise["trackingMode"] = "strength",
+  initialWeight: number | null = null
+): WorkoutSet {
+  return normalizeSetForTrackingMode(
+    {
+      id: generateId(),
+      weight: initialWeight,
+      reps: null,
+      durationSeconds: null,
+      distance: null,
+    },
+    trackingMode,
+    initialWeight
+  );
 }
 
-function createEmptySets(count: number, initialWeight: number | null = null): WorkoutSet[] {
-  return Array.from({ length: count }, () => createEmptySet(initialWeight));
+function createEmptySets(
+  count: number,
+  trackingMode: WorkoutExercise["trackingMode"] = "strength",
+  initialWeight: number | null = null
+): WorkoutSet[] {
+  return Array.from({ length: count }, () => createEmptySet(trackingMode, initialWeight));
 }
 
 function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
@@ -182,26 +218,6 @@ function buildCompletedSession(session: WorkoutSession): WorkoutSession {
   };
 }
 
-function getKnownExerciseNames(sessionHistory: WorkoutSession[], activeSession: WorkoutSession | null) {
-  const names = new Set<string>();
-
-  for (const session of sessionHistory) {
-    for (const exercise of session.exercises) {
-      if (exercise.name.trim().length > 0) {
-        names.add(exercise.name);
-      }
-    }
-  }
-
-  for (const exercise of activeSession?.exercises || []) {
-    if (exercise.name.trim().length > 0) {
-      names.add(exercise.name);
-    }
-  }
-
-  return Array.from(names);
-}
-
 function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
   if (!raw || typeof raw !== "object") return null;
   const id = raw._id ? String(raw._id) : null;
@@ -212,6 +228,9 @@ function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
         id: ex?.id ? String(ex.id) : generateId(),
         programExerciseId:
           typeof ex?.programExerciseId === "string" ? ex.programExerciseId : undefined,
+        exerciseDefinitionId:
+          typeof ex?.exerciseDefinitionId === "string" ? ex.exerciseDefinitionId : undefined,
+        trackingMode: normalizeTrackingMode(ex?.trackingMode),
         name: typeof ex?.name === "string" ? ex.name : "",
         restSeconds:
           typeof ex?.restSeconds === "number" && Number.isFinite(ex.restSeconds)
@@ -233,8 +252,20 @@ function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
                   : s?.reps == null
                     ? null
                     : null,
+              durationSeconds:
+                typeof s?.durationSeconds === "number" && Number.isFinite(s.durationSeconds)
+                  ? s.durationSeconds
+                  : s?.durationSeconds == null
+                    ? null
+                    : null,
+              distance:
+                typeof s?.distance === "number" && Number.isFinite(s.distance)
+                  ? s.distance
+                  : s?.distance == null
+                    ? null
+                    : null,
               completedAt: typeof s?.completedAt === "string" ? s.completedAt : undefined,
-            }))
+            })).map((set: WorkoutSet) => normalizeSetForTrackingMode(set, normalizeTrackingMode(ex?.trackingMode)))
           : [],
         weightUnit: ex?.weightUnit === "lbs" ? "lbs" : "kg",
         muscles: Array.isArray(ex?.muscles) ? ex.muscles : [],
@@ -350,10 +381,16 @@ export const useWorkoutSessionStore = create<
         const exercises: WorkoutExercise[] = (program.exercises || []).map((pe) => ({
           id: generateId(),
           programExerciseId: pe.id,
+          exerciseDefinitionId: pe.exerciseDefinitionId,
+          trackingMode: normalizeTrackingMode(pe.trackingMode),
           name: pe.name,
           restSeconds: pe.restSeconds,
           notes: pe.notes,
-          sets: createEmptySets(pe.defaultSets, pe.initialWeight ?? null),
+          sets: createEmptySets(
+            pe.defaultSets,
+            normalizeTrackingMode(pe.trackingMode),
+            pe.initialWeight ?? null
+          ),
           weightUnit: pe.weightUnit || "kg",
           muscles: pe.muscles || [],
         }));
@@ -488,36 +525,20 @@ export const useWorkoutSessionStore = create<
         }
       },
 
-      addExercise: (name) => {
-        const history = get().history;
-        const normalizedName = normalizeExerciseName(
-          name,
-          getKnownExerciseNames(history, get().activeSession)
-        );
-        const lowerName = normalizedName.toLowerCase();
-
-        // Smart Lookup: Find the most recent session containing this exercise to copy its muscles
-        let inferredMuscles: MuscleGroup[] = [];
-        for (const session of history) {
-          const existingEx = session.exercises.find(
-            (e) => e.name.toLowerCase() === lowerName
-          );
-          if (existingEx && existingEx.muscles && existingEx.muscles.length > 0) {
-            inferredMuscles = [...existingEx.muscles];
-            break;
-          }
-        }
-
+      addExercise: (exerciseDefinition = null) => {
         set((state) => {
           if (!state.activeSession) return;
+          const trackingMode = inferTrackingModeFromExerciseDefinition(exerciseDefinition);
           const exercise: WorkoutExercise = {
             id: generateId(),
-            name: normalizedName,
+            exerciseDefinitionId: exerciseDefinition?.id,
+            trackingMode,
+            name: exerciseDefinition?.name || "",
             restSeconds: 90,
             notes: "",
-            sets: createEmptySets(3),
+            sets: createEmptySets(3, trackingMode),
             weightUnit: "kg",
-            muscles: inferredMuscles,
+            muscles: exerciseDefinition?.muscles || [],
           };
           state.activeSession.exercises.push(exercise);
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
@@ -548,17 +569,32 @@ export const useWorkoutSessionStore = create<
         });
       },
 
+      selectExerciseDefinition: (exerciseId, exerciseDefinition) => {
+        set((state) => {
+          if (!state.activeSession) return;
+          const ex = state.activeSession.exercises.find((exercise) => exercise.id === exerciseId);
+          if (!ex) return;
+
+          ex.exerciseDefinitionId = exerciseDefinition.id;
+          ex.name = exerciseDefinition.name;
+          ex.muscles = [...exerciseDefinition.muscles];
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+
+          if (state.activeRestTimer?.exerciseId === exerciseId) {
+            state.activeRestTimer.exerciseName = exerciseDefinition.name;
+          }
+        });
+      },
+
       updateExerciseField: (exerciseId, field, value) => {
         const currentExercise = get().activeSession?.exercises.find((e) => e.id === exerciseId);
-        const oldName = field === "name" ? currentExercise?.name ?? null : null;
         const oldRestSeconds = field === "restSeconds" ? currentExercise?.restSeconds ?? null : null;
         const normalizedValue =
-          field === "name"
-            ? normalizeExerciseName(
-                value as string,
-                getKnownExerciseNames(get().history, get().activeSession)
-              )
-            : value;
+          field === "exerciseDefinitionId" && typeof value === "string"
+            ? value.trim()
+            : field === "trackingMode"
+              ? normalizeTrackingMode(value)
+              : value;
 
         set((state) => {
           if (!state.activeSession) return;
@@ -568,10 +604,21 @@ export const useWorkoutSessionStore = create<
           if (!ex) return;
           if (field === "restSeconds") {
             ex.restSeconds = normalizedValue as number;
+          } else if (field === "exerciseDefinitionId") {
+            ex.exerciseDefinitionId = normalizedValue as string;
+          } else if (field === "trackingMode") {
+            const nextTrackingMode = normalizedValue as WorkoutExercise["trackingMode"];
+            ex.trackingMode = nextTrackingMode;
+            ex.sets = ex.sets.map((set) => normalizeSetForTrackingMode(set, nextTrackingMode));
           } else if (field === "weightUnit") {
             ex.weightUnit = normalizedValue as "kg" | "lbs";
           } else if (field === "muscles") {
             ex.muscles = normalizedValue as MuscleGroup[];
+            if (typeof ex.exerciseDefinitionId === "string" && ex.exerciseDefinitionId.startsWith("custom-")) {
+              useExerciseLibraryStore
+                .getState()
+                .updateCustomExerciseMuscles(ex.exerciseDefinitionId, normalizedValue as MuscleGroup[]);
+            }
           } else {
             (ex[field] as any) = normalizedValue;
           }
@@ -580,11 +627,6 @@ export const useWorkoutSessionStore = create<
             state.activeRestTimer.exerciseName = normalizedValue as string;
           }
         });
-
-        // Trigger history rename if name changed during active workout
-        if (field === "name" && oldName && oldName.toLowerCase() !== (normalizedValue as string).toLowerCase()) {
-          get().renameExerciseInHistory(oldName, normalizedValue as string);
-        }
 
         if (
           field === "restSeconds" &&
@@ -633,7 +675,7 @@ export const useWorkoutSessionStore = create<
             (e) => e.id === exerciseId
           );
           if (!ex) return;
-          ex.sets.push(createEmptySet());
+          ex.sets.push(createEmptySet(ex.trackingMode));
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
@@ -812,16 +854,17 @@ export const useWorkoutSessionStore = create<
 
       // ── Stats ─────────────────────────────────
 
-      togglePinExercise: (name) => {
+      togglePinExercise: (identityKey) => {
         set((state) => {
           if (!state.pinnedExerciseNames) {
             state.pinnedExerciseNames = [];
           }
-          const lowerName = name.toLowerCase();
-          if (state.pinnedExerciseNames.includes(lowerName)) {
-            state.pinnedExerciseNames = state.pinnedExerciseNames.filter(n => n !== lowerName);
+          const normalizedKey = normalizeExerciseIdentityKey(identityKey);
+          if (!normalizedKey) return;
+          if (state.pinnedExerciseNames.includes(normalizedKey)) {
+            state.pinnedExerciseNames = state.pinnedExerciseNames.filter((n) => n !== normalizedKey);
           } else {
-            state.pinnedExerciseNames.push(lowerName);
+            state.pinnedExerciseNames.push(normalizedKey);
           }
           state.isDirty = true;
         });
@@ -852,50 +895,18 @@ export const useWorkoutSessionStore = create<
         });
       },
 
-      renameExerciseInHistory: (oldName, newName) => {
-        if (!oldName || !newName || oldName.toLowerCase() === newName.toLowerCase()) return;
+      updateMusclesInHistory: (exerciseIdentityKey, muscles) => {
+        const normalizedKey = normalizeExerciseIdentityKey(exerciseIdentityKey);
+        if (!normalizedKey) return;
 
         const updatedSessions: WorkoutSession[] = [];
         set((state) => {
           let count = 0;
+
           state.history.forEach(session => {
             let sessionChanged = false;
             session.exercises.forEach(ex => {
-              if (ex.name.toLowerCase() === oldName.toLowerCase()) {
-                ex.name = newName;
-                session.updatedAt = Date.now();
-                count++;
-                sessionChanged = true;
-              }
-            });
-            if (sessionChanged) {
-              updatedSessions.push(safeClone(session));
-              if (!state.dirtyWorkoutIds.includes(session._id)) {
-                state.dirtyWorkoutIds.push(session._id);
-              }
-            }
-          });
-          if (count > 0) state.isDirty = true;
-        });
-
-        if (updatedSessions.length > 0) {
-          workoutStorage.saveBatch(updatedSessions);
-          void workoutStatsStorage.upsertBatch(updatedSessions);
-        }
-      },
-
-      updateMusclesInHistory: (exerciseName, muscles) => {
-        if (!exerciseName) return;
-        
-        const updatedSessions: WorkoutSession[] = [];
-        set((state) => {
-          let count = 0;
-          const lowerName = exerciseName.toLowerCase();
-          
-          state.history.forEach(session => {
-            let sessionChanged = false;
-            session.exercises.forEach(ex => {
-              if (ex.name.toLowerCase() === lowerName) {
+              if (getExerciseIdentityKey(ex) === normalizedKey) {
                 ex.muscles = [...muscles];
                 session.updatedAt = Date.now();
                 count++;
@@ -913,7 +924,7 @@ export const useWorkoutSessionStore = create<
           // Also update active session if it contains the exercise
           if (state.activeSession) {
             state.activeSession.exercises.forEach(ex => {
-              if (ex.name.toLowerCase() === lowerName) {
+              if (getExerciseIdentityKey(ex) === normalizedKey) {
                 ex.muscles = [...muscles];
               }
             });
@@ -924,6 +935,10 @@ export const useWorkoutSessionStore = create<
 
         if (updatedSessions.length > 0) {
           workoutStorage.saveBatch(updatedSessions);
+        }
+
+        if (normalizedKey.startsWith("custom-")) {
+          useExerciseLibraryStore.getState().updateCustomExerciseMuscles(normalizedKey, muscles);
         }
       },
 

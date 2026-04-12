@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { WorkoutSession } from "@/types";
+import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
 
 export const WORKOUT_STATS_KEY = "workout-stats-index-v1";
 
@@ -50,8 +51,6 @@ const toDateKey = (isoString: string) => {
   return date.toISOString().split("T")[0];
 };
 
-const normalizeExerciseKey = (name: string) => name.trim().toLowerCase();
-
 function addAgg(target: Aggregate, source: Aggregate) {
   target.volume = clamp(target.volume + source.volume);
   target.sets = clamp(target.sets + source.sets);
@@ -77,7 +76,7 @@ function computeContribution(session: WorkoutSession): SessionContribution | nul
   const total = emptyAggregate();
 
   for (const exercise of session.exercises) {
-    const key = normalizeExerciseKey(exercise.name || "");
+    const key = getExerciseIdentityKey(exercise);
     if (!key) continue;
 
     let exerciseVolume = 0;

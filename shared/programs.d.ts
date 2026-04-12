@@ -1,7 +1,10 @@
 export type WeightUnit = "kg" | "lbs";
+export type ExerciseTrackingMode = "strength" | "timed" | "cardio";
 
 export interface RoutineExerciseDraft<TMuscle extends string = string> {
   id: string;
+  exerciseDefinitionId: string;
+  trackingMode: ExerciseTrackingMode;
   name: string;
   defaultSets: number;
   restSeconds: number;
@@ -19,6 +22,7 @@ export interface RoutineDraft<TMuscle extends string = string> {
 export const DEFAULT_EXERCISE_SETS: 3;
 export const DEFAULT_EXERCISE_REST_SECONDS: 90;
 export const DEFAULT_WEIGHT_UNIT: "kg";
+export const DEFAULT_TRACKING_MODE: "strength";
 
 export function createEmptyExercise<TMuscle extends string = string>(
   createId: () => string

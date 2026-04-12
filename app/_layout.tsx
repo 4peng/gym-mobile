@@ -2,16 +2,36 @@ import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import * as Font from 'expo-font';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { COLORS } from '@/src/constants/colors';
 import { useState } from 'react';
 import { startNetworkSyncListener } from '@/src/lib/api/networkListener';
 import { initSyncEffect } from '@/src/stores/syncEffect';
+import RestTimerLiveActivitySync from '@/src/components/RestTimerLiveActivitySync';
+import {
+  clearAppNotifications,
+  configureNotificationHandler,
+} from '@/src/utils/notifications';
 
 export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    configureNotificationHandler();
+    void clearAppNotifications();
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void clearAppNotifications();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // Break circular dependencies by initializing sync listeners here
@@ -53,6 +73,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <RestTimerLiveActivitySync />
       <Stack
         screenOptions={{
           headerShown: false,

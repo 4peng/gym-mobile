@@ -2,6 +2,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IProgramExercise {
   id: string;
+  exerciseDefinitionId?: string;
+  trackingMode?: 'strength' | 'timed' | 'cardio';
   name: string;
   defaultSets: number;
   restSeconds: number;
@@ -22,6 +24,8 @@ export interface IProgram extends Document<string> {
 
 const ProgramExerciseSchema = new Schema({
   id: { type: String, required: true },
+  exerciseDefinitionId: { type: String },
+  trackingMode: { type: String, enum: ['strength', 'timed', 'cardio'], default: 'strength' },
   name: { type: String, required: true },
   defaultSets: { type: Number, required: true },
   restSeconds: { type: Number, required: true },

@@ -46,9 +46,10 @@ import LiveWorkoutTimer from "@/components/LiveWorkoutTimer";
 import { HapticFeedback } from "@/utils/haptics";
 import { ExerciseCard } from "@/components/Workout/ExerciseCard";
 import ExerciseReorderModal from "@/components/Workout/ExerciseReorderModal";
+import ExercisePickerModal from "@/components/ExercisePickerModal";
 import { copyExercises, createRoutineSnapshot, normalizeExercises } from "@/shared/programs.js";
 import { generateId } from "@/utils/id";
-import type { Program, ProgramExercise, WorkoutExercise, WorkoutSession } from "@/types";
+import type { ExerciseDefinition, Program, ProgramExercise, WorkoutExercise, WorkoutSession } from "@/types";
 
 function areIdArraysEqual(left: string[], right: string[]) {
   if (left.length !== right.length) return false;
@@ -59,6 +60,10 @@ function getExerciseInitialWeight(
   exercise: WorkoutExercise,
   sourceExercise?: ProgramExercise
 ) {
+  if (exercise.trackingMode !== "strength") {
+    return null;
+  }
+
   if (typeof sourceExercise?.initialWeight === "number") {
     return sourceExercise.initialWeight;
   }
@@ -88,6 +93,9 @@ function buildRoutineExercisesFromSession(
 
         return {
           id: sourceExercise?.id ?? generateId(),
+          exerciseDefinitionId:
+            exercise.exerciseDefinitionId ?? sourceExercise?.exerciseDefinitionId ?? "",
+          trackingMode: exercise.trackingMode ?? sourceExercise?.trackingMode ?? "strength",
           name: exercise.name,
           defaultSets: Math.max(1, exercise.sets.length),
           restSeconds: exercise.restSeconds,
@@ -121,6 +129,7 @@ export default function WorkoutSessionScreen() {
   const [routinePromptVisible, setRoutinePromptVisible] = useState(false);
   const [saveAsNewVisible, setSaveAsNewVisible] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState("");
+  const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -203,9 +212,9 @@ export default function WorkoutSessionScreen() {
     );
   }, [activeSession?.programId, getDerivedRoutineExercises, sourceProgram]);
 
-  const handleAddExercise = useCallback(() => {
+  const handleAddExercise = useCallback((definition: ExerciseDefinition) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    addExercise("");
+    addExercise(definition);
   }, [addExercise]);
 
   const finishWorkout = useCallback(() => {
@@ -357,7 +366,7 @@ export default function WorkoutSessionScreen() {
 
                 <View style={styles.footerActionsRow}>
                   <Pressable
-                    onPress={handleAddExercise}
+                    onPress={() => setExercisePickerVisible(true)}
                     style={({ pressed }) => [
                       styles.footerActionBtn,
                       pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
@@ -392,68 +401,82 @@ export default function WorkoutSessionScreen() {
         onSave={handleReorderSave}
       />
 
+      <ExercisePickerModal
+        visible={exercisePickerVisible}
+        onClose={() => setExercisePickerVisible(false)}
+        onSelect={handleAddExercise}
+        title="Add Exercise"
+        subtitle="Pick from the library or add a custom exercise."
+      />
+
       <Modal
         visible={routinePromptVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setRoutinePromptVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRoutinePromptVisible(false)} />
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Routine Changed During Workout</Text>
-            <Text style={styles.modalDescription}>
-              Save these exercise-stack changes back to your routine, turn them into a new routine,
-              or keep them only in this workout.
-            </Text>
+        <KeyboardAvoidingView
+          style={styles.modalKeyboardAvoider}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setRoutinePromptVisible(false)} />
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>Routine Changed During Workout</Text>
+              <Text style={styles.modalDescription}>
+                Save these exercise-stack changes back to your routine, turn them into a new routine,
+                or keep them only in this workout.
+              </Text>
 
-            <Pressable
-              style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-              onPress={() => handleSaveRoutineChanges("current")}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-                <Save size={20} color={COLORS.ACCENT_BLUE} />
-              </View>
-              <View style={styles.optionCopy}>
-                <Text style={styles.optionLabel}>Save To Current Routine</Text>
-                <Text style={styles.optionDesc}>Update the routine you started from.</Text>
-              </View>
-            </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
+                onPress={() => handleSaveRoutineChanges("current")}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
+                  <Save size={20} color={COLORS.ACCENT_BLUE} />
+                </View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionLabel}>Save To Current Routine</Text>
+                  <Text style={styles.optionDesc}>Update the routine you started from.</Text>
+                </View>
+              </Pressable>
 
-            <Pressable
-              style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-              onPress={() => {
-                setRoutinePromptVisible(false);
-                setSaveAsNewVisible(true);
-              }}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
-                <Copy size={20} color={COLORS.ACCENT_GREEN} />
-              </View>
-              <View style={styles.optionCopy}>
-                <Text style={styles.optionLabel}>Save As New Routine</Text>
-                <Text style={styles.optionDesc}>Keep the original routine untouched.</Text>
-              </View>
-            </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
+                onPress={() => {
+                  setRoutinePromptVisible(false);
+                  setSaveAsNewVisible(true);
+                }}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
+                  <Copy size={20} color={COLORS.ACCENT_GREEN} />
+                </View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionLabel}>Save As New Routine</Text>
+                  <Text style={styles.optionDesc}>Keep the original routine untouched.</Text>
+                </View>
+              </Pressable>
 
-            <Pressable
-              style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-              onPress={() => handleSaveRoutineChanges("workout-only")}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: "rgba(255,255,255,0.06)" }]}>
-                <Check size={20} color={COLORS.TEXT_PRIMARY} />
-              </View>
-              <View style={styles.optionCopy}>
-                <Text style={styles.optionLabel}>Workout Only</Text>
-                <Text style={styles.optionDesc}>Finish now without changing any saved routine.</Text>
-              </View>
-            </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
+                onPress={() => handleSaveRoutineChanges("workout-only")}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "rgba(255,255,255,0.06)" }]}>
+                  <Check size={20} color={COLORS.TEXT_PRIMARY} />
+                </View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionLabel}>Workout Only</Text>
+                  <Text style={styles.optionDesc}>Finish now without changing any saved routine.</Text>
+                </View>
+              </Pressable>
 
-            <Pressable style={styles.modalCancelBtn} onPress={() => setRoutinePromptVisible(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
+              <Pressable style={styles.modalCancelBtn} onPress={() => setRoutinePromptVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -465,52 +488,58 @@ export default function WorkoutSessionScreen() {
           setRoutinePromptVisible(true);
         }}
       >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => {
-              setSaveAsNewVisible(false);
-              setRoutinePromptVisible(true);
-            }}
-          />
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>New Routine Name</Text>
-            <Text style={styles.modalDescription}>
-              This will save the adjusted exercise stack as a separate routine.
-            </Text>
-
-            <View style={styles.newRoutineInputShell}>
-              <TextInput
-                style={styles.newRoutineInput}
-                value={newRoutineName}
-                onChangeText={setNewRoutineName}
-                placeholder="Routine name"
-                placeholderTextColor={COLORS.TEXT_TERTIARY}
-                autoFocus
-              />
-            </View>
-
+        <KeyboardAvoidingView
+          style={styles.modalKeyboardAvoider}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        >
+          <View style={styles.modalOverlay}>
             <Pressable
-              style={({ pressed }) => [
-                styles.primaryModalBtn,
-                pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] },
-              ]}
-              onPress={handleCreateRoutineAndFinish}
-            >
-              <Text style={styles.primaryModalBtnText}>Save New Routine And Finish</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.modalCancelBtn}
+              style={StyleSheet.absoluteFill}
               onPress={() => {
                 setSaveAsNewVisible(false);
                 setRoutinePromptVisible(true);
               }}
-            >
-              <Text style={styles.modalCancelText}>Back</Text>
-            </Pressable>
+            />
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>New Routine Name</Text>
+              <Text style={styles.modalDescription}>
+                This will save the adjusted exercise stack as a separate routine.
+              </Text>
+
+              <View style={styles.newRoutineInputShell}>
+                <TextInput
+                  style={styles.newRoutineInput}
+                  value={newRoutineName}
+                  onChangeText={setNewRoutineName}
+                  placeholder="Routine name"
+                  placeholderTextColor={COLORS.TEXT_TERTIARY}
+                  autoFocus
+                />
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryModalBtn,
+                  pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] },
+                ]}
+                onPress={handleCreateRoutineAndFinish}
+              >
+                <Text style={styles.primaryModalBtnText}>Save New Routine And Finish</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setSaveAsNewVisible(false);
+                  setRoutinePromptVisible(true);
+                }}
+              >
+                <Text style={styles.modalCancelText}>Back</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
@@ -524,7 +553,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: UI.LAYOUT_PADDING,
     paddingTop: UI.HEADER_TOP,
-    paddingBottom: 32,
+    paddingBottom: 18,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -536,13 +565,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   headerTitle: {
     color: COLORS.TEXT_PRIMARY,
-    fontSize: 34,
-    fontWeight: "900",
-    letterSpacing: -1.5,
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.8,
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   headerActions: {
@@ -551,40 +580,40 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingBottom: 180,
+    paddingBottom: 160,
   },
   footerSection: {
-    marginTop: 8,
+    marginTop: 2,
     marginBottom: 100,
   },
   workoutNotesCard: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
-    padding: 16,
-    minHeight: 120,
+    padding: 14,
+    minHeight: 96,
   },
   workoutNotesInput: {
     flex: 1,
     color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     fontFamily: FONT_FAMILIES.MEDIUM,
     padding: 0,
     textAlignVertical: "top",
   },
   footerActionsRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 18,
+    gap: 10,
+    marginTop: 12,
   },
   footerActionBtn: {
     flex: 1,
-    height: 58,
-    borderRadius: 20,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: COLORS.CARD_BG,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.04)",
@@ -595,14 +624,17 @@ const styles = StyleSheet.create({
   },
   footerActionText: {
     color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontWeight: "800",
+    fontSize: 14,
+    fontWeight: "700",
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.82)",
     justifyContent: "flex-end",
+  },
+  modalKeyboardAvoider: {
+    flex: 1,
   },
   modalSheet: {
     backgroundColor: COLORS.CARD_BG,

@@ -5,7 +5,6 @@ import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
-import { toTitleCase } from "@/utils/string";
 import type { WorkoutExercise } from "@/types";
 import { resolveExercisePlaceholders } from "@/utils/placeholders";
 import { formatSecondsToMMSS } from "@/utils/conversions";
@@ -13,12 +12,47 @@ import RestTimerPicker from "@/components/RestTimerPicker";
 import { showConfirm } from "@/utils/alerts";
 import { HapticFeedback } from "@/utils/haptics";
 import { SetRow } from "./SetRow";
-
+import ExercisePickerField from "@/components/ExercisePickerField";
+import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelector";
 import MuscleSelector from "@/src/components/MuscleSelector";
 import { MuscleGroup } from "@/src/constants/muscles";
+import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
+import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
+}
+
+function StatChip({
+  value,
+  icon,
+  onPress,
+  accent,
+}: {
+  value: string;
+  icon: React.ReactNode;
+  onPress?: () => void;
+  accent?: string;
+}) {
+  const content = (
+    <View style={styles.statChipContent}>
+      {icon}
+      <Text style={[styles.statChipValue, accent ? { color: accent } : null]}>{value}</Text>
+    </View>
+  );
+
+  if (!onPress) {
+    return <View style={styles.statChip}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.statChip, pressed && styles.statChipPressed]}
+    >
+      {content}
+    </Pressable>
+  );
 }
 
 export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard({
@@ -30,24 +64,43 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   const removeExercise = useWorkoutSessionStore((s) => s.removeExercise);
   const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
   const toggleExerciseUnit = useWorkoutSessionStore((s) => s.toggleExerciseUnit);
+  const selectExerciseDefinition = useWorkoutSessionStore((s) => s.selectExerciseDefinition);
   const history = useWorkoutSessionStore((s) => s.history);
 
-  const handleRestSave = useCallback((seconds: number) => {
-    updateExerciseField(exercise.id, "restSeconds", seconds);
-  }, [exercise.id, updateExerciseField]);
+  const handleRestSave = useCallback(
+    (seconds: number) => {
+      updateExerciseField(exercise.id, "restSeconds", seconds);
+    },
+    [exercise.id, updateExerciseField]
+  );
 
-  const handleNameChange = useCallback((text: string) => {
-    updateExerciseField(exercise.id, "name", text);
-  }, [exercise.id, updateExerciseField]);
+  const handleExerciseSelect = useCallback(
+    (selectedExercise: ExerciseDefinition) => {
+      selectExerciseDefinition(exercise.id, selectedExercise);
+    },
+    [exercise.id, selectExerciseDefinition]
+  );
 
-  const handleNotesChange = useCallback((text: string) => {
-    updateExerciseField(exercise.id, "notes", text);
-  }, [exercise.id, updateExerciseField]);
+  const handleNotesChange = useCallback(
+    (text: string) => {
+      updateExerciseField(exercise.id, "notes", text);
+    },
+    [exercise.id, updateExerciseField]
+  );
+
+  const handleTrackingModeChange = useCallback(
+    (trackingMode: ExerciseTrackingMode) => {
+      updateExerciseField(exercise.id, "trackingMode", trackingMode);
+    },
+    [exercise.id, updateExerciseField]
+  );
 
   const placeholders = useMemo(
     () =>
-      resolveExercisePlaceholders(exercise.name, exercise.sets, history),
-    [exercise.name, exercise.sets, history]
+      exercise.trackingMode === "strength"
+        ? resolveExercisePlaceholders(getExerciseIdentityKey(exercise), exercise.sets, history)
+        : [],
+    [exercise, history]
   );
 
   const handleAddSet = useCallback(() => {
@@ -56,14 +109,10 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   }, [exercise.id, addSet]);
 
   const handleRemoveExercise = useCallback(() => {
-    showConfirm(
-      "Remove Exercise",
-      `Remove "${exercise.name}"?`,
-      () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        removeExercise(exercise.id);
-      }
-    );
+    showConfirm("Remove Exercise", `Remove "${exercise.name}"?`, () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      removeExercise(exercise.id);
+    });
   }, [exercise.id, exercise.name, removeExercise]);
 
   const handleUnitToggle = useCallback(() => {
@@ -71,48 +120,61 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
     toggleExerciseUnit(exercise.id);
   }, [exercise.id, toggleExerciseUnit]);
 
-  const handleMusclesChange = useCallback((muscles: MuscleGroup[]) => {
-    updateExerciseField(exercise.id, "muscles", muscles);
-    HapticFeedback.selection();
-  }, [exercise.id, updateExerciseField]);
+  const handleMusclesChange = useCallback(
+    (muscles: MuscleGroup[]) => {
+      updateExerciseField(exercise.id, "muscles", muscles);
+      HapticFeedback.selection();
+    },
+    [exercise.id, updateExerciseField]
+  );
+
+  const hasNotes = exercise.notes.trim().length > 0;
 
   return (
-    <View style={UI.SHARED.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.exerciseInfo}>
-          <TextInput
-            style={styles.exerciseNameInput}
-            value={toTitleCase(exercise.name)}
-            onChangeText={handleNameChange}
-            placeholder="Exercise name"
-            placeholderTextColor={COLORS.TEXT_TERTIARY}
-            multiline={false}
+    <View style={[UI.SHARED.card, styles.card]}>
+      <View style={styles.topRow}>
+        <View style={styles.topContent}>
+          <ExercisePickerField
+            label=""
+            value={exercise.name}
+            selectedDefinitionId={exercise.exerciseDefinitionId}
+            onSelect={handleExerciseSelect}
           />
-          <View style={styles.exerciseMetaRow}>
-            <MuscleSelector 
-              selectedMuscles={exercise.muscles || []}
-              onSelect={handleMusclesChange}
-            />
-            <View style={{ width: '100%', height: 12 }} />
-            <Pressable 
-              style={({ pressed }) => [styles.unitPill, pressed && { opacity: 0.7 }]}
-              onPress={handleUnitToggle}
-            >
-              <Dumbbell size={10} color={COLORS.ACCENT_BLUE} />
-              <Text style={styles.unitPillText}>{exercise.weightUnit || "kg"}</Text>
-            </Pressable>
-            <Pressable 
-              style={({ pressed }) => [styles.restPill, pressed && { opacity: 0.7 }]}
-              onPress={() => setPickerVisible(true)}
-            >
-              <Clock size={10} color={COLORS.ACCENT_BLUE} />
-              <Text style={styles.restPillText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
-            </Pressable>
-          </View>
         </View>
         <Pressable onPress={handleRemoveExercise} hitSlop={12} style={styles.cardRemoveBtn}>
-          <Trash2 size={18} color={COLORS.DANGER} />
+          <Trash2 size={16} color={COLORS.DANGER} />
         </Pressable>
+      </View>
+
+      <View style={styles.controlsSection}>
+        <View style={styles.quickRow}>
+          <ExerciseTrackingModeSelector
+            value={exercise.trackingMode}
+            onChange={handleTrackingModeChange}
+            compact
+          />
+
+          <StatChip
+            value={`Rest ${formatSecondsToMMSS(exercise.restSeconds)}`}
+            icon={<Clock size={12} color={COLORS.TEXT_TERTIARY} />}
+            onPress={() => setPickerVisible(true)}
+          />
+
+          {exercise.trackingMode === "strength" ? (
+            <StatChip
+              value={(exercise.weightUnit || "kg").toUpperCase()}
+              icon={<Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />}
+              onPress={handleUnitToggle}
+              accent={COLORS.ACCENT_BLUE}
+            />
+          ) : null}
+        </View>
+
+        <MuscleSelector
+          selectedMuscles={exercise.muscles || []}
+          onSelect={handleMusclesChange}
+          label="Muscles"
+        />
       </View>
 
       <Pressable
@@ -122,57 +184,79 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
           pressed && !isEditingNotes && { opacity: 0.85 },
         ]}
       >
-        <StickyNote size={12} color={COLORS.ACCENT_BLUE} style={{ marginTop: 2 }} />
+        <StickyNote
+          size={12}
+          color={COLORS.TEXT_TERTIARY}
+          style={{ marginTop: isEditingNotes ? 3 : 1 }}
+        />
         {isEditingNotes ? (
           <TextInput
             style={styles.notesInput}
             value={exercise.notes}
             onChangeText={handleNotesChange}
             onBlur={() => setIsEditingNotes(false)}
-            placeholder="Tap to add notes..."
+            placeholder="Add cues, pace targets, machine settings..."
             placeholderTextColor={COLORS.TEXT_TERTIARY}
             autoFocus
             multiline
           />
         ) : (
-          <Text style={[styles.notesText, exercise.notes === "" && styles.notesPlaceholder]}>
-            {exercise.notes === "" ? "Tap to add notes..." : exercise.notes}
+          <Text
+            style={[
+              styles.notesText,
+              !hasNotes && styles.notesPlaceholder,
+              !hasNotes && styles.notesTextCompact,
+            ]}
+          >
+            {hasNotes ? exercise.notes : "Add notes"}
           </Text>
         )}
       </Pressable>
 
-      <View style={styles.setHeader}>
-        <Text style={[styles.setHeaderText, { width: '15%', textAlign: 'center' }]}>Set</Text>
-        <Text style={[styles.setHeaderText, { width: '30%', textAlign: 'center' }]}>Weight</Text>
-        <Text style={[styles.setHeaderText, { width: '30%', textAlign: 'center' }]}>Reps</Text>
-        <View style={{ width: '25%' }} />
+      <View style={styles.setsShell}>
+        <View style={styles.setsHeaderRow}>
+          <View>
+            <Text style={styles.setsTitle}>Sets</Text>
+            <Text style={styles.setsSubtitle}>
+              {exercise.trackingMode === "strength"
+                ? "Log weight and reps"
+                : exercise.trackingMode === "timed"
+                  ? "Log duration for each set"
+                  : "Log duration and distance"}
+            </Text>
+          </View>
+          <Text style={styles.setCount}>{exercise.sets.length}</Text>
+        </View>
+
+        <View style={styles.rowsWrap}>
+          {exercise.sets.map((s, i) => (
+            <SetRow
+              key={s.id}
+              set={s}
+              index={i}
+              placeholder={placeholders[i] ?? { weight: null, reps: null }}
+              exerciseId={exercise.id}
+              exerciseName={exercise.name}
+              restSeconds={exercise.restSeconds}
+              trackingMode={exercise.trackingMode}
+              weightUnit={exercise.weightUnit || "kg"}
+            />
+          ))}
+        </View>
+
+        <Pressable
+          onPress={handleAddSet}
+          style={({ pressed }) => [
+            styles.addSetBtn,
+            pressed && { backgroundColor: "rgba(11, 130, 255, 0.1)" },
+          ]}
+        >
+          <Plus size={15} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
+          <Text style={styles.addSetBtnText}>Add Set</Text>
+        </Pressable>
       </View>
 
-      {exercise.sets.map((s, i) => (
-        <SetRow
-          key={s.id}
-          set={s}
-          index={i}
-          placeholder={placeholders[i] ?? { weight: null, reps: null }}
-          exerciseId={exercise.id}
-          exerciseName={exercise.name}
-          restSeconds={exercise.restSeconds}
-          weightUnit={exercise.weightUnit || "kg"}
-        />
-      ))}
-
-      <Pressable 
-        onPress={handleAddSet} 
-        style={({ pressed }) => [
-          styles.addSetBtn,
-          pressed && { backgroundColor: "rgba(255,255,255,0.03)" }
-        ]}
-      >
-        <Plus size={16} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
-        <Text style={styles.addSetBtnText}>Add Set</Text>
-      </Pressable>
-
-      <RestTimerPicker 
+      <RestTimerPicker
         visible={pickerVisible}
         initialSeconds={exercise.restSeconds}
         onClose={() => setPickerVisible(false)}
@@ -183,76 +267,74 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
 });
 
 const styles = StyleSheet.create({
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
+  card: {
+    padding: 16,
+    borderRadius: 22,
+    marginBottom: 14,
   },
-  exerciseInfo: {
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  topContent: {
     flex: 1,
   },
-  exerciseNameInput: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 8,
-    padding: 0,
-  },
-  exerciseMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: 'wrap',
-  },
-  unitPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.CARD_HOVER,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    gap: 6,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-  },
-  unitPillText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  restPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.CARD_HOVER,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-  },
-  restPillText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 12,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
   cardRemoveBtn: {
-    padding: 8,
-    backgroundColor: "rgba(255,255,255,0.02)",
+    width: 38,
+    height: 38,
     borderRadius: 12,
+    backgroundColor: "rgba(239, 68, 68, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  controlsSection: {
+    marginTop: 12,
+    gap: 10,
+  },
+  quickRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  statChip: {
+    minHeight: 38,
+    borderRadius: 12,
+    backgroundColor: COLORS.BG,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: "center",
+  },
+  statChipPressed: {
+    opacity: 0.82,
+  },
+  statChipContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statChipValue: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 12,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   notesContainer: {
     flexDirection: "row",
     gap: 10,
-    backgroundColor: "rgba(11, 130, 255, 0.05)",
-    padding: 14,
-    borderRadius: 16,
-    marginBottom: 24,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    marginTop: 10,
+    minHeight: 44,
   },
   notesText: {
     color: COLORS.TEXT_SECONDARY,
@@ -260,6 +342,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: FONT_FAMILIES.MEDIUM,
     flex: 1,
+  },
+  notesTextCompact: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   notesPlaceholder: {
     color: COLORS.TEXT_TERTIARY,
@@ -271,41 +357,56 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: FONT_FAMILIES.MEDIUM,
     padding: 0,
-    minHeight: 18,
+    minHeight: 20,
     textAlignVertical: "top",
   },
-  setHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER,
-    marginBottom: 12,
+  setsShell: {
+    marginTop: 12,
   },
-  setHeaderText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 10,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
+  setsHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  setsTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 16,
+    fontWeight: "800",
     fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  setsSubtitle: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  setCount: {
+    color: COLORS.ACCENT_BLUE,
+    fontSize: 20,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    lineHeight: 22,
+  },
+  rowsWrap: {
+    gap: 8,
   },
   addSetBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
+    marginTop: 10,
+    minHeight: 42,
+    borderRadius: 14,
     backgroundColor: "rgba(11, 130, 255, 0.05)",
     borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.2)",
+    borderColor: "rgba(11, 130, 255, 0.14)",
   },
   addSetBtnText: {
     color: COLORS.ACCENT_BLUE,
     fontWeight: "800",
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
 });

@@ -30,8 +30,5 @@ export const useUpdateSessionDate = () =>
 export const useTogglePinExercise = () =>
   useWorkoutSessionStore((state) => state.togglePinExercise);
 
-export const useRenameExerciseInHistory = () =>
-  useWorkoutSessionStore((state) => state.renameExerciseInHistory);
-
 export const useUpdateMusclesInHistory = () =>
   useWorkoutSessionStore((state) => state.updateMusclesInHistory);

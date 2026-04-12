@@ -9,7 +9,12 @@ import { create } from "zustand";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WORKOUT_STATS_KEY } from "@/storage/workoutStatsStorage";
 
-const APP_STORAGE_KEYS = ["program-store", "workout-session-store", WORKOUT_STATS_KEY] as const;
+const APP_STORAGE_KEYS = [
+  "program-store",
+  "workout-session-store",
+  "exercise-library-store",
+  WORKOUT_STATS_KEY,
+] as const;
 const APP_STORAGE_PREFIXES = ["workout_"] as const;
 
 interface SyncState {
@@ -76,6 +81,7 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
   forceResync: async () => {
     const { useProgramStore } = await import("./programStore");
     const { useWorkoutSessionStore } = await import("./workoutSessionStore");
+    const { useExerciseLibraryStore } = await import("./exerciseLibraryStore");
     const { runFullSync: engineRunFullSync } = await import("@/lib/api/sync");
 
     if (get().isSyncing) return false;
@@ -110,6 +116,9 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
         pinnedExerciseNames: [],
         isDirty: false,
         lastSyncedAt: null,
+      });
+      useExerciseLibraryStore.setState({
+        customExercises: [],
       });
 
       // 3. Run sync (it will now be a full sync because local is empty)

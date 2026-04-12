@@ -20,11 +20,11 @@ export interface SetPlaceholder {
  *    that haven't been filled yet.
  */
 export function resolveExercisePlaceholders(
-  exerciseName: string,
+  exerciseIdentityKey: string,
   currentSets: WorkoutSet[],
   history: WorkoutSession[]
 ): SetPlaceholder[] {
-  const previous = findMostRecentExercise(exerciseName, history);
+  const previous = findMostRecentExercise(exerciseIdentityKey, history);
   const currentSetCount = currentSets.length;
 
   // 1. Initial pass: use history
@@ -104,13 +104,18 @@ export function resolveSetOnComplete(
  * the sets array from the first matching exercise name.
  */
 function findMostRecentExercise(
-  name: string,
+  exerciseIdentityKey: string,
   history: WorkoutSession[]
 ): WorkoutSet[] | null {
   for (const session of history) {
     if (!session.completedAt) continue; // skip incomplete
     const match = session.exercises.find(
-      (e) => e.name.toLowerCase() === name.toLowerCase()
+      (e) => {
+        const key =
+          (typeof e.exerciseDefinitionId === "string" && e.exerciseDefinitionId.trim()) ||
+          e.name;
+        return key.toLowerCase() === exerciseIdentityKey.toLowerCase();
+      }
     );
     if (match) return match.sets;
   }

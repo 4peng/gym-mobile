@@ -19,7 +19,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-widgets",
+        {
+          "frequentUpdates": true,
+          "widgets": []
+        }
+      ]
     ]
   }
 }

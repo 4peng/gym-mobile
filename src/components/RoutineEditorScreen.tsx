@@ -18,6 +18,8 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import ExerciseEditor, { type ExerciseFormData } from "@/components/ExerciseEditor";
+import ExerciseReorderModal from "@/components/Workout/ExerciseReorderModal";
+import ExercisePickerModal from "@/components/ExercisePickerModal";
 import {
   buildRoutineDraft,
   createEmptyExercise,
@@ -25,6 +27,8 @@ import {
   validateRoutineDraft,
 } from "@/shared/programs.js";
 import { generateId } from "@/utils/id";
+import type { ExerciseDefinition } from "@/types";
+import { inferTrackingModeFromExerciseDefinition } from "@/utils/exerciseTracking";
 
 type Mode = "create" | "edit" | "duplicate";
 
@@ -55,6 +59,8 @@ export default function RoutineEditorScreen({
   const [name, setName] = useState(initialName);
   const [exercises, setExercises] = useState<ExerciseFormData[]>(initialExercises);
   const [showOptions, setShowOptions] = useState(false);
+  const [reorderVisible, setReorderVisible] = useState(false);
+  const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
 
   const isCreateLike = mode === "create" || mode === "duplicate";
 
@@ -84,8 +90,33 @@ export default function RoutineEditorScreen({
     setExercises((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
-  const handleAddExercise = useCallback(() => {
-    setExercises((prev) => [...prev, createEmptyExercise(generateId)]);
+  const handleAddExerciseFromPicker = useCallback((definition: ExerciseDefinition) => {
+    const nextExercise = createEmptyExercise(generateId) as ExerciseFormData;
+    nextExercise.exerciseDefinitionId = definition.id;
+    nextExercise.trackingMode = inferTrackingModeFromExerciseDefinition(definition);
+    nextExercise.name = definition.name;
+    nextExercise.muscles = definition.muscles;
+    setExercises((prev) => [...prev, nextExercise]);
+  }, []);
+
+  const reorderItems = useMemo(
+    () =>
+      exercises.map((exercise) => ({
+        id: exercise.id,
+        name: exercise.name,
+      })),
+    [exercises]
+  );
+
+  const handleReorderSave = useCallback((exerciseIds: string[]) => {
+    setExercises((prev) => {
+      const byId = new Map(prev.map((exercise) => [exercise.id, exercise]));
+      const reordered = exerciseIds
+        .map((id) => byId.get(id))
+        .filter((exercise): exercise is ExerciseFormData => !!exercise);
+
+      return reordered.length === prev.length ? reordered : prev;
+    });
   }, []);
 
   const validate = useCallback((): boolean => {
@@ -206,7 +237,7 @@ export default function RoutineEditorScreen({
         ListEmptyComponent={
           <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
             <Pressable
-              onPress={handleAddExercise}
+              onPress={() => setExercisePickerVisible(true)}
               style={({ pressed }) => [styles.emptyContainer, pressed && { opacity: 0.7 }]}
             >
               <View style={styles.emptyIconCircle}>
@@ -220,16 +251,33 @@ export default function RoutineEditorScreen({
         ListFooterComponent={
           exercises.length > 0 ? (
             <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
-              <Pressable
-                onPress={handleAddExercise}
-                style={({ pressed }) => [
-                  styles.addBtn,
-                  pressed && { backgroundColor: "#1D1D21", transform: [{ scale: 0.99 }] },
-                ]}
-              >
-                <Plus size={20} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
-                <Text style={styles.addBtnText}>Add Exercise</Text>
-              </Pressable>
+              <View style={styles.footerActionsRow}>
+                <Pressable
+                  onPress={() => setExercisePickerVisible(true)}
+                  style={({ pressed }) => [
+                    styles.footerActionBtn,
+                    pressed && { backgroundColor: "#1D1D21", transform: [{ scale: 0.99 }] },
+                  ]}
+                >
+                  <Plus size={20} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
+                  <Text style={styles.addBtnText}>Add Exercise</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setReorderVisible(true)}
+                  disabled={exercises.length < 2}
+                  style={({ pressed }) => [
+                    styles.footerActionBtn,
+                    exercises.length < 2 && styles.footerActionBtnDisabled,
+                    pressed && exercises.length >= 2 && {
+                      backgroundColor: "#1D1D21",
+                      transform: [{ scale: 0.99 }],
+                    },
+                  ]}
+                >
+                  <Text style={styles.addBtnText}>Reorder</Text>
+                </Pressable>
+              </View>
             </View>
           ) : null
         }
@@ -311,6 +359,21 @@ export default function RoutineEditorScreen({
           </Pressable>
         </Modal>
       ) : null}
+
+      <ExerciseReorderModal
+        visible={reorderVisible}
+        exercises={reorderItems}
+        onClose={() => setReorderVisible(false)}
+        onSave={handleReorderSave}
+      />
+
+      <ExercisePickerModal
+        visible={exercisePickerVisible}
+        onClose={() => setExercisePickerVisible(false)}
+        onSelect={handleAddExerciseFromPicker}
+        title="Add Exercise"
+        subtitle="Pick from the library or add a custom exercise."
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -433,6 +496,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  footerActionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  footerActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "rgba(11, 130, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(11, 130, 255, 0.2)",
+    borderStyle: "dashed",
+    borderRadius: 24,
+    paddingVertical: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  footerActionBtnDisabled: {
+    opacity: 0.45,
   },
   modalOverlay: {
     flex: 1,

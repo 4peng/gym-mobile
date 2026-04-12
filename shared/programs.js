@@ -1,6 +1,7 @@
 export const DEFAULT_EXERCISE_SETS = 3;
 export const DEFAULT_EXERCISE_REST_SECONDS = 90;
 export const DEFAULT_WEIGHT_UNIT = "kg";
+export const DEFAULT_TRACKING_MODE = "strength";
 
 function normalizeName(name) {
   return typeof name === "string" ? name.trim() : "";
@@ -26,6 +27,10 @@ function normalizeMuscles(muscles) {
   );
 }
 
+function normalizeTrackingMode(value) {
+  return value === "timed" || value === "cardio" ? value : DEFAULT_TRACKING_MODE;
+}
+
 function normalizeOptionalWeight(value) {
   if (value === "" || value == null) {
     return null;
@@ -42,6 +47,8 @@ function normalizeOptionalWeight(value) {
 export function createEmptyExercise(createId) {
   return {
     id: typeof createId === "function" ? createId() : "",
+    exerciseDefinitionId: "",
+    trackingMode: DEFAULT_TRACKING_MODE,
     name: "",
     defaultSets: DEFAULT_EXERCISE_SETS,
     restSeconds: DEFAULT_EXERCISE_REST_SECONDS,
@@ -60,6 +67,11 @@ export function normalizeExercise(exercise, createId) {
         : typeof createId === "function"
           ? createId()
           : "",
+    exerciseDefinitionId:
+      typeof exercise?.exerciseDefinitionId === "string"
+        ? exercise.exerciseDefinitionId.trim()
+        : "",
+    trackingMode: normalizeTrackingMode(exercise?.trackingMode),
     name: normalizeName(exercise?.name),
     defaultSets: normalizeWholeNumber(exercise?.defaultSets, DEFAULT_EXERCISE_SETS, 1),
     restSeconds: normalizeWholeNumber(exercise?.restSeconds, DEFAULT_EXERCISE_REST_SECONDS, 0),

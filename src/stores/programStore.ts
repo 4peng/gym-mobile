@@ -5,8 +5,9 @@ import { zustandAsyncStorage } from "@/storage/mmkv";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import type { Program, ProgramExercise } from "@/types";
+import { normalizeExercises } from "@/shared/programs.js";
 
-const PROGRAM_STORE_VERSION = 4;
+const PROGRAM_STORE_VERSION = 5;
 
 interface ProgramState {
   programs: Program[];
@@ -37,7 +38,7 @@ function normalizeProgram(raw: any): Program {
     _id: String(raw?._id ?? generateId()),
     userId: String(raw?.userId ?? USER_ID),
     name: typeof raw?.name === "string" ? raw.name : "Untitled Program",
-    exercises: Array.isArray(raw?.exercises) ? raw.exercises : [],
+    exercises: normalizeExercises(Array.isArray(raw?.exercises) ? raw.exercises : [], generateId),
     pinned: typeof raw?.pinned === "boolean" ? raw.pinned : undefined,
     createdAt:
       typeof raw?.createdAt === "string" ? raw.createdAt : new Date().toISOString(),

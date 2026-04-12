@@ -6,6 +6,8 @@
 
 export interface ProgramExerciseServer {
   id: string;
+  exerciseDefinitionId?: string;
+  trackingMode?: string;
   name: string;
   defaultSets: number;
   restSeconds: number;
@@ -29,11 +31,15 @@ export interface WorkoutSetServer {
   id: string;
   weight: number | null;
   reps: number | null;
+  durationSeconds?: number | null;
+  distance?: number | null;
   completedAt?: string;
 }
 
 export interface WorkoutExerciseServer {
   id: string;
+  exerciseDefinitionId?: string;
+  trackingMode?: string;
   name: string;
   restSeconds: number;
   notes: string;

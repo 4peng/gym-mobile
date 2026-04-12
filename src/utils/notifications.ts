@@ -21,6 +21,21 @@ export function configureNotificationHandler(): void {
   });
 }
 
+/**
+ * Clear delivered notifications and reset the badge when the app becomes active.
+ * This intentionally keeps future scheduled notifications intact.
+ */
+export async function clearAppNotifications(): Promise<void> {
+  try {
+    await Promise.all([
+      Notifications.dismissAllNotificationsAsync(),
+      Notifications.setBadgeCountAsync(0),
+    ]);
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 // ──────────────────────────────────────────────
 // Permissions (iOS)
 // ──────────────────────────────────────────────

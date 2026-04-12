@@ -27,6 +27,7 @@ import {
   MUSCLE_LABELS,
   MuscleGroup,
 } from "@/constants/muscles";
+import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -110,12 +111,12 @@ export default function ExerciseListStatsScreen() {
     
     history.forEach(session => {
       session.exercises.forEach(ex => {
-        const lowerName = ex.name.toLowerCase();
-        if (!exerciseMap.has(lowerName)) {
-          exerciseMap.set(lowerName, []);
-          originalNameMap.set(lowerName, ex.name);
+        const identityKey = getExerciseIdentityKey(ex);
+        if (!exerciseMap.has(identityKey)) {
+          exerciseMap.set(identityKey, []);
+          originalNameMap.set(identityKey, ex.name);
           musclesMap.set(
-            lowerName,
+            identityKey,
             showDetailedMuscleGroups
               ? expandPrimaryMusclesForDetailedMode(ex.muscles || [])
               : ex.muscles || []
@@ -127,7 +128,7 @@ export default function ExerciseListStatsScreen() {
           if (s.completedAt && s.weight && s.reps) vol += s.weight * s.reps;
         });
         
-        const currentData = exerciseMap.get(lowerName)!;
+        const currentData = exerciseMap.get(identityKey)!;
         if (currentData.length < 10) {
           currentData.unshift(vol);
         }
@@ -135,9 +136,10 @@ export default function ExerciseListStatsScreen() {
     });
 
     return Array.from(exerciseMap.keys())
-      .filter(lowerName => {
-        const matchesSearch = lowerName.includes(search.toLowerCase());
-        const muscles = musclesMap.get(lowerName) || [];
+      .filter((identityKey) => {
+        const displayName = (originalNameMap.get(identityKey) || identityKey).toLowerCase();
+        const matchesSearch = displayName.includes(search.toLowerCase());
+        const muscles = musclesMap.get(identityKey) || [];
         const matchesMuscle =
           selectedMuscles.length === 0 ||
           selectedMuscles.some((selected) => muscles.includes(selected));
@@ -148,19 +150,20 @@ export default function ExerciseListStatsScreen() {
         const bPinned = pinnedExerciseNames.includes(b);
         if (aPinned && !bPinned) return -1;
         if (!aPinned && bPinned) return 1;
-        return a.localeCompare(b);
+        return (originalNameMap.get(a) || a).localeCompare(originalNameMap.get(b) || b);
       })
-      .map(lowerName => ({
-        name: originalNameMap.get(lowerName) || lowerName,
-        isPinned: pinnedExerciseNames.includes(lowerName),
-        recentVolume: exerciseMap.get(lowerName) || [],
-        muscles: musclesMap.get(lowerName) || []
+      .map((identityKey) => ({
+        key: identityKey,
+        name: originalNameMap.get(identityKey) || identityKey,
+        isPinned: pinnedExerciseNames.includes(identityKey),
+        recentVolume: exerciseMap.get(identityKey) || [],
+        muscles: musclesMap.get(identityKey) || []
       }));
   }, [history, search, pinnedExerciseNames, selectedMuscles, showDetailedMuscleGroups]);
 
-  const handlePin = useCallback((name: string) => {
+  const handlePin = useCallback((identityKey: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    togglePinExercise(name);
+    togglePinExercise(identityKey);
   }, [togglePinExercise]);
 
   return (
@@ -221,7 +224,7 @@ export default function ExerciseListStatsScreen() {
       {/* List */}
       <FlatList
         data={exerciseStats}
-        keyExtractor={(item) => item.name}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={styles.listContent}
         scrollEnabled={scrollEnabled}
         ListEmptyComponent={
@@ -235,7 +238,7 @@ export default function ExerciseListStatsScreen() {
         renderItem={({ item }) => (
           <Swipeable 
             onDelete={() => {}} // No delete on insights page
-            onPin={() => handlePin(item.name)} 
+            onPin={() => handlePin(item.key)} 
             onToggleScroll={setScrollEnabled}
           >
             <Pressable
@@ -244,7 +247,7 @@ export default function ExerciseListStatsScreen() {
                 { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 0, borderRadius: 0 },
                 pressed && { backgroundColor: COLORS.CARD_HOVER }
               ]}
-              onPress={() => router.push(`/exercises/${encodeURIComponent(item.name)}/volume`)}
+              onPress={() => router.push(`/exercises/${encodeURIComponent(item.key)}/volume`)}
             >
               <View style={styles.itemInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

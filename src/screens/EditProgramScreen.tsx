@@ -38,19 +38,6 @@ export default function EditProgramScreen() {
     (draft: RoutineDraft): Program | null => {
       if (!id || !program) return null;
 
-      const renameExerciseInHistory = useWorkoutSessionStore.getState().renameExerciseInHistory;
-      draft.exercises.forEach((newExercise) => {
-        const oldExercise = (program.exercises || []).find((e) => e.id === newExercise.id);
-        if (
-          oldExercise &&
-          oldExercise.name &&
-          newExercise.name &&
-          oldExercise.name.toLowerCase() !== newExercise.name.toLowerCase()
-        ) {
-          renameExerciseInHistory(oldExercise.name, newExercise.name);
-        }
-      });
-
       const updates = toProgramUpdates(draft);
       updateProgram(id, updates);
       return {

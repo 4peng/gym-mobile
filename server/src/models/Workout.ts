@@ -4,11 +4,15 @@ export interface IWorkoutSet {
   id: string;
   weight: number | null;
   reps: number | null;
+  durationSeconds?: number | null;
+  distance?: number | null;
   completedAt?: string;
 }
 
 export interface IWorkoutExercise {
   id: string;
+  exerciseDefinitionId?: string;
+  trackingMode?: 'strength' | 'timed' | 'cardio';
   name: string;
   restSeconds: number;
   timerStartedAt?: string;
@@ -33,11 +37,15 @@ const WorkoutSetSchema = new Schema({
   id: { type: String, required: true },
   weight: { type: Number, default: null },
   reps: { type: Number, default: null },
+  durationSeconds: { type: Number, default: null },
+  distance: { type: Number, default: null },
   completedAt: { type: String },
 }, { _id: false });
 
 const WorkoutExerciseSchema = new Schema({
   id: { type: String, required: true },
+  exerciseDefinitionId: { type: String },
+  trackingMode: { type: String, enum: ['strength', 'timed', 'cardio'], default: 'strength' },
   name: { type: String, required: true },
   restSeconds: { type: Number, required: true },
   timerStartedAt: { type: String },

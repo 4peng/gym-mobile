@@ -68,6 +68,7 @@ export default function MockDataInjector() {
         exercises: routine.exercises.map(ex => ({
           id: generateId(),
           name: ex.name,
+          trackingMode: "strength" as const,
           restSeconds: 90,
           notes: "",
           muscles: ex.muscles,

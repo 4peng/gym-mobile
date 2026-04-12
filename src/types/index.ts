@@ -2,9 +2,21 @@
 
 import { MuscleGroup } from "@/src/constants/muscles";
 
+export type ExerciseTrackingMode = "strength" | "timed" | "cardio";
+
+export interface ExerciseDefinition {
+  id: string;
+  name: string;
+  muscles: MuscleGroup[];
+  aliases?: string[];
+  isCustom?: boolean;
+}
+
 /** A single exercise definition inside a Program template. */
 export interface ProgramExercise {
   id: string;
+  exerciseDefinitionId?: string;
+  trackingMode: ExerciseTrackingMode;
   name: string;
   defaultSets: number;
   restSeconds: number;
@@ -31,6 +43,8 @@ export interface WorkoutSet {
   id: string;
   weight: number | null; // null = untouched / placeholder state
   reps: number | null; // null = untouched / placeholder state
+  durationSeconds?: number | null;
+  distance?: number | null;
   completedAt?: string; // ISO-8601
 }
 
@@ -38,6 +52,8 @@ export interface WorkoutSet {
 export interface WorkoutExercise {
   id: string;
   programExerciseId?: string;
+  exerciseDefinitionId?: string;
+  trackingMode: ExerciseTrackingMode;
   name: string;
   restSeconds: number;
   timerStartedAt?: string; // ISO-8601, for future expo-notifications

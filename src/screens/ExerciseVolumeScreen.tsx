@@ -30,6 +30,7 @@ import { convertWeight } from "@/utils/conversions";
 import { Swipeable } from "@/src/components/Swipeable";
 import { HapticFeedback } from "@/src/utils/haptics";
 import { WorkoutSession } from "@/src/types";
+import { getExerciseIdentityKey, normalizeExerciseIdentityKey } from "@/utils/exerciseIdentity";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_HEIGHT = 220;
@@ -38,10 +39,10 @@ const CHART_PADDING_HORIZONTAL = 40;
 type TimeRange = "30D" | "6M" | "1Y";
 
 interface ExerciseVolumeScreenProps {
-  exerciseName: string;
+  exerciseKey: string;
 }
 
-export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScreenProps) {
+export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScreenProps) {
   const router = useAppRouter();
   const historyCache = useWorkoutSessionStore((s) => s.history);
   const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
@@ -63,6 +64,7 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
     weight: string;
     reps: string;
   } | null>(null);
+  const normalizedExerciseKey = normalizeExerciseIdentityKey(exerciseKey);
 
   /**
    * Shard Hydration Strategy:
@@ -85,7 +87,11 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
         
         // 4. Combine and filter for the target exercise
         const combined = [...historyCache, ...shards]
-          .filter(s => !s.deletedAt && s.exercises.some(e => e.name.toLowerCase() === exerciseName.toLowerCase()))
+          .filter(
+            (s) =>
+              !s.deletedAt &&
+              s.exercises.some((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
+          )
           .sort((a, b) => {
             const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
             const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
@@ -104,19 +110,33 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
 
     loadShards();
     return () => { isMounted = false; };
-  }, [exerciseName, historyIndex, historyCache]);
+  }, [normalizedExerciseKey, historyIndex, historyCache]);
 
   const history = localFullHistory;
 
   const currentMuscles = useMemo(() => {
     // Find the most recent session that has this exercise to get its categories
-    const lastSession = history.find(s => s.exercises.some(e => e.name.toLowerCase() === exerciseName.toLowerCase()));
-    const ex = lastSession?.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase());
+    const lastSession = history.find((s) =>
+      s.exercises.some((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
+    );
+    const ex = lastSession?.exercises.find(
+      (e) => getExerciseIdentityKey(e) === normalizedExerciseKey
+    );
     return ex?.muscles || [];
-  }, [history, exerciseName]);
+  }, [history, normalizedExerciseKey]);
+
+  const displayName = useMemo(() => {
+    const lastSession = history.find((s) =>
+      s.exercises.some((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
+    );
+    const ex = lastSession?.exercises.find(
+      (e) => getExerciseIdentityKey(e) === normalizedExerciseKey
+    );
+    return ex?.name || exerciseKey;
+  }, [exerciseKey, history, normalizedExerciseKey]);
 
   const handleMusclesChange = (muscles: MuscleGroup[]) => {
-    updateMusclesInHistory(exerciseName, muscles);
+    updateMusclesInHistory(normalizedExerciseKey, muscles);
   };
 
   // ── Data Processing ────────────────────────
@@ -147,7 +167,7 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
     // First pass: Global maxes
     history.forEach(s => {
       s.exercises.forEach(ex => {
-        if (ex.name.toLowerCase() === exerciseName.toLowerCase()) {
+        if (getExerciseIdentityKey(ex) === normalizedExerciseKey) {
           ex.sets.forEach(set => {
             if (set.weight && set.reps) {
               const current1RM = set.weight * (1 + set.reps / 30);
@@ -186,10 +206,13 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
       });
     }
 
-    const lastSessionWithEx = [...history].reverse().find(s => 
-      s.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase())
+    const lastSessionWithEx = [...history].reverse().find((s) => 
+      s.exercises.find((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
     );
-    const targetUnit = lastSessionWithEx?.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase())?.weightUnit || "kg";
+    const targetUnit =
+      lastSessionWithEx?.exercises.find(
+        (e) => getExerciseIdentityKey(e) === normalizedExerciseKey
+      )?.weightUnit || "kg";
 
     // Second pass: Group logs by local date
     const logsByDate: { [key: string]: any } = {};
@@ -199,7 +222,7 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
       const dateKey = `${sessionDate.getFullYear()}-${(sessionDate.getMonth() + 1).toString().padStart(2, '0')}-${sessionDate.getDate().toString().padStart(2, '0')}`;
       
       const sessionExercises = session.exercises.filter(
-        (e) => e.name.toLowerCase() === exerciseName.toLowerCase()
+        (e) => getExerciseIdentityKey(e) === normalizedExerciseKey
       );
 
       sessionExercises.forEach(exercise => {
@@ -271,7 +294,7 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
     }
 
     return { buckets: data, unit: targetUnit, sessionLogs, stats: { max1RM, maxDailyVolume, lastVolume } };
-  }, [history, exerciseName, range]);
+  }, [history, normalizedExerciseKey, range]);
 
   const { buckets, unit, sessionLogs, stats } = processedData;
   const maxVolume = Math.max(100, ...buckets.map(d => d.value));
@@ -446,7 +469,7 @@ export default function ExerciseVolumeScreen({ exerciseName }: ExerciseVolumeScr
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} scrollEnabled={scrollEnabled} onScroll={handleScroll} scrollEventThrottle={16}>
-          <Text style={styles.title}>Volume Trends:{"\n"}<Text style={{ color: COLORS.ACCENT_GREEN }}>{toTitleCase(exerciseName)}</Text></Text>
+          <Text style={styles.title}>Volume Trends:{"\n"}<Text style={{ color: COLORS.ACCENT_GREEN }}>{toTitleCase(displayName)}</Text></Text>
 
           {/* Muscle Category Editor */}
           <View style={styles.categorySection}>
