@@ -199,6 +199,14 @@ export default function RoutineEditorScreen({
                 </Text>
               </View>
               <View style={styles.headerActions}>
+                {mode === "edit" && onDelete ? (
+                  <Pressable
+                    onPress={doDelete}
+                    style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Trash2 size={22} color={COLORS.DANGER} />
+                  </Pressable>
+                ) : null}
                 <Pressable
                   onPress={handleCancel}
                   style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}

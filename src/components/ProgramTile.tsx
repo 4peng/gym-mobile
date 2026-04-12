@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Play, Activity, Pin } from "lucide-react-native";
+import { Play, Activity, Pin, MoreHorizontal } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -13,6 +13,7 @@ interface ProgramTileProps {
   onStart: (program: Program) => void;
   onDelete: (id: string, name: string) => void;
   onPin: (id: string) => void;
+  onOptions: (program: Program) => void;
   onToggleScroll: (enabled: boolean) => void;
 }
 
@@ -22,11 +23,13 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
   onStart,
   onDelete,
   onPin,
+  onOptions,
   onToggleScroll,
 }) {
   const handlePress = useCallback(() => onPress(program._id), [program._id, onPress]);
   const handleStart = useCallback(() => onStart(program), [program, onStart]);
   const handlePin = useCallback(() => onPin(program._id), [program._id, onPin]);
+  const handleOptions = useCallback(() => onOptions(program), [program, onOptions]);
 
   return (
     <Swipeable 
@@ -60,15 +63,28 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
             </View>
           </View>
           
-          <Pressable
-            onPress={handleStart}
-            style={({ pressed }) => [
-              styles.tileStartBtn,
-              pressed && styles.tileStartBtnPressed
-            ]}
-          >
-            <Play size={18} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
-          </Pressable>
+          <View style={styles.tileActions}>
+            <Pressable
+              onPress={handleOptions}
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.tileIconBtn,
+                pressed && styles.tileIconBtnPressed,
+              ]}
+            >
+              <MoreHorizontal size={18} color={COLORS.TEXT_SECONDARY} />
+            </Pressable>
+
+            <Pressable
+              onPress={handleStart}
+              style={({ pressed }) => [
+                styles.tileStartBtn,
+                pressed && styles.tileStartBtnPressed
+              ]}
+            >
+              <Play size={18} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
+            </Pressable>
+          </View>
         </View>
       </Pressable>
     </Swipeable>
@@ -87,6 +103,7 @@ const styles = StyleSheet.create({
   tileMainInfo: {
     flex: 1,
     marginRight: 16,
+    minWidth: 0,
   },
   programName: {
     color: COLORS.TEXT_PRIMARY,
@@ -106,6 +123,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  tileActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  tileIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.CARD_HOVER,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tileIconBtnPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
   },
   tileStartBtn: {
     width: 44,

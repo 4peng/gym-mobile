@@ -45,6 +45,7 @@ export default function ProgramsListScreen() {
 
   const [scrollEnabled, setScrollEnabled] = React.useState(true);
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [selectedProgram, setSelectedProgram] = React.useState<Program | null>(null);
   const animation = useRef(new Animated.Value(0)).current;
 
   const toggleMenu = useCallback(() => {
@@ -162,11 +163,40 @@ export default function ProgramsListScreen() {
 
   const handleCreate = useCallback(() => router.push("/programs/create"), [router]);
 
+  const handleOpenOptions = useCallback((program: Program) => {
+    setSelectedProgram(program);
+  }, []);
+
+  const handleCloseOptions = useCallback(() => {
+    setSelectedProgram(null);
+  }, []);
+
+  const handleEditSelected = useCallback(() => {
+    if (!selectedProgram) return;
+    const id = selectedProgram._id;
+    setSelectedProgram(null);
+    router.push(`/programs/${id}`);
+  }, [router, selectedProgram]);
+
   const handlePin = useCallback((id: string) => {
     // Only animate the layout specifically when pinning/unpinning
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     togglePin(id);
   }, [togglePin]);
+
+  const handleTogglePinSelected = useCallback(() => {
+    if (!selectedProgram) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    togglePin(selectedProgram._id);
+    setSelectedProgram(null);
+  }, [selectedProgram, togglePin]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (!selectedProgram) return;
+    const { _id, name } = selectedProgram;
+    setSelectedProgram(null);
+    handleDelete(_id, name);
+  }, [handleDelete, selectedProgram]);
 
   return (
     <View style={styles.container}>
@@ -278,6 +308,7 @@ export default function ProgramsListScreen() {
                     onStart={handleStartProgram}
                     onDelete={handleDelete}
                     onPin={handlePin}
+                    onOptions={handleOpenOptions}
                     onToggleScroll={setScrollEnabled}
                   />
                 ))}
@@ -383,6 +414,49 @@ export default function ProgramsListScreen() {
           </Animated.View>
         </Pressable>
       </View>
+
+      <Modal
+        visible={!!selectedProgram}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseOptions}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseOptions} />
+          <View style={styles.optionsSheet}>
+            <Text style={styles.optionsTitle} numberOfLines={1}>
+              {selectedProgram?.name || "Routine"}
+            </Text>
+
+            <Pressable
+              onPress={handleEditSelected}
+              style={({ pressed }) => [styles.optionBtn, pressed && styles.optionBtnPressed]}
+            >
+              <Text style={styles.optionText}>Edit Routine</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleTogglePinSelected}
+              style={({ pressed }) => [styles.optionBtn, pressed && styles.optionBtnPressed]}
+            >
+              <Text style={styles.optionText}>
+                {selectedProgram?.pinned ? "Unpin Routine" : "Pin Routine"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleDeleteSelected}
+              style={({ pressed }) => [styles.optionBtn, pressed && styles.optionBtnPressed]}
+            >
+              <Text style={[styles.optionText, styles.optionTextDanger]}>Delete Routine</Text>
+            </Pressable>
+
+            <Pressable onPress={handleCloseOptions} style={styles.cancelBtn}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -549,5 +623,58 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  optionsSheet: {
+    backgroundColor: COLORS.CARD_BG,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  optionsTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 20,
+    fontWeight: '800',
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    marginBottom: 14,
+  },
+  optionBtn: {
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: COLORS.BG,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  optionBtnPressed: {
+    opacity: 0.84,
+  },
+  optionText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  optionTextDanger: {
+    color: COLORS.DANGER,
+  },
+  cancelBtn: {
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  cancelText: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: FONT_FAMILIES.MEDIUM,
   },
 });
