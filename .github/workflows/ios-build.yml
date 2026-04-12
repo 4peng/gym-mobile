@@ -30,24 +30,44 @@ jobs:
 
       - name: Build App with Xcode
         run: |
-          # 1. List everything for debugging
-          echo "--- Available Schemes ---"
-          xcodebuild -workspace ios/*.xcworkspace -list
-          
-          # 2. Try to find the main app scheme (usually matches the project name or slug)
-          # We look for a scheme that is NOT 'Pods' and contains the project name.
-          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | grep -i "gym" | head -n 1)
-          
-          # Fallback: just take the first non-Pods scheme if the search fails
-          if [ -z "$SCHEME" ]; then
-            SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
+          echo "--- iOS Directory ---"
+          ls -la
+          ls -la ios || true
+          find ios -maxdepth 2 \( -name "*.xcworkspace" -o -name "*.xcodeproj" \) -print || true
+
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -print -quit)
+          PROJECT=$(find ios -maxdepth 1 -name "*.xcodeproj" -print -quit)
+
+          if [ -n "$WORKSPACE" ]; then
+            CONTAINER_FLAG="-workspace"
+            CONTAINER_PATH="$WORKSPACE"
+          elif [ -n "$PROJECT" ]; then
+            CONTAINER_FLAG="-project"
+            CONTAINER_PATH="$PROJECT"
+          else
+            echo "Error: Expo prebuild did not produce an iOS workspace or project."
+            exit 1
           fi
-          
+
+          echo "--- Available Schemes ---"
+          xcodebuild $CONTAINER_FLAG "$CONTAINER_PATH" -list
+
+          SCHEME=$(xcodebuild $CONTAINER_FLAG "$CONTAINER_PATH" -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | grep -i "gym" | head -n 1)
+
+          if [ -z "$SCHEME" ]; then
+            SCHEME=$(xcodebuild $CONTAINER_FLAG "$CONTAINER_PATH" -list | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | grep -v "Pods-" | head -n 1)
+          fi
+
+          if [ -z "$SCHEME" ]; then
+            echo "Error: Could not determine a non-Pods Xcode scheme."
+            exit 1
+          fi
+
+          echo "Selected Container: $CONTAINER_FLAG $CONTAINER_PATH"
           echo "Final Selected Scheme: $SCHEME"
-          
-          # 3. Use 'archive' which is more robust for creating the .app
+
           xcodebuild archive \
-            -workspace ios/*.xcworkspace \
+            $CONTAINER_FLAG "$CONTAINER_PATH" \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
