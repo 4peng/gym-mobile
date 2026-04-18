@@ -99,3 +99,18 @@ jobs:
         with:
           name: ios-ipa
           path: GymMobile.ipa
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build for sideloading.
+            Commit: ${{ github.sha }}
+          files: GymMobile.ipa
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
