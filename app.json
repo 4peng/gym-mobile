@@ -12,7 +12,8 @@
     },
     "ios": {
       "bundleIdentifier": "com.x4peng.gym-mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "deploymentTarget": "16.1"
     },
     "web": {
       "bundler": "metro"
