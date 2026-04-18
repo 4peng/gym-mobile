@@ -12,22 +12,14 @@
     },
     "ios": {
       "bundleIdentifier": "com.x4peng.gym-mobile",
-      "supportsTablet": true,
-      "deploymentTarget": "16.1"
+      "supportsTablet": true
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
-      [
-        "expo-widgets",
-        {
-          "frequentUpdates": true,
-          "widgets": []
-        }
-      ]
+      "expo-notifications"
     ]
   }
 }
