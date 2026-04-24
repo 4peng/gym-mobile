@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useEffect } from "react";
+import React, { useCallback, useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   ScrollView,
   Alert,
   Clipboard,
+  Platform,
+  TextInput,
   Animated,
   Easing,
 } from "react-native";
@@ -36,8 +38,23 @@ export default function SettingsScreen() {
   const toggleDetailedMuscleGroups = useUiPreferencesStore(
     (s) => s.toggleDetailedMuscleGroups
   );
+  const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
+  const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
+  const setAnalyticsBodyweight = useUiPreferencesStore((s) => s.setAnalyticsBodyweight);
+  const toggleAnalyticsBodyweightUnit = useUiPreferencesStore(
+    (s) => s.toggleAnalyticsBodyweightUnit
+  );
+  const [analyticsBodyweightText, setAnalyticsBodyweightText] = useState(
+    analyticsBodyweight !== null ? String(analyticsBodyweight) : ""
+  );
 
   const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    setAnalyticsBodyweightText(
+      analyticsBodyweight !== null ? String(analyticsBodyweight) : ""
+    );
+  }, [analyticsBodyweight]);
 
   useEffect(() => {
     if (isSyncing) {
@@ -62,6 +79,21 @@ export default function SettingsScreen() {
   const handleSync = useCallback(() => {
     runFullSync();
   }, [runFullSync]);
+
+  const commitAnalyticsBodyweight = useCallback(() => {
+    const normalizedText = analyticsBodyweightText.trim().replace(",", ".");
+    if (normalizedText === "") {
+      setAnalyticsBodyweight(null);
+      return;
+    }
+    const parsed = Number(normalizedText);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setAnalyticsBodyweightText(analyticsBodyweight !== null ? String(analyticsBodyweight) : "");
+      showAlert("Invalid Bodyweight", "Enter a positive number or leave it blank.");
+      return;
+    }
+    setAnalyticsBodyweight(parsed);
+  }, [analyticsBodyweight, analyticsBodyweightText, setAnalyticsBodyweight]);
 
   const handleExport = () => {
     const data = {
@@ -163,6 +195,37 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        <Text style={styles.sectionLabel}>Training Profile</Text>
+        <View style={[UI.SHARED.card, { marginBottom: 24 }]}>
+          <Text style={styles.profileLabel}>Analytics Bodyweight</Text>
+          <Text style={styles.profileDesc}>
+            Used for bodyweight strength exercise analytics like pull-ups, dips, and push-ups.
+          </Text>
+          <View style={styles.profileRow}>
+            <View style={styles.bodyweightInputShell}>
+              <TextInput
+                style={styles.bodyweightInput}
+                value={analyticsBodyweightText}
+                onChangeText={setAnalyticsBodyweightText}
+                onBlur={commitAnalyticsBodyweight}
+                onEndEditing={commitAnalyticsBodyweight}
+                placeholder="Not set"
+                placeholderTextColor={COLORS.TEXT_TERTIARY}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <Pressable
+              onPress={toggleAnalyticsBodyweightUnit}
+              style={({ pressed }) => [
+                styles.unitToggle,
+                pressed && { opacity: 0.86, transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <Text style={styles.unitToggleText}>{analyticsBodyweightUnit.toUpperCase()}</Text>
+            </Pressable>
+          </View>
+        </View>
+
         <Text style={styles.sectionLabel}>Data Management</Text>
         <View style={[UI.SHARED.card, { padding: 0 }]}>
           <Pressable 
@@ -229,6 +292,58 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: UI.LAYOUT_PADDING,
+  },
+  profileLabel: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  profileDesc: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    marginBottom: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  profileRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  bodyweightInputShell: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: COLORS.BG,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+  },
+  bodyweightInput: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 18,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    padding: 0,
+  },
+  unitToggle: {
+    minWidth: 72,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: "rgba(11, 130, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(11, 130, 255, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unitToggleText: {
+    color: COLORS.ACCENT_BLUE,
+    fontSize: 15,
+    fontWeight: "900",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    letterSpacing: 0.6,
   },
   sectionLabel: {
     color: COLORS.TEXT_TERTIARY,

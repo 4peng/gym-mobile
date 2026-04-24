@@ -81,6 +81,7 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
   const [isExpanded, setIsExpanded] = useState(false);
   const updateHistorySet = useUpdateHistorySet();
   const updateSessionDate = useUpdateSessionDate();
+  const decimalKeyboardType = "decimal-pad";
   
   const [editingSet, setEditingSet] = useState<{
     exerciseId: string;
@@ -137,9 +138,9 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
 
   const handleSaveEdit = () => {
     if (!editingSet) return;
-    const w = parseFloat(editingSet.weight);
-    const r = parseFloat(editingSet.reps);
-    if (!isNaN(w) && !isNaN(r)) {
+    const w = Number(editingSet.weight.trim().replace(",", "."));
+    const r = Number(editingSet.reps.trim());
+    if (Number.isFinite(w) && Number.isFinite(r)) {
       updateHistorySet(session._id, editingSet.exerciseId, editingSet.setId, "weight", w);
       updateHistorySet(session._id, editingSet.exerciseId, editingSet.setId, "reps", r);
     }
@@ -211,7 +212,7 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
                             style={styles.editInput}
                             value={editingSet.weight}
                             onChangeText={(v) => setEditingSet({ ...editingSet, weight: v })}
-                            keyboardType="numeric"
+                            keyboardType={decimalKeyboardType}
                             autoFocus
                           />
                           <Text style={styles.setTagX}>×</Text>

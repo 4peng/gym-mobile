@@ -26,11 +26,12 @@ import { UI } from "@/constants/ui";
 import MuscleSelector from "@/src/components/MuscleSelector";
 import { MuscleGroup } from "@/constants/muscles";
 import { toTitleCase } from "@/utils/string";
-import { convertWeight } from "@/utils/conversions";
 import { Swipeable } from "@/src/components/Swipeable";
 import { HapticFeedback } from "@/src/utils/haptics";
 import { WorkoutSession } from "@/src/types";
 import { getExerciseIdentityKey, normalizeExerciseIdentityKey } from "@/utils/exerciseIdentity";
+import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
+import { resolveEffectiveStrengthLoad } from "@/utils/bodyweightAnalytics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_HEIGHT = 220;
@@ -50,6 +51,8 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
   const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
   const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
   const updateMusclesInHistory = useWorkoutSessionStore((s) => s.updateMusclesInHistory);
+  const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
+  const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
   
   const [loading, setLoading] = useState(true);
   const [localFullHistory, setLocalFullHistory] = useState<WorkoutSession[]>([]);
@@ -64,6 +67,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
     weight: string;
     reps: string;
   } | null>(null);
+  const decimalKeyboardType = "decimal-pad";
   const normalizedExerciseKey = normalizeExerciseIdentityKey(exerciseKey);
 
   /**
@@ -169,8 +173,17 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
       s.exercises.forEach(ex => {
         if (getExerciseIdentityKey(ex) === normalizedExerciseKey) {
           ex.sets.forEach(set => {
-            if (set.weight && set.reps) {
-              const current1RM = set.weight * (1 + set.reps / 30);
+            if (set.reps !== null && Number.isFinite(set.reps)) {
+              const effectiveLoad = resolveEffectiveStrengthLoad(
+                ex,
+                set.weight,
+                ex.weightUnit || "kg",
+                ex.weightUnit || "kg",
+                analyticsBodyweight,
+                analyticsBodyweightUnit
+              );
+              if (effectiveLoad === null || !Number.isFinite(effectiveLoad)) return;
+              const current1RM = effectiveLoad * (1 + set.reps / 30);
               if (current1RM > max1RM) max1RM = current1RM;
             }
           });
@@ -230,9 +243,17 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
         const completedSets: any[] = [];
 
         exercise.sets.forEach(s => {
-          if (s.completedAt && s.weight !== null && s.reps !== null) {
-            const normalizedWeight = convertWeight(s.weight, exercise.weightUnit || "kg", targetUnit) || 0;
-            totalExerciseVolume += normalizedWeight * s.reps;
+          if (s.completedAt && s.reps !== null && Number.isFinite(s.reps)) {
+            const effectiveLoad = resolveEffectiveStrengthLoad(
+              exercise,
+              s.weight,
+              exercise.weightUnit || "kg",
+              targetUnit,
+              analyticsBodyweight,
+              analyticsBodyweightUnit
+            );
+            if (effectiveLoad === null || !Number.isFinite(effectiveLoad)) return;
+            totalExerciseVolume += effectiveLoad * s.reps;
             completedSets.push({ ...s, sessionId: session._id, exerciseId: exercise.id });
           }
         });
@@ -294,7 +315,13 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
     }
 
     return { buckets: data, unit: targetUnit, sessionLogs, stats: { max1RM, maxDailyVolume, lastVolume } };
-  }, [history, normalizedExerciseKey, range]);
+  }, [
+    analyticsBodyweight,
+    analyticsBodyweightUnit,
+    history,
+    normalizedExerciseKey,
+    range,
+  ]);
 
   const { buckets, unit, sessionLogs, stats } = processedData;
   const maxVolume = Math.max(100, ...buckets.map(d => d.value));
@@ -367,9 +394,9 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
 
   const handleSaveEdit = () => {
     if (!editingSet) return;
-    const w = parseFloat(editingSet.weight);
-    const r = parseFloat(editingSet.reps);
-    if (!isNaN(w) && !isNaN(r)) {
+    const w = Number(editingSet.weight.trim().replace(",", "."));
+    const r = Number(editingSet.reps.trim());
+    if (Number.isFinite(w) && Number.isFinite(r)) {
       updateHistorySet(editingSet.sessionId, editingSet.exerciseId, editingSet.setId, "weight", w);
       updateHistorySet(editingSet.sessionId, editingSet.exerciseId, editingSet.setId, "reps", r);
     }
@@ -607,7 +634,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
                           if (isEditing) {
                             return (
                               <View key={s.id} style={styles.editRow}>
-                                <TextInput style={styles.editInput} value={editingSet?.weight ?? ""} onChangeText={(v) => setEditingSet((prev) => (prev ? { ...prev, weight: v } : prev))} keyboardType="numeric" autoFocus />
+                                <TextInput style={styles.editInput} value={editingSet?.weight ?? ""} onChangeText={(v) => setEditingSet((prev) => (prev ? { ...prev, weight: v } : prev))} keyboardType={decimalKeyboardType} autoFocus />
                                 <Text style={styles.setTagX}>×</Text>
                                 <TextInput style={styles.editInput} value={editingSet?.reps ?? ""} onChangeText={(v) => setEditingSet((prev) => (prev ? { ...prev, reps: v } : prev))} keyboardType="numeric" />
                                 <Pressable onPress={handleSaveEdit} style={styles.editIcon}><Check size={16} color={COLORS.ACCENT_GREEN} /></Pressable>

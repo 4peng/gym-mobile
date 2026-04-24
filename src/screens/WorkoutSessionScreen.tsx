@@ -143,12 +143,16 @@ export default function WorkoutSessionScreen() {
   }, [clearExpiredTimer]);
 
   useEffect(() => {
-    if (!sourceProgram) {
-      setNewRoutineName("");
+    if (sourceProgram) {
+      setNewRoutineName(`${sourceProgram.name} Copy`);
       return;
     }
-    setNewRoutineName(`${sourceProgram.name} Copy`);
-  }, [sourceProgram]);
+    if (activeSession && !activeSession.programId) {
+      setNewRoutineName("Quick Workout");
+      return;
+    }
+    setNewRoutineName("");
+  }, [activeSession?._id, activeSession?.programId, sourceProgram]);
 
   useEffect(() => {
     if (!activeSession) {
@@ -211,6 +215,11 @@ export default function WorkoutSessionScreen() {
       createRoutineSnapshot("", derivedRoutineExercises)
     );
   }, [activeSession?.programId, getDerivedRoutineExercises, sourceProgram]);
+  const isQuickSession = !activeSession?.programId;
+  const hasSavableRoutineExercises = useMemo(
+    () => getDerivedRoutineExercises().length > 0,
+    [getDerivedRoutineExercises]
+  );
 
   const handleAddExercise = useCallback((definition: ExerciseDefinition) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -226,7 +235,7 @@ export default function WorkoutSessionScreen() {
   }, [completeSession, router]);
 
   const handleFinishConfirmed = useCallback(() => {
-    if (getRoutineHasChanges()) {
+    if (getRoutineHasChanges() || (isQuickSession && hasSavableRoutineExercises)) {
       setRoutinePromptVisible(true);
       return;
     }
@@ -236,7 +245,7 @@ export default function WorkoutSessionScreen() {
       "Complete this workout session?",
       finishWorkout
     );
-  }, [finishWorkout, getRoutineHasChanges]);
+  }, [finishWorkout, getRoutineHasChanges, hasSavableRoutineExercises, isQuickSession]);
 
   const handleSaveRoutineChanges = useCallback(
     (mode: "current" | "workout-only") => {
@@ -376,10 +385,24 @@ export default function WorkoutSessionScreen() {
                     <Text style={styles.footerActionText}>Add Exercise</Text>
                   </Pressable>
 
+                  {isQuickSession && hasSavableRoutineExercises && (
+                    <Pressable
+                      onPress={() => setSaveAsNewVisible(true)}
+                      style={({ pressed }) => [
+                        styles.footerActionBtn,
+                        pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                      ]}
+                    >
+                      <Save size={18} color={COLORS.ACCENT_GREEN} />
+                      <Text style={styles.footerActionText}>Save As Routine</Text>
+                    </Pressable>
+                  )}
+
                   <Pressable
                     onPress={() => setReorderVisible(true)}
                     style={({ pressed }) => [
                       styles.footerActionBtn,
+                      { flex: isQuickSession && hasSavableRoutineExercises ? 0.8 : 1 },
                       pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
                     ]}
                   >
@@ -423,24 +446,29 @@ export default function WorkoutSessionScreen() {
           <View style={styles.modalOverlay}>
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setRoutinePromptVisible(false)} />
             <View style={styles.modalSheet}>
-              <Text style={styles.modalTitle}>Routine Changed During Workout</Text>
+              <Text style={styles.modalTitle}>
+                {isQuickSession ? "Save Workout As Routine" : "Routine Changed During Workout"}
+              </Text>
               <Text style={styles.modalDescription}>
-                Save these exercise-stack changes back to your routine, turn them into a new routine,
-                or keep them only in this workout.
+                {isQuickSession
+                  ? "Save this empty-start workout as a new routine before finishing, or keep it only in workout history."
+                  : "Save these exercise-stack changes back to your routine, turn them into a new routine, or keep them only in this workout."}
               </Text>
 
-              <Pressable
-                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-                onPress={() => handleSaveRoutineChanges("current")}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-                  <Save size={20} color={COLORS.ACCENT_BLUE} />
-                </View>
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionLabel}>Save To Current Routine</Text>
-                  <Text style={styles.optionDesc}>Update the routine you started from.</Text>
-                </View>
-              </Pressable>
+              {!isQuickSession ? (
+                <Pressable
+                  style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
+                  onPress={() => handleSaveRoutineChanges("current")}
+                >
+                  <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
+                    <Save size={20} color={COLORS.ACCENT_BLUE} />
+                  </View>
+                  <View style={styles.optionCopy}>
+                    <Text style={styles.optionLabel}>Save To Current Routine</Text>
+                    <Text style={styles.optionDesc}>Update the routine you started from.</Text>
+                  </View>
+                </Pressable>
+              ) : null}
 
               <Pressable
                 style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
@@ -453,8 +481,14 @@ export default function WorkoutSessionScreen() {
                   <Copy size={20} color={COLORS.ACCENT_GREEN} />
                 </View>
                 <View style={styles.optionCopy}>
-                  <Text style={styles.optionLabel}>Save As New Routine</Text>
-                  <Text style={styles.optionDesc}>Keep the original routine untouched.</Text>
+                  <Text style={styles.optionLabel}>
+                    {isQuickSession ? "Save As Routine" : "Save As New Routine"}
+                  </Text>
+                  <Text style={styles.optionDesc}>
+                    {isQuickSession
+                      ? "Create a reusable routine from this workout."
+                      : "Keep the original routine untouched."}
+                  </Text>
                 </View>
               </Pressable>
 
@@ -502,9 +536,13 @@ export default function WorkoutSessionScreen() {
               }}
             />
             <View style={styles.modalSheet}>
-              <Text style={styles.modalTitle}>New Routine Name</Text>
+              <Text style={styles.modalTitle}>
+                {isQuickSession ? "Routine Name" : "New Routine Name"}
+              </Text>
               <Text style={styles.modalDescription}>
-                This will save the adjusted exercise stack as a separate routine.
+                {isQuickSession
+                  ? "This will save the workout's exercise stack as a reusable routine."
+                  : "This will save the adjusted exercise stack as a separate routine."}
               </Text>
 
               <View style={styles.newRoutineInputShell}>
@@ -525,7 +563,9 @@ export default function WorkoutSessionScreen() {
                 ]}
                 onPress={handleCreateRoutineAndFinish}
               >
-                <Text style={styles.primaryModalBtnText}>Save New Routine And Finish</Text>
+                <Text style={styles.primaryModalBtnText}>
+                  {isQuickSession ? "Save Routine And Finish" : "Save New Routine And Finish"}
+                </Text>
               </Pressable>
 
               <Pressable

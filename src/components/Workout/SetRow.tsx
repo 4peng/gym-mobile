@@ -1,5 +1,14 @@
-import React, { useCallback } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, LayoutAnimation, Keyboard } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  LayoutAnimation,
+  Keyboard,
+  Platform,
+} from "react-native";
 import { Check, X } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";
@@ -27,27 +36,39 @@ function InputBlock({
   placeholder,
   keyboardType,
   onChangeText,
+  onBlur,
+  onFocus,
   completed,
 }: {
   label: string;
   value: string;
   placeholder: string;
-  keyboardType: "decimal-pad" | "number-pad";
+  keyboardType: "decimal-pad" | "number-pad" | "numeric";
   onChangeText: (text: string) => void;
+  onBlur?: () => void;
+  onFocus?: () => void;
   completed: boolean;
 }) {
+  const inputRef = useRef<TextInput>(null);
+  const handlePress = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
   return (
-    <View style={[styles.inputBlock, completed && styles.inputBlockCompleted]}>
+    <Pressable onPress={handlePress} style={[styles.inputBlock, completed && styles.inputBlockCompleted]}>
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
+        ref={inputRef}
         style={[styles.inputText, completed && styles.inputTextCompleted]}
         keyboardType={keyboardType}
         value={value}
         placeholder={placeholder}
         placeholderTextColor={COLORS.TEXT_TERTIARY}
         onChangeText={onChangeText}
+        onBlur={onBlur}
+        onFocus={onFocus}
       />
-    </View>
+    </Pressable>
   );
 }
 
@@ -65,17 +86,60 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
   const toggleSetCompletion = useWorkoutSessionStore((s) => s.toggleSetCompletion);
   const removeSet = useWorkoutSessionStore((s) => s.removeSet);
   const startRestTimer = useWorkoutSessionStore((s) => s.startRestTimer);
+  const decimalKeyboardType = "decimal-pad";
+  const [weightDraft, setWeightDraft] = useState(set.weight !== null ? String(set.weight) : "");
+  const [distanceDraft, setDistanceDraft] = useState(
+    set.distance !== null && set.distance !== undefined ? String(set.distance) : ""
+  );
+  const [isWeightFocused, setIsWeightFocused] = useState(false);
+  const [isDistanceFocused, setIsDistanceFocused] = useState(false);
 
   const isCompleted = !!set.completedAt;
 
+  useEffect(() => {
+    if (isWeightFocused) return;
+    setWeightDraft(set.weight !== null ? String(set.weight) : "");
+  }, [isWeightFocused, set.weight]);
+
+  useEffect(() => {
+    if (isDistanceFocused) return;
+    setDistanceDraft(
+      set.distance !== null && set.distance !== undefined ? String(set.distance) : ""
+    );
+  }, [isDistanceFocused, set.distance]);
+
   const handleWeightChange = useCallback(
     (text: string) => {
-      const val = text === "" ? null : parseFloat(text);
-      if (val !== null && isNaN(val)) return;
+      const normalizedText = text.replace(",", ".");
+      setWeightDraft(normalizedText);
+      if (normalizedText === "") {
+        updateSet(exerciseId, set.id, "weight", null);
+        return;
+      }
+      if (normalizedText === ".") return;
+      const val = Number(normalizedText);
+      if (!Number.isFinite(val)) return;
       updateSet(exerciseId, set.id, "weight", val);
     },
     [exerciseId, set.id, updateSet]
   );
+
+  const handleWeightBlur = useCallback(() => {
+    setIsWeightFocused(false);
+    const normalizedText = weightDraft.trim().replace(",", ".");
+    if (normalizedText === "") {
+      setWeightDraft("");
+      updateSet(exerciseId, set.id, "weight", null);
+      return;
+    }
+    const val = Number(normalizedText);
+    if (!Number.isFinite(val)) {
+      setWeightDraft(set.weight !== null ? String(set.weight) : "");
+      return;
+    }
+    setWeightDraft(String(val));
+    updateSet(exerciseId, set.id, "weight", val);
+  }, [exerciseId, set.id, set.weight, updateSet, weightDraft]);
 
   const handleRepsChange = useCallback(
     (text: string) => {
@@ -97,12 +161,38 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
 
   const handleDistanceChange = useCallback(
     (text: string) => {
-      const val = text === "" ? null : parseFloat(text);
-      if (val !== null && isNaN(val)) return;
+      const normalizedText = text.replace(",", ".");
+      setDistanceDraft(normalizedText);
+      if (normalizedText === "") {
+        updateSet(exerciseId, set.id, "distance", null);
+        return;
+      }
+      if (normalizedText === ".") return;
+      const val = Number(normalizedText);
+      if (!Number.isFinite(val)) return;
       updateSet(exerciseId, set.id, "distance", val);
     },
     [exerciseId, set.id, updateSet]
   );
+
+  const handleDistanceBlur = useCallback(() => {
+    setIsDistanceFocused(false);
+    const normalizedText = distanceDraft.trim().replace(",", ".");
+    if (normalizedText === "") {
+      setDistanceDraft("");
+      updateSet(exerciseId, set.id, "distance", null);
+      return;
+    }
+    const val = Number(normalizedText);
+    if (!Number.isFinite(val)) {
+      setDistanceDraft(
+        set.distance !== null && set.distance !== undefined ? String(set.distance) : ""
+      );
+      return;
+    }
+    setDistanceDraft(String(val));
+    updateSet(exerciseId, set.id, "distance", val);
+  }, [distanceDraft, exerciseId, set.distance, set.id, updateSet]);
 
   const handleToggleComplete = useCallback(() => {
     if (!isCompleted) {
@@ -181,12 +271,12 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
           />
           <InputBlock
             label="Distance"
-            value={
-              set.distance !== null && set.distance !== undefined ? String(set.distance) : ""
-            }
+            value={distanceDraft}
             placeholder="0.00"
-            keyboardType="decimal-pad"
+            keyboardType={decimalKeyboardType}
             onChangeText={handleDistanceChange}
+            onFocus={() => setIsDistanceFocused(true)}
+            onBlur={handleDistanceBlur}
             completed={isCompleted}
           />
         </>
@@ -197,10 +287,12 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
       <>
         <InputBlock
           label={`Weight (${weightUnit})`}
-          value={set.weight !== null ? String(set.weight) : ""}
+          value={weightDraft}
           placeholder={placeholder.weight !== null ? String(placeholder.weight) : weightUnit}
-          keyboardType="decimal-pad"
+          keyboardType={decimalKeyboardType}
           onChangeText={handleWeightChange}
+          onFocus={() => setIsWeightFocused(true)}
+          onBlur={handleWeightBlur}
           completed={isCompleted}
         />
         <InputBlock
