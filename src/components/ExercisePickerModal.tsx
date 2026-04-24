@@ -25,6 +25,7 @@ import {
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { showAlert } from "@/utils/alerts";
+import { Swipeable } from "./Swipeable";
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -44,6 +45,7 @@ export default function ExercisePickerModal({
   subtitle = "Search the library or add a custom exercise.",
 }: ExercisePickerModalProps) {
   const [search, setSearch] = useState("");
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const [renameTarget, setRenameTarget] = useState<ExerciseDefinition | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const renameInputRef = useRef<TextInput>(null);
@@ -51,12 +53,28 @@ export default function ExercisePickerModal({
   const customExercises = useExerciseLibraryStore((state) => state.customExercises);
   const addCustomExercise = useExerciseLibraryStore((state) => state.addCustomExercise);
   const renameCustomExercise = useExerciseLibraryStore((state) => state.renameCustomExercise);
+  const removeCustomExercise = useExerciseLibraryStore((state) => state.removeCustomExercise);
   const renameExerciseDefinitionReferencesInPrograms = useProgramStore(
     (state) => state.renameExerciseDefinitionReferences
+  );
+  const removeExerciseDefinitionReferencesInPrograms = useProgramStore(
+    (state) => state.removeExerciseDefinitionReferences
   );
   const renameExerciseDefinitionReferencesInWorkouts = useWorkoutSessionStore(
     (state) => state.renameExerciseDefinitionReferences
   );
+  const removeExerciseDefinitionReferencesInHistory = useWorkoutSessionStore(
+    (state) => state.removeExerciseDefinitionReferences
+  );
+
+  const handleDeleteCustomExercise = (id: string) => {
+    // 1. Orphanize references in programs and history
+    removeExerciseDefinitionReferencesInPrograms(id);
+    removeExerciseDefinitionReferencesInHistory(id);
+
+    // 2. Remove the custom definition
+    removeCustomExercise(id);
+  };
 
   useEffect(() => {
     if (!visible) {
@@ -259,6 +277,7 @@ export default function ExercisePickerModal({
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={scrollEnabled}
               renderItem={({ item }) => {
                 const isSelected = item.id === selectedDefinitionId;
                 const subtitleText =
@@ -270,11 +289,12 @@ export default function ExercisePickerModal({
                       ? "Custom exercise"
                       : "Uncategorized";
 
-                return (
+                const content = (
                   <View
                     style={[
                       styles.item,
                       isSelected && styles.itemSelected,
+                      item.isCustom && styles.swipeableItemInner,
                     ]}
                   >
                     <Pressable
@@ -302,6 +322,23 @@ export default function ExercisePickerModal({
                     ) : null}
                   </View>
                 );
+
+                if (item.isCustom) {
+                  return (
+                    <Swipeable
+                      onDelete={() => handleDeleteCustomExercise(item.id)}
+                      onToggleScroll={setScrollEnabled}
+                      style={[
+                        styles.swipeableItem,
+                        isSelected && styles.swipeableItemSelected,
+                      ]}
+                    >
+                      {content}
+                    </Swipeable>
+                  );
+                }
+
+                return content;
               }}
               ListEmptyComponent={
                 !canAddCustomExercise ? (
@@ -465,7 +502,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    gap: 8,
+    gap: 0,
   },
   item: {
     flexDirection: "row",
@@ -474,6 +511,23 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
+    marginBottom: 8,
+  },
+  swipeableItem: {
+    marginBottom: 8,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.03)",
+  },
+  swipeableItemInner: {
+    marginBottom: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+  },
+  swipeableItemSelected: {
+    borderColor: "rgba(11, 130, 255, 0.25)",
+    backgroundColor: "rgba(11, 130, 255, 0.08)",
   },
   itemSelected: {
     borderColor: "rgba(11, 130, 255, 0.25)",

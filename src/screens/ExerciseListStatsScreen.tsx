@@ -261,6 +261,7 @@ export default function ExerciseListStatsScreen() {
             onDelete={() => {}} // No delete on insights page
             onPin={() => handlePin(item.key)} 
             onToggleScroll={setScrollEnabled}
+            style={{ marginBottom: 16 }}
           >
             <Pressable
               style={({ pressed }) => [

@@ -156,6 +156,7 @@ interface WorkoutSessionActions {
   clearDirtyWorkouts: (ids: string[]) => void;
   updateMusclesInHistory: (exerciseIdentityKey: string, muscles: MuscleGroup[]) => void;
   renameExerciseDefinitionReferences: (exerciseDefinitionId: string, nextName: string) => void;
+  removeExerciseDefinitionReferences: (exerciseDefinitionId: string) => void;
 
   /**
    * Applies remote data using last-write-wins against the current state.
@@ -1062,6 +1063,94 @@ export const useWorkoutSessionStore = create<
                   if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
                   if (exercise.name === normalizedName) return;
                   exercise.name = normalizedName;
+                  sessionChanged = true;
+                });
+
+                if (!sessionChanged) return null;
+
+                nextSession.updatedAt = Date.now();
+                return nextSession;
+              })
+              .filter((session): session is WorkoutSession => session !== null);
+
+            if (changedShardSessions.length === 0) return;
+
+            await workoutStorage.saveBatch(changedShardSessions);
+
+            set((state) => {
+              changedShardSessions.forEach((session) => {
+                if (!state.dirtyWorkoutIds.includes(session._id)) {
+                  state.dirtyWorkoutIds.push(session._id);
+                }
+              });
+              state.isDirty = true;
+              state.history = [...state.history];
+            });
+          })();
+        }
+      },
+
+      removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
+        const normalizedExerciseDefinitionId = String(exerciseDefinitionId).trim();
+        if (!normalizedExerciseDefinitionId) return;
+
+        const loadedHistoryIds = new Set(get().history.map((session) => session._id));
+        const shardOnlyIds = get().historyIndex.filter((id) => !loadedHistoryIds.has(id));
+        const updatedSessions: WorkoutSession[] = [];
+
+        set((state) => {
+          let changed = false;
+
+          state.history.forEach((session) => {
+            let sessionChanged = false;
+            session.exercises.forEach((exercise) => {
+              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
+              exercise.exerciseDefinitionId = "";
+              session.updatedAt = Date.now();
+              sessionChanged = true;
+              changed = true;
+            });
+
+            if (sessionChanged) {
+              updatedSessions.push(safeClone(session));
+              if (!state.dirtyWorkoutIds.includes(session._id)) {
+                state.dirtyWorkoutIds.push(session._id);
+              }
+            }
+          });
+
+          if (state.activeSession) {
+            state.activeSession.exercises.forEach((exercise) => {
+              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
+              exercise.exerciseDefinitionId = "";
+              changed = true;
+            });
+
+            if (changed) {
+              state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+            }
+          }
+
+          if (changed) {
+            state.isDirty = true;
+          }
+        });
+
+        if (updatedSessions.length > 0) {
+          workoutStorage.saveBatch(updatedSessions);
+        }
+
+        if (shardOnlyIds.length > 0) {
+          void (async () => {
+            const shardSessions = await workoutStorage.getBatch(shardOnlyIds);
+            const changedShardSessions = shardSessions
+              .map((session) => {
+                let sessionChanged = false;
+                const nextSession = safeClone(session);
+
+                nextSession.exercises.forEach((exercise) => {
+                  if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
+                  exercise.exerciseDefinitionId = "";
                   sessionChanged = true;
                 });
 

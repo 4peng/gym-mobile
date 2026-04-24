@@ -12,6 +12,7 @@ interface ExerciseLibraryState {
 interface ExerciseLibraryActions {
   addCustomExercise: (name: string, muscles?: MuscleGroup[]) => ExerciseDefinition;
   renameCustomExercise: (id: string, name: string) => ExerciseDefinition | null;
+  removeCustomExercise: (id: string) => void;
   updateCustomExerciseMuscles: (id: string, muscles: MuscleGroup[]) => void;
 }
 
@@ -118,6 +119,12 @@ export const useExerciseLibraryStore = create<
           customExercises: state.customExercises.map((exercise) =>
             exercise.id === id ? { ...exercise, muscles: [...muscles] } : exercise
           ),
+        }));
+      },
+
+      removeCustomExercise: (id) => {
+        set((state) => ({
+          customExercises: state.customExercises.filter((exercise) => exercise.id !== id),
         }));
       },
     }),

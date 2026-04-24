@@ -22,9 +22,10 @@ interface SwipeableProps {
   onDelete: () => void;
   onPin?: () => void;
   onToggleScroll?: (enabled: boolean) => void;
+  style?: any;
 }
 
-export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: SwipeableProps) => {
+export const Swipeable = ({ children, onDelete, onPin, onToggleScroll, style }: SwipeableProps) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const lastOffset = useRef(0);
   const gestureStartOffset = useRef(0);
@@ -179,7 +180,7 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: Swipeab
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <View style={styles.backgroundContainer}>
         <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.ACCENT_BLUE, opacity: pinOpacity, justifyContent: 'flex-start' }]}>
           <Pressable style={styles.actionButton} onPress={handlePinAction}>
@@ -207,7 +208,6 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: Swipeab
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    marginBottom: 16,
     backgroundColor: 'transparent',
     borderRadius: 32,
     overflow: 'hidden',
