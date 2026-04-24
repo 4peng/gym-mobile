@@ -11,6 +11,7 @@ interface ExerciseLibraryState {
 
 interface ExerciseLibraryActions {
   addCustomExercise: (name: string, muscles?: MuscleGroup[]) => ExerciseDefinition;
+  renameCustomExercise: (id: string, name: string) => ExerciseDefinition | null;
   updateCustomExerciseMuscles: (id: string, muscles: MuscleGroup[]) => void;
 }
 
@@ -32,6 +33,18 @@ function normalizeName(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function matchesCustomExerciseNameOrAlias(
+  exercise: ExerciseDefinition,
+  normalizedName: string
+) {
+  const target = normalizedName.toLowerCase();
+  if (exercise.name.trim().toLowerCase() === target) return true;
+
+  return (exercise.aliases || []).some(
+    (alias) => alias.trim().toLowerCase() === target
+  );
+}
+
 export const useExerciseLibraryStore = create<
   ExerciseLibraryState & ExerciseLibraryActions
 >()(
@@ -42,7 +55,7 @@ export const useExerciseLibraryStore = create<
       addCustomExercise: (name, muscles = []) => {
         const normalizedName = normalizeName(name);
         const existing = get().customExercises.find(
-          (exercise) => exercise.name.toLowerCase() === normalizedName.toLowerCase()
+          (exercise) => matchesCustomExerciseNameOrAlias(exercise, normalizedName)
         );
         if (existing) {
           return existing;
@@ -63,6 +76,43 @@ export const useExerciseLibraryStore = create<
         return next;
       },
 
+      renameCustomExercise: (id, name) => {
+        const normalizedName = normalizeName(name);
+        if (!normalizedName) return null;
+
+        const current = get().customExercises.find((exercise) => exercise.id === id);
+        if (!current) return null;
+
+        const conflicting = get().customExercises.find(
+          (exercise) => exercise.id !== id && matchesCustomExerciseNameOrAlias(exercise, normalizedName)
+        );
+        if (conflicting) {
+          return null;
+        }
+
+        const nextAliases = Array.from(
+          new Set(
+            [current.name, ...(current.aliases || [])].filter(
+              (alias) => alias.trim().toLowerCase() !== normalizedName.toLowerCase()
+            )
+          )
+        );
+
+        const renamed: ExerciseDefinition = {
+          ...current,
+          name: normalizedName,
+          aliases: nextAliases,
+        };
+
+        set((state) => ({
+          customExercises: state.customExercises.map((exercise) =>
+            exercise.id === id ? renamed : exercise
+          ),
+        }));
+
+        return renamed;
+      },
+
       updateCustomExerciseMuscles: (id, muscles) => {
         set((state) => ({
           customExercises: state.customExercises.map((exercise) =>
@@ -74,7 +124,7 @@ export const useExerciseLibraryStore = create<
     {
       name: "exercise-library-store",
       storage: createJSONStorage(() => zustandAsyncStorage),
-      version: 1,
+      version: 2,
       migrate: (persistedState) => {
         const state = persistedState as Partial<ExerciseLibraryState> | undefined;
         return {

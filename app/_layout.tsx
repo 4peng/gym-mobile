@@ -8,7 +8,6 @@ import { COLORS } from '@/src/constants/colors';
 import { useState } from 'react';
 import { startNetworkSyncListener } from '@/src/lib/api/networkListener';
 import { initSyncEffect } from '@/src/stores/syncEffect';
-import RestTimerLiveActivitySync from '@/src/components/RestTimerLiveActivitySync';
 import {
   clearAppNotifications,
   configureNotificationHandler,
@@ -83,14 +82,6 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="programs" />
         <Stack.Screen name="workout/index" />
-        <Stack.Screen 
-          name="exercises/[name]/index" 
-          options={{ 
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-            gestureEnabled: true,
-          }} 
-        />
         <Stack.Screen 
           name="exercises/[name]/volume" 
           options={{ 

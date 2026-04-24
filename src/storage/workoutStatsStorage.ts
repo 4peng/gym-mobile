@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { WorkoutSession } from "@/types";
 import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
+import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
+import { resolveEffectiveStrengthLoad } from "@/utils/bodyweightAnalytics";
 
 export const WORKOUT_STATS_KEY = "workout-stats-index-v1";
 
@@ -71,6 +73,7 @@ function isZeroAgg(agg: Aggregate) {
 
 function computeContribution(session: WorkoutSession): SessionContribution | null {
   if (session.deletedAt || !session.completedAt) return null;
+  const { analyticsBodyweight, analyticsBodyweightUnit } = useUiPreferencesStore.getState();
 
   const byExercise: Record<string, Aggregate> = {};
   const total = emptyAggregate();
@@ -85,12 +88,20 @@ function computeContribution(session: WorkoutSession): SessionContribution | nul
 
     for (const set of exercise.sets) {
       if (!set.completedAt) continue;
-      if (set.weight == null || set.reps == null) continue;
-      if (!Number.isFinite(set.weight) || !Number.isFinite(set.reps)) continue;
+      if (set.reps == null || !Number.isFinite(set.reps)) continue;
+      const effectiveLoad = resolveEffectiveStrengthLoad(
+        exercise,
+        set.weight,
+        exercise.weightUnit || "kg",
+        exercise.weightUnit || "kg",
+        analyticsBodyweight,
+        analyticsBodyweightUnit
+      );
+      if (effectiveLoad == null || !Number.isFinite(effectiveLoad)) continue;
 
       exerciseSets += 1;
       exerciseReps += set.reps;
-      exerciseVolume += set.weight * set.reps;
+      exerciseVolume += effectiveLoad * set.reps;
     }
 
     if (exerciseSets === 0) continue;

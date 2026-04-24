@@ -21,6 +21,7 @@ interface ProgramActions {
   updateProgram: (id: string, updates: Partial<Program>) => void;
   deleteProgram: (id: string) => void;
   togglePin: (id: string) => void;
+  renameExerciseDefinitionReferences: (exerciseDefinitionId: string, nextName: string) => void;
   getProgramById: (id: string) => Program | undefined;
   markDirty: () => void;
   clearDeletedPrograms: (ids: string[]) => void;
@@ -131,6 +132,38 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           if (program) {
             program.pinned = !program.pinned;
             program.updatedAt = updatedAt;
+            state.isDirty = true;
+          }
+        });
+      },
+
+      renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
+        const normalizedExerciseDefinitionId = String(exerciseDefinitionId).trim();
+        const normalizedName = String(nextName).trim();
+        if (!normalizedExerciseDefinitionId || !normalizedName) return;
+
+        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
+        set((state) => {
+          let changed = false;
+
+          state.programs.forEach((program) => {
+            let programChanged = false;
+
+            program.exercises.forEach((exercise) => {
+              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
+              if (exercise.name === normalizedName) return;
+
+              exercise.name = normalizedName;
+              programChanged = true;
+            });
+
+            if (programChanged) {
+              program.updatedAt = updatedAt;
+              changed = true;
+            }
+          });
+
+          if (changed) {
             state.isDirty = true;
           }
         });

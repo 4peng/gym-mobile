@@ -28,6 +28,7 @@ import {
   MuscleGroup,
 } from "@/constants/muscles";
 import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
+import { resolveEffectiveStrengthLoad } from "@/utils/bodyweightAnalytics";
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -75,6 +76,8 @@ export default function ExerciseListStatsScreen() {
   const showDetailedMuscleGroups = useUiPreferencesStore(
     (s) => s.showDetailedMuscleGroups
   );
+  const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
+  const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
   const [search, setSearch] = React.useState("");
   const [selectedMuscles, setSelectedMuscles] = React.useState<MuscleGroup[]>([]);
   const [scrollEnabled, setScrollEnabled] = React.useState(true);
@@ -125,7 +128,17 @@ export default function ExerciseListStatsScreen() {
         
         let vol = 0;
         ex.sets.forEach(s => {
-          if (s.completedAt && s.weight && s.reps) vol += s.weight * s.reps;
+          if (!s.completedAt || s.reps === null || !Number.isFinite(s.reps)) return;
+          const effectiveLoad = resolveEffectiveStrengthLoad(
+            ex,
+            s.weight,
+            ex.weightUnit || "kg",
+            ex.weightUnit || "kg",
+            analyticsBodyweight,
+            analyticsBodyweightUnit
+          );
+          if (effectiveLoad === null || !Number.isFinite(effectiveLoad)) return;
+          vol += effectiveLoad * s.reps;
         });
         
         const currentData = exerciseMap.get(identityKey)!;
@@ -159,7 +172,15 @@ export default function ExerciseListStatsScreen() {
         recentVolume: exerciseMap.get(identityKey) || [],
         muscles: musclesMap.get(identityKey) || []
       }));
-  }, [history, search, pinnedExerciseNames, selectedMuscles, showDetailedMuscleGroups]);
+  }, [
+    analyticsBodyweight,
+    analyticsBodyweightUnit,
+    history,
+    search,
+    pinnedExerciseNames,
+    selectedMuscles,
+    showDetailedMuscleGroups,
+  ]);
 
   const handlePin = useCallback((identityKey: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
