@@ -262,6 +262,7 @@ export default function ExerciseListStatsScreen() {
             onPin={() => handlePin(item.key)} 
             onToggleScroll={setScrollEnabled}
             style={{ marginBottom: 16 }}
+            borderRadius={0}
           >
             <Pressable
               style={({ pressed }) => [

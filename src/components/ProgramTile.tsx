@@ -37,6 +37,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
       onPin={handlePin}
       onToggleScroll={onToggleScroll}
       style={{ marginBottom: 16 }}
+      borderRadius={0}
     >
       <Pressable
         onPress={handlePress}

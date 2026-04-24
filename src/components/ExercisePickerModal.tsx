@@ -294,7 +294,6 @@ export default function ExercisePickerModal({
                     style={[
                       styles.item,
                       isSelected && styles.itemSelected,
-                      item.isCustom && styles.swipeableItemInner,
                     ]}
                   >
                     <Pressable
@@ -328,10 +327,8 @@ export default function ExercisePickerModal({
                     <Swipeable
                       onDelete={() => handleDeleteCustomExercise(item.id)}
                       onToggleScroll={setScrollEnabled}
-                      style={[
-                        styles.swipeableItem,
-                        isSelected && styles.swipeableItemSelected,
-                      ]}
+                      style={styles.swipeableItem}
+                      borderRadius={18}
                     >
                       {content}
                     </Swipeable>
@@ -515,19 +512,6 @@ const styles = StyleSheet.create({
   },
   swipeableItem: {
     marginBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-  },
-  swipeableItemInner: {
-    marginBottom: 0,
-    backgroundColor: "transparent",
-    borderWidth: 0,
-  },
-  swipeableItemSelected: {
-    borderColor: "rgba(11, 130, 255, 0.25)",
-    backgroundColor: "rgba(11, 130, 255, 0.08)",
   },
   itemSelected: {
     borderColor: "rgba(11, 130, 255, 0.25)",

@@ -616,6 +616,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
                     onDelete={() => handleDeleteSession(log.sessionIds)} 
                     onToggleScroll={setScrollEnabled}
                     style={{ marginBottom: 16 }}
+                    borderRadius={0}
                   >
                     <View style={[
                       UI.SHARED.card, 
