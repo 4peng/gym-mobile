@@ -611,13 +611,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
             {sessionLogs.length === 0 ? <View style={styles.emptyLogs}><Text style={styles.emptyLogsText}>No recorded sessions found</Text></View> : (
               <View style={{ gap: 0 }}>
                 {sessionLogs.slice(0, displayLimit).map((log) => (
-                  <Swipeable 
-                    key={log.id} 
-                    onDelete={() => handleDeleteSession(log.sessionIds)} 
-                    onToggleScroll={setScrollEnabled}
-                    style={{ marginBottom: 16 }}
-                    borderRadius={0}
-                  >
+                  <Swipeable key={log.id} onDelete={() => handleDeleteSession(log.sessionIds)} onToggleScroll={setScrollEnabled}>
                     <View style={[
                       UI.SHARED.card, 
                       { marginBottom: 0, borderRadius: 32 },

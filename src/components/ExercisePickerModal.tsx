@@ -294,6 +294,7 @@ export default function ExercisePickerModal({
                     style={[
                       styles.item,
                       isSelected && styles.itemSelected,
+                      item.isCustom && styles.itemCustom, // Solid background for swiping
                     ]}
                   >
                     <Pressable
@@ -324,18 +325,22 @@ export default function ExercisePickerModal({
 
                 if (item.isCustom) {
                   return (
-                    <Swipeable
-                      onDelete={() => handleDeleteCustomExercise(item.id)}
-                      onToggleScroll={setScrollEnabled}
-                      style={styles.swipeableItem}
-                      borderRadius={18}
-                    >
-                      {content}
-                    </Swipeable>
+                    <View style={styles.swipeWrapper}>
+                      <Swipeable
+                        onDelete={() => handleDeleteCustomExercise(item.id)}
+                        onToggleScroll={setScrollEnabled}
+                      >
+                        {content}
+                      </Swipeable>
+                    </View>
                   );
                 }
 
-                return content;
+                return (
+                  <View style={{ marginHorizontal: 16 }}>
+                    {content}
+                  </View>
+                );
               }}
               ListEmptyComponent={
                 !canAddCustomExercise ? (
@@ -498,8 +503,14 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   listContent: {
-    paddingHorizontal: 16,
-    gap: 0,
+    paddingHorizontal: 0,
+    gap: 8,
+  },
+  swipeWrapper: {
+    marginHorizontal: 16,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   item: {
     flexDirection: "row",
@@ -508,14 +519,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
-    marginBottom: 8,
+    marginBottom: 0, // Handled by gap or marginHorizontal wrapper
   },
-  swipeableItem: {
-    marginBottom: 8,
+  itemCustom: {
+    backgroundColor: '#1C1C1E', // Solid opaque background for swiping
   },
   itemSelected: {
     borderColor: "rgba(11, 130, 255, 0.25)",
-    backgroundColor: "rgba(11, 130, 255, 0.08)",
+    backgroundColor: "rgba(11, 130, 255, 0.12)", // Slightly more opaque
   },
   itemMain: {
     flex: 1,

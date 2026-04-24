@@ -152,12 +152,7 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
     .join(", ");
 
   return (
-    <Swipeable 
-      onDelete={() => onDelete(session._id)} 
-      onToggleScroll={onToggleScroll}
-      style={{ marginBottom: 16 }}
-      borderRadius={0}
-    >
+    <Swipeable onDelete={() => onDelete(session._id)} onToggleScroll={onToggleScroll}>
       <View style={[UI.SHARED.card, { marginBottom: 0, borderRadius: 0 }]}>
         <View style={{ padding: 12 }}>
           <View style={styles.cardHeader}>

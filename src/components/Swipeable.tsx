@@ -22,11 +22,9 @@ interface SwipeableProps {
   onDelete: () => void;
   onPin?: () => void;
   onToggleScroll?: (enabled: boolean) => void;
-  style?: any;
-  borderRadius?: number;
 }
 
-export const Swipeable = ({ children, onDelete, onPin, onToggleScroll, style, borderRadius = 32 }: SwipeableProps) => {
+export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: SwipeableProps) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const lastOffset = useRef(0);
   const gestureStartOffset = useRef(0);
@@ -147,7 +145,6 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll, style, bo
         const toValue = shouldBeOpenLeft ? -BUTTON_WIDTH : (shouldBeOpenRight ? BUTTON_WIDTH : 0);
         Animated.spring(translateX, { toValue, useNativeDriver: true, tension: 50, friction: 12 }).start(() => setIsOpen(shouldBeOpenLeft || shouldBeOpenRight));
       },
-      onPanResponderTerminationRequest: () => true,
       onShouldBlockNativeResponder: () => true,
     })
   ).current;
@@ -181,15 +178,15 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll, style, bo
   });
 
   return (
-    <View style={[styles.container, { borderRadius }, style]}>
-      <View style={[styles.backgroundContainer, { borderRadius }]}>
-        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.ACCENT_BLUE, opacity: pinOpacity, justifyContent: 'flex-start', borderRadius }]}>
+    <View style={styles.container}>
+      <View style={styles.backgroundContainer}>
+        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.ACCENT_BLUE, opacity: pinOpacity, justifyContent: 'flex-start' }]}>
           <Pressable style={styles.actionButton} onPress={handlePinAction}>
             <Pin size={22} color={COLORS.TEXT_PRIMARY} />
           </Pressable>
         </Animated.View>
 
-        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.DANGER, opacity: deleteOpacity, justifyContent: 'flex-end', borderRadius }]}>
+        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.DANGER, opacity: deleteOpacity, justifyContent: 'flex-end' }]}>
           <Pressable style={styles.actionButton} onPress={handleDelete}>
             <Trash2 size={22} color={COLORS.TEXT_PRIMARY} />
           </Pressable>
@@ -209,6 +206,7 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll, style, bo
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
+    marginBottom: 16,
     backgroundColor: 'transparent',
     borderRadius: 32,
     overflow: 'hidden',
