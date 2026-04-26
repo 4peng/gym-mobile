@@ -385,24 +385,10 @@ export default function WorkoutSessionScreen() {
                     <Text style={styles.footerActionText}>Add Exercise</Text>
                   </Pressable>
 
-                  {isQuickSession && hasSavableRoutineExercises && (
-                    <Pressable
-                      onPress={() => setSaveAsNewVisible(true)}
-                      style={({ pressed }) => [
-                        styles.footerActionBtn,
-                        pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                      ]}
-                    >
-                      <Save size={18} color={COLORS.ACCENT_GREEN} />
-                      <Text style={styles.footerActionText}>Save As Routine</Text>
-                    </Pressable>
-                  )}
-
                   <Pressable
                     onPress={() => setReorderVisible(true)}
                     style={({ pressed }) => [
                       styles.footerActionBtn,
-                      { flex: isQuickSession && hasSavableRoutineExercises ? 0.8 : 1 },
                       pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
                     ]}
                   >

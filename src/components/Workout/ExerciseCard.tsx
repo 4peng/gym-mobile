@@ -14,6 +14,7 @@ import { HapticFeedback } from "@/utils/haptics";
 import { SetRow } from "./SetRow";
 import ExercisePickerField from "@/components/ExercisePickerField";
 import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelector";
+import ExerciseBodyweightSelector from "@/components/ExerciseBodyweightSelector";
 import MuscleSelector from "@/src/components/MuscleSelector";
 import { MuscleGroup } from "@/src/constants/muscles";
 import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
@@ -64,6 +65,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   const removeExercise = useWorkoutSessionStore((s) => s.removeExercise);
   const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
   const toggleExerciseUnit = useWorkoutSessionStore((s) => s.toggleExerciseUnit);
+  const toggleExerciseBodyweight = useWorkoutSessionStore((s) => s.toggleExerciseBodyweight);
   const selectExerciseDefinition = useWorkoutSessionStore((s) => s.selectExerciseDefinition);
   const history = useWorkoutSessionStore((s) => s.history);
 
@@ -98,7 +100,12 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   const placeholders = useMemo(
     () =>
       exercise.trackingMode === "strength"
-        ? resolveExercisePlaceholders(getExerciseIdentityKey(exercise), exercise.sets, history)
+        ? resolveExercisePlaceholders(
+            getExerciseIdentityKey(exercise),
+            exercise.sets,
+            history,
+            exercise.weightUnit || "kg"
+          )
         : [],
     [exercise, history]
   );
@@ -119,6 +126,11 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
     HapticFeedback.selection();
     toggleExerciseUnit(exercise.id);
   }, [exercise.id, toggleExerciseUnit]);
+
+  const handleBodyweightToggle = useCallback(() => {
+    HapticFeedback.selection();
+    toggleExerciseBodyweight(exercise.id);
+  }, [exercise.id, toggleExerciseBodyweight]);
 
   const handleMusclesChange = useCallback(
     (muscles: MuscleGroup[]) => {
@@ -153,6 +165,14 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
             onChange={handleTrackingModeChange}
             compact
           />
+
+          {exercise.trackingMode === "strength" ? (
+            <ExerciseBodyweightSelector
+              isBodyweight={!!exercise.isBodyweight}
+              onToggle={handleBodyweightToggle}
+              compact
+            />
+          ) : null}
 
           <StatChip
             value={`Rest ${formatSecondsToMMSS(exercise.restSeconds)}`}

@@ -1,4 +1,5 @@
-import type { WorkoutSession, WorkoutSet } from "@/types";
+import type { WorkoutSession, WorkoutSet, WorkoutExercise } from "@/types";
+import { convertWeight } from "./conversions";
 
 /**
  * Placeholder values to show in the UI for a set whose weight/reps are null.
@@ -22,17 +23,21 @@ export interface SetPlaceholder {
 export function resolveExercisePlaceholders(
   exerciseIdentityKey: string,
   currentSets: WorkoutSet[],
-  history: WorkoutSession[]
+  history: WorkoutSession[],
+  targetUnit: "kg" | "lbs" = "kg"
 ): SetPlaceholder[] {
-  const previous = findMostRecentExercise(exerciseIdentityKey, history);
+  const previousMatch = findMostRecentExercise(exerciseIdentityKey, history);
+  const previousSets = previousMatch?.sets || null;
+  const previousUnit = previousMatch?.weightUnit || "kg";
   const currentSetCount = currentSets.length;
 
   // 1. Initial pass: use history
   const placeholders: SetPlaceholder[] = Array.from({ length: currentSetCount }, (_, i) => {
-    if (!previous || previous.length === 0) return { weight: null, reps: null };
-    const source = i < previous.length ? previous[i] : previous[previous.length - 1];
+    if (!previousSets || previousSets.length === 0) return { weight: null, reps: null };
+    const source = i < previousSets.length ? previousSets[i] : previousSets[previousSets.length - 1];
+    
     return {
-      weight: source.weight,
+      weight: convertWeight(source.weight, previousUnit, targetUnit),
       reps: source.reps,
     };
   });
@@ -101,12 +106,12 @@ export function resolveSetOnComplete(
 
 /**
  * Walk through completed history (already sorted newest-first) and return
- * the sets array from the first matching exercise name.
+ * the first matching exercise.
  */
 function findMostRecentExercise(
   exerciseIdentityKey: string,
   history: WorkoutSession[]
-): WorkoutSet[] | null {
+): WorkoutExercise | null {
   for (const session of history) {
     if (!session.completedAt) continue; // skip incomplete
     const match = session.exercises.find(
@@ -117,7 +122,7 @@ function findMostRecentExercise(
         return key.toLowerCase() === exerciseIdentityKey.toLowerCase();
       }
     );
-    if (match) return match.sets;
+    if (match) return match;
   }
   return null;
 }

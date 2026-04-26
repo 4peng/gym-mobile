@@ -44,6 +44,8 @@ export default function SettingsScreen() {
   const toggleAnalyticsBodyweightUnit = useUiPreferencesStore(
     (s) => s.toggleAnalyticsBodyweightUnit
   );
+  const preferredWeightUnit = useUiPreferencesStore((s) => s.preferredWeightUnit);
+  const setPreferredWeightUnit = useUiPreferencesStore((s) => s.setPreferredWeightUnit);
   const [analyticsBodyweightText, setAnalyticsBodyweightText] = useState(
     analyticsBodyweight !== null ? String(analyticsBodyweight) : ""
   );
@@ -193,6 +195,52 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </Pressable>
+
+          <View style={styles.divider} />
+
+          <View style={styles.option}>
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
+              <RefreshCw size={20} color={COLORS.ACCENT_BLUE} />
+            </View>
+            <View style={styles.optionText}>
+              <Text style={styles.optionLabel}>Preferred Weight Unit</Text>
+              <Text style={styles.optionDesc}>Used for new exercise cards</Text>
+            </View>
+            <View style={styles.unitToggleGroup}>
+              <Pressable
+                onPress={() => setPreferredWeightUnit("kg")}
+                style={[
+                  styles.unitBtn,
+                  preferredWeightUnit === "kg" && styles.unitBtnActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.unitBtnText,
+                    preferredWeightUnit === "kg" && styles.unitBtnTextActive,
+                  ]}
+                >
+                  KG
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setPreferredWeightUnit("lbs")}
+                style={[
+                  styles.unitBtn,
+                  preferredWeightUnit === "lbs" && styles.unitBtnActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.unitBtnText,
+                    preferredWeightUnit === "lbs" && styles.unitBtnTextActive,
+                  ]}
+                >
+                  LBS
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
 
         <Text style={styles.sectionLabel}>Training Profile</Text>
@@ -412,6 +460,31 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   toggleTextActive: {
+    color: COLORS.ACCENT_BLUE,
+  },
+  unitToggleGroup: {
+    flexDirection: "row",
+    backgroundColor: COLORS.BG,
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+  },
+  unitBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  unitBtnActive: {
+    backgroundColor: "rgba(11, 130, 255, 0.15)",
+  },
+  unitBtnText: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  unitBtnTextActive: {
     color: COLORS.ACCENT_BLUE,
   },
   infoText: {

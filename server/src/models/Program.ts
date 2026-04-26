@@ -11,6 +11,7 @@ export interface IProgramExercise {
   weightUnit?: 'kg' | 'lbs';
   initialWeight?: number | null;
   muscles: string[];
+  isBodyweight?: boolean;
 }
 
 export interface IProgram extends Document<string> {
@@ -33,6 +34,7 @@ const ProgramExerciseSchema = new Schema({
   weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
   initialWeight: { type: Number, default: null },
   muscles: { type: [String], default: [] },
+  isBodyweight: { type: Boolean, default: false },
 }, { _id: false });
 
 const ProgramSchema = new Schema({

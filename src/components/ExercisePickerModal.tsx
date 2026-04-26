@@ -293,8 +293,8 @@ export default function ExercisePickerModal({
                   <View
                     style={[
                       styles.item,
-                      isSelected && styles.itemSelected,
                       item.isCustom && styles.itemCustom, // Solid background for swiping
+                      isSelected && styles.itemSelected, // Selection wins background color
                     ]}
                   >
                     <Pressable
@@ -329,6 +329,8 @@ export default function ExercisePickerModal({
                       <Swipeable
                         onDelete={() => handleDeleteCustomExercise(item.id)}
                         onToggleScroll={setScrollEnabled}
+                        borderRadius={18}
+                        marginBottom={0}
                       >
                         {content}
                       </Swipeable>
@@ -477,7 +479,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   customAddBtn: {
-    marginHorizontal: 24,
+    marginHorizontal: 16,
     marginBottom: 12,
     backgroundColor: "rgba(11, 130, 255, 0.08)",
     borderWidth: 1,
@@ -522,11 +524,11 @@ const styles = StyleSheet.create({
     marginBottom: 0, // Handled by gap or marginHorizontal wrapper
   },
   itemCustom: {
-    backgroundColor: '#1C1C1E', // Solid opaque background for swiping
+    backgroundColor: '#161618', // Solid opaque background for swiping, slightly darker than standard
   },
   itemSelected: {
     borderColor: "rgba(11, 130, 255, 0.25)",
-    backgroundColor: "rgba(11, 130, 255, 0.12)", // Slightly more opaque
+    backgroundColor: "rgba(11, 130, 255, 0.12)", // Selection color
   },
   itemMain: {
     flex: 1,

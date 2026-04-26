@@ -7,6 +7,7 @@ interface UiPreferencesState {
   showDetailedMuscleGroups: boolean;
   analyticsBodyweight: number | null;
   analyticsBodyweightUnit: "kg" | "lbs";
+  preferredWeightUnit: "kg" | "lbs";
 }
 
 interface UiPreferencesActions {
@@ -14,6 +15,7 @@ interface UiPreferencesActions {
   setDetailedMuscleGroups: (enabled: boolean) => void;
   setAnalyticsBodyweight: (bodyweight: number | null) => void;
   toggleAnalyticsBodyweightUnit: () => void;
+  setPreferredWeightUnit: (unit: "kg" | "lbs") => void;
 }
 
 export const useUiPreferencesStore = create<
@@ -24,6 +26,7 @@ export const useUiPreferencesStore = create<
       showDetailedMuscleGroups: false,
       analyticsBodyweight: null,
       analyticsBodyweightUnit: "kg",
+      preferredWeightUnit: "kg",
       toggleDetailedMuscleGroups: () =>
         set((state) => ({
           showDetailedMuscleGroups: !state.showDetailedMuscleGroups,
@@ -43,6 +46,8 @@ export const useUiPreferencesStore = create<
               : convertWeight(analyticsBodyweight, analyticsBodyweightUnit, nextUnit),
         });
       },
+      setPreferredWeightUnit: (preferredWeightUnit) =>
+        set({ preferredWeightUnit }),
     }),
     {
       name: "ui-preferences-store",
@@ -58,6 +63,7 @@ export const useUiPreferencesStore = create<
               ? state.analyticsBodyweight
               : null,
           analyticsBodyweightUnit: state?.analyticsBodyweightUnit === "lbs" ? "lbs" : "kg",
+          preferredWeightUnit: state?.preferredWeightUnit === "lbs" ? "lbs" : "kg",
         } as UiPreferencesState;
       },
       partialize: (state) => ({

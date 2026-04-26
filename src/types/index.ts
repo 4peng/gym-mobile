@@ -24,6 +24,7 @@ export interface ProgramExercise {
   weightUnit?: "kg" | "lbs";
   initialWeight?: number | null;
   muscles: MuscleGroup[];
+  isBodyweight?: boolean;
 }
 
 /** A saved program / template. */
@@ -61,6 +62,7 @@ export interface WorkoutExercise {
   sets: WorkoutSet[];
   weightUnit?: "kg" | "lbs";
   muscles: MuscleGroup[];
+  isBodyweight?: boolean;
 }
 
 /** A workout session document. */

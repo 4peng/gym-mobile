@@ -20,6 +20,7 @@ export interface IWorkoutExercise {
   sets: IWorkoutSet[];
   weightUnit?: 'kg' | 'lbs';
   muscles: string[];
+  isBodyweight?: boolean;
 }
 
 export interface IWorkout extends Document<string> {
@@ -53,6 +54,7 @@ const WorkoutExerciseSchema = new Schema({
   sets: [WorkoutSetSchema],
   weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
   muscles: { type: [String], default: [] },
+  isBodyweight: { type: Boolean, default: false },
 }, { _id: false });
 
 const WorkoutSchema = new Schema({

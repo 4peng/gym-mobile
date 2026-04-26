@@ -15,6 +15,7 @@ import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "./RestTimerPicker";
 import ExercisePickerField from "@/components/ExercisePickerField";
 import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelector";
+import ExerciseBodyweightSelector from "./ExerciseBodyweightSelector";
 import MuscleSelector from "@/src/components/MuscleSelector";
 import { MuscleGroup } from "@/src/constants/muscles";
 import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
@@ -31,6 +32,7 @@ export interface ExerciseFormData {
   weightUnit?: "kg" | "lbs";
   initialWeight?: number | null;
   muscles: MuscleGroup[];
+  isBodyweight?: boolean;
 }
 
 interface ExerciseEditorProps {
@@ -139,6 +141,10 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     onUpdate(exercise.id, { weightUnit: nextUnit });
   }, [exercise.id, exercise.weightUnit, onUpdate]);
 
+  const handleToggleBodyweight = useCallback(() => {
+    onUpdate(exercise.id, { isBodyweight: !exercise.isBodyweight });
+  }, [exercise.id, exercise.isBodyweight, onUpdate]);
+
   const handleNotesChange = useCallback(
     (text: string) => onUpdate(exercise.id, { notes: text }),
     [exercise.id, onUpdate]
@@ -240,6 +246,15 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
           </View>
         ) : null}
       </View>
+
+      {exercise.trackingMode === "strength" ? (
+        <View style={{ marginTop: 12 }}>
+          <ExerciseBodyweightSelector
+            isBodyweight={!!exercise.isBodyweight}
+            onToggle={handleToggleBodyweight}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.notesBlock}>
         <Text style={styles.panelLabel}>Notes</Text>

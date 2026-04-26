@@ -3,6 +3,7 @@ import { EXERCISE_CATALOG } from "@/data/exerciseCatalog";
 export interface ExerciseIdentityLike {
   exerciseDefinitionId?: string | null;
   name: string;
+  isBodyweight?: boolean;
 }
 
 const NORMALIZATION_RULES: Array<[RegExp, string]> = [

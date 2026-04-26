@@ -22,9 +22,18 @@ interface SwipeableProps {
   onDelete: () => void;
   onPin?: () => void;
   onToggleScroll?: (enabled: boolean) => void;
+  borderRadius?: number;
+  marginBottom?: number;
 }
 
-export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: SwipeableProps) => {
+export const Swipeable = ({ 
+  children, 
+  onDelete, 
+  onPin, 
+  onToggleScroll,
+  borderRadius = 32,
+  marginBottom = 16
+}: SwipeableProps) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const lastOffset = useRef(0);
   const gestureStartOffset = useRef(0);
@@ -178,15 +187,15 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: Swipeab
   });
 
   return (
-    <View style={styles.container}>
-      <View style={styles.backgroundContainer}>
-        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.ACCENT_BLUE, opacity: pinOpacity, justifyContent: 'flex-start' }]}>
+    <View style={[styles.container, { borderRadius, marginBottom }]}>
+      <View style={[styles.backgroundContainer, { borderRadius }]}>
+        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.ACCENT_BLUE, opacity: pinOpacity, justifyContent: 'flex-start', borderRadius }]}>
           <Pressable style={styles.actionButton} onPress={handlePinAction}>
             <Pin size={22} color={COLORS.TEXT_PRIMARY} />
           </Pressable>
         </Animated.View>
 
-        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.DANGER, opacity: deleteOpacity, justifyContent: 'flex-end' }]}>
+        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.DANGER, opacity: deleteOpacity, justifyContent: 'flex-end', borderRadius }]}>
           <Pressable style={styles.actionButton} onPress={handleDelete}>
             <Trash2 size={22} color={COLORS.TEXT_PRIMARY} />
           </Pressable>
@@ -206,21 +215,17 @@ export const Swipeable = ({ children, onDelete, onPin, onToggleScroll }: Swipeab
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    marginBottom: 16,
     backgroundColor: 'transparent',
-    borderRadius: 32,
     overflow: 'hidden',
   },
   backgroundContainer: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
     overflow: 'hidden',
   },
   actionBackground: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 32,
   },
   actionButton: {
     width: BUTTON_WIDTH,

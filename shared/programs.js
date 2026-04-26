@@ -56,6 +56,7 @@ export function createEmptyExercise(createId) {
     weightUnit: DEFAULT_WEIGHT_UNIT,
     initialWeight: null,
     muscles: [],
+    isBodyweight: false,
   };
 }
 
@@ -79,6 +80,7 @@ export function normalizeExercise(exercise, createId) {
     weightUnit: exercise?.weightUnit === "lbs" ? "lbs" : DEFAULT_WEIGHT_UNIT,
     initialWeight: normalizeOptionalWeight(exercise?.initialWeight),
     muscles: normalizeMuscles(exercise?.muscles),
+    isBodyweight: typeof exercise?.isBodyweight === "boolean" ? exercise.isBodyweight : false,
   };
 }
 

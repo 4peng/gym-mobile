@@ -34,6 +34,8 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 }
 
 export function isBodyweightStrengthExercise(exercise: ExerciseIdentityLike): boolean {
+  if (exercise.isBodyweight) return true;
+
   const identityKey = normalizeExerciseIdentityKey(
     exercise.exerciseDefinitionId || exercise.name
   );

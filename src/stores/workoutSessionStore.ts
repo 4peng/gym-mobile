@@ -29,6 +29,7 @@ import {
   cancelScheduledNotification,
 } from "@/utils/notifications";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
+import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 
 // ──────────────────────────────────────────────
 // Constants for Optimization
@@ -110,10 +111,12 @@ interface WorkoutSessionActions {
       | "notes"
       | "weightUnit"
       | "muscles"
+      | "isBodyweight"
     >,
     value: any
   ) => void;
   toggleExerciseUnit: (exerciseId: string) => void;
+  toggleExerciseBodyweight: (exerciseId: string) => void;
 
   // ── Set mutations ──────────────────────────
   addSet: (exerciseId: string) => void;
@@ -208,6 +211,50 @@ function hasCompletedSets(exercise: WorkoutExercise): boolean {
   return exercise.sets.some((set) => !!set.completedAt);
 }
 
+function inferTrackingMode(
+  exercise: ExerciseDefinition | WorkoutExercise | null,
+  history: WorkoutSession[]
+): WorkoutExercise["trackingMode"] {
+  const defaultMode = inferTrackingModeFromExerciseDefinition(exercise);
+  if (!exercise) return defaultMode;
+
+  const identityKey = getExerciseIdentityKey(exercise);
+  if (!identityKey) return defaultMode;
+
+  // Search history for the most recent occurrence of this exercise
+  for (const session of history) {
+    if (!session.completedAt) continue;
+    const match = session.exercises.find((ex) => getExerciseIdentityKey(ex) === identityKey);
+    if (match?.trackingMode) {
+      return match.trackingMode;
+    }
+  }
+
+  return defaultMode;
+}
+
+function inferWeightUnit(
+  exercise: ExerciseDefinition | WorkoutExercise | null,
+  history: WorkoutSession[]
+): "kg" | "lbs" {
+  const globalPreferred = useUiPreferencesStore.getState().preferredWeightUnit || "kg";
+  if (!exercise) return globalPreferred;
+
+  const identityKey = getExerciseIdentityKey(exercise);
+  if (!identityKey) return globalPreferred;
+
+  // Search history for the most recent occurrence of this exercise
+  for (const session of history) {
+    if (!session.completedAt) continue;
+    const match = session.exercises.find((ex) => getExerciseIdentityKey(ex) === identityKey);
+    if (match?.weightUnit) {
+      return match.weightUnit;
+    }
+  }
+
+  return globalPreferred;
+}
+
 function buildCompletedSession(session: WorkoutSession): WorkoutSession {
   return {
     ...session,
@@ -271,6 +318,7 @@ function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
           : [],
         weightUnit: ex?.weightUnit === "lbs" ? "lbs" : "kg",
         muscles: Array.isArray(ex?.muscles) ? ex.muscles : [],
+        isBodyweight: typeof ex?.isBodyweight === "boolean" ? ex.isBodyweight : false,
         timerStartedAt:
           typeof ex?.timerStartedAt === "string" ? ex.timerStartedAt : undefined,
       }))
@@ -530,7 +578,8 @@ export const useWorkoutSessionStore = create<
       addExercise: (exerciseDefinition = null) => {
         set((state) => {
           if (!state.activeSession) return;
-          const trackingMode = inferTrackingModeFromExerciseDefinition(exerciseDefinition);
+          const trackingMode = inferTrackingMode(exerciseDefinition, state.history);
+          const weightUnit = inferWeightUnit(exerciseDefinition, state.history);
           const exercise: WorkoutExercise = {
             id: generateId(),
             exerciseDefinitionId: exerciseDefinition?.id,
@@ -539,7 +588,7 @@ export const useWorkoutSessionStore = create<
             restSeconds: 90,
             notes: "",
             sets: createEmptySets(3, trackingMode),
-            weightUnit: "kg",
+            weightUnit,
             muscles: exerciseDefinition?.muscles || [],
           };
           state.activeSession.exercises.push(exercise);
@@ -577,9 +626,15 @@ export const useWorkoutSessionStore = create<
           const ex = state.activeSession.exercises.find((exercise) => exercise.id === exerciseId);
           if (!ex) return;
 
+          const weightUnit = inferWeightUnit(exerciseDefinition, state.history);
+          const trackingMode = inferTrackingMode(exerciseDefinition, state.history);
+
           ex.exerciseDefinitionId = exerciseDefinition.id;
           ex.name = exerciseDefinition.name;
           ex.muscles = [...exerciseDefinition.muscles];
+          ex.weightUnit = weightUnit;
+          ex.trackingMode = trackingMode;
+          ex.sets = ex.sets.map((set) => normalizeSetForTrackingMode(set, trackingMode));
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
 
           if (state.activeRestTimer?.exerciseId === exerciseId) {
@@ -664,6 +719,18 @@ export const useWorkoutSessionStore = create<
           );
           if (!ex) return;
           ex.weightUnit = ex.weightUnit === "lbs" ? "kg" : "lbs";
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+        });
+      },
+
+      toggleExerciseBodyweight: (exerciseId) => {
+        set((state) => {
+          if (!state.activeSession) return;
+          const ex = state.activeSession.exercises.find(
+            (e) => e.id === exerciseId
+          );
+          if (!ex) return;
+          ex.isBodyweight = !ex.isBodyweight;
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
