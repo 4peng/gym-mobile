@@ -7,9 +7,6 @@
     "scheme": "gym-mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "android": {
-      "package": "com.x4peng.myproject"
-    },
     "ios": {
       "bundleIdentifier": "com.x4peng.gym-mobile",
       "supportsTablet": true
@@ -19,7 +16,24 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-widgets",
+        {
+          "frequentUpdates": true,
+          "widgets": [
+            {
+              "name": "RestTimerLiveActivity",
+              "displayName": "Rest Timer",
+              "description": "Shows the active workout rest timer.",
+              "contentMarginsDisabled": true,
+              "supportedFamilies": [
+                "systemSmall"
+              ]
+            }
+          ]
+        }
+      ]
     ]
   }
 }

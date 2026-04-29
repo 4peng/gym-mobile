@@ -28,6 +28,13 @@ import {
   scheduleRestCompleteNotification,
   cancelScheduledNotification,
 } from "@/utils/notifications";
+import {
+  buildActiveRestTimerLiveActivityProps,
+  buildRestTimerLiveActivityProps,
+  endRestTimerLiveActivity,
+  startRestTimerLiveActivity,
+  updateRestTimerLiveActivity,
+} from "@/utils/restTimerLiveActivity";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 
@@ -44,6 +51,8 @@ const WORKOUT_SESSION_STORE_VERSION = 5;
 export interface ActiveRestTimer {
   /** Absolute epoch-ms when the rest period ends. */
   endTime: number;
+  /** Absolute epoch-ms when the rest period started. */
+  startTime: number;
   /** The exercise that triggered this rest. */
   exerciseId: string;
   /** Human-readable name, shown in the floating UI. */
@@ -79,6 +88,8 @@ interface WorkoutSessionState {
   activeRestTimer: ActiveRestTimer | null;
   /** List of exercise names pinned on the insights page. */
   pinnedExerciseNames: string[];
+  /** Currently focused exercise ID for the single-exercise view. */
+  activeExerciseId: string | null;
   /** True when completed workouts have un-synced changes. */
   isDirty: boolean;
   /** Epoch-ms of the last successful sync. */
@@ -96,6 +107,7 @@ interface WorkoutSessionActions {
   updateSessionDate: (sessionId: string, newDate: string) => void;
 
   // ── Exercise mutations ─────────────────────
+  setActiveExerciseId: (id: string | null) => void;
   addExercise: (exerciseDefinition?: ExerciseDefinition | null) => void;
   reorderExercises: (exerciseIds: string[]) => void;
   removeExercise: (exerciseId: string) => void;
@@ -135,6 +147,7 @@ interface WorkoutSessionActions {
     value: number | null
   ) => void;
   toggleSetCompletion: (exerciseId: string, setId: string) => void;
+  toggleSetType: (exerciseId: string, setId: string) => void;
 
   // ── Queries ────────────────────────────────
   getActiveSession: () => WorkoutSession | null;
@@ -179,7 +192,8 @@ interface WorkoutSessionActions {
 
 function createEmptySet(
   trackingMode: WorkoutExercise["trackingMode"] = "strength",
-  initialWeight: number | null = null
+  initialWeight: number | null = null,
+  type: WorkoutSet["type"] = "working"
 ): WorkoutSet {
   return normalizeSetForTrackingMode(
     {
@@ -188,18 +202,19 @@ function createEmptySet(
       reps: null,
       durationSeconds: null,
       distance: null,
+      type,
     },
     trackingMode,
     initialWeight
   );
 }
 
-function createEmptySets(
-  count: number,
+function createEmptySetsFromTemplates(
+  templates: { type: WorkoutSet["type"] }[],
   trackingMode: WorkoutExercise["trackingMode"] = "strength",
   initialWeight: number | null = null
 ): WorkoutSet[] {
-  return Array.from({ length: count }, () => createEmptySet(trackingMode, initialWeight));
+  return templates.map((t) => createEmptySet(trackingMode, initialWeight, t.type));
 }
 
 function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
@@ -341,6 +356,10 @@ function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
         : undefined,
     notes: typeof raw.notes === "string" ? raw.notes : "",
     exercises,
+    cumulativeRestSeconds:
+      typeof raw.cumulativeRestSeconds === "number" && Number.isFinite(raw.cumulativeRestSeconds)
+        ? raw.cumulativeRestSeconds
+        : 0,
   };
 }
 
@@ -360,6 +379,13 @@ function normalizePersistedWorkoutState(
 
   const dedupedHistoryIndex = Array.from(new Set(historyIndex));
 
+  let activeExerciseId = typeof state?.activeExerciseId === "string" ? state.activeExerciseId : null;
+
+  // Fallback: If there's an active session but no focused exercise ID, default to the first exercise
+  if (!activeExerciseId && activeSession && activeSession.exercises.length > 0) {
+    activeExerciseId = activeSession.exercises[0].id;
+  }
+
   return {
     activeSession,
     history,
@@ -374,6 +400,7 @@ function normalizePersistedWorkoutState(
     activeRestTimer:
       state?.activeRestTimer &&
       typeof state.activeRestTimer.endTime === "number" &&
+      typeof state.activeRestTimer.startTime === "number" &&
       typeof state.activeRestTimer.exerciseId === "string" &&
       typeof state.activeRestTimer.exerciseName === "string" &&
       typeof state.activeRestTimer.notificationId === "string"
@@ -382,6 +409,7 @@ function normalizePersistedWorkoutState(
     pinnedExerciseNames: Array.isArray(state?.pinnedExerciseNames)
       ? state!.pinnedExerciseNames.map((name) => String(name).toLowerCase())
       : [],
+    activeExerciseId,
     isDirty: !!state?.isDirty,
     lastSyncedAt:
       typeof state?.lastSyncedAt === "number" && Number.isFinite(state.lastSyncedAt)
@@ -407,6 +435,7 @@ export const useWorkoutSessionStore = create<
       hasMoreHistory: true,
       activeRestTimer: null,
       pinnedExerciseNames: [],
+      activeExerciseId: null,
       isDirty: false,
       lastSyncedAt: null,
 
@@ -420,9 +449,11 @@ export const useWorkoutSessionStore = create<
           updatedAt: Date.now(),
           notes: "",
           exercises: [],
+          cumulativeRestSeconds: 0,
         };
         set((state) => {
           state.activeSession = session;
+          state.activeExerciseId = null;
         });
       },
 
@@ -436,7 +467,7 @@ export const useWorkoutSessionStore = create<
           name: pe.name,
           restSeconds: pe.restSeconds,
           notes: pe.notes,
-          sets: createEmptySets(
+          sets: createEmptySetsFromTemplates(
             pe.defaultSets,
             normalizeTrackingMode(pe.trackingMode),
             pe.initialWeight ?? null
@@ -453,9 +484,11 @@ export const useWorkoutSessionStore = create<
           updatedAt: Date.now(),
           notes: "",
           exercises,
+          cumulativeRestSeconds: 0,
         };
         set((state) => {
           state.activeSession = session;
+          state.activeExerciseId = exercises.length > 0 ? exercises[0].id : null;
         });
       },
 
@@ -472,6 +505,9 @@ export const useWorkoutSessionStore = create<
         const timer = get().activeRestTimer;
         if (timer) {
           cancelScheduledNotification(timer.notificationId);
+          void endRestTimerLiveActivity(
+            buildActiveRestTimerLiveActivityProps(get().activeSession, timer)
+          );
         }
 
         const session = get().activeSession;
@@ -504,6 +540,7 @@ export const useWorkoutSessionStore = create<
 
           state.activeSession = null;
           state.activeRestTimer = null;
+          state.activeExerciseId = null;
           if (!state.dirtyWorkoutIds.includes(finalSession._id)) {
             state.dirtyWorkoutIds.push(finalSession._id);
           }
@@ -516,11 +553,15 @@ export const useWorkoutSessionStore = create<
         const timer = get().activeRestTimer;
         if (timer) {
           cancelScheduledNotification(timer.notificationId);
+          void endRestTimerLiveActivity(
+            buildActiveRestTimerLiveActivityProps(get().activeSession, timer)
+          );
         }
 
         set((state) => {
           state.activeSession = null;
           state.activeRestTimer = null;
+          state.activeExerciseId = null;
         });
       },
 
@@ -575,11 +616,21 @@ export const useWorkoutSessionStore = create<
         }
       },
 
+      setActiveExerciseId: (id) => {
+        set((state) => {
+          state.activeExerciseId = id;
+        });
+      },
+
       addExercise: (exerciseDefinition = null) => {
         set((state) => {
           if (!state.activeSession) return;
           const trackingMode = inferTrackingMode(exerciseDefinition, state.history);
           const weightUnit = inferWeightUnit(exerciseDefinition, state.history);
+          
+          // Use shared default sets structure
+          const defaultSetsTemplates = [{ type: "working" }, { type: "working" }, { type: "working" }] as const;
+
           const exercise: WorkoutExercise = {
             id: generateId(),
             exerciseDefinitionId: exerciseDefinition?.id,
@@ -587,11 +638,12 @@ export const useWorkoutSessionStore = create<
             name: exerciseDefinition?.name || "",
             restSeconds: 90,
             notes: "",
-            sets: createEmptySets(3, trackingMode),
+            sets: createEmptySetsFromTemplates(defaultSetsTemplates as any, trackingMode),
             weightUnit,
             muscles: exerciseDefinition?.muscles || [],
           };
           state.activeSession.exercises.push(exercise);
+          state.activeExerciseId = exercise.id; // Auto-focus new exercise
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
@@ -616,6 +668,13 @@ export const useWorkoutSessionStore = create<
           if (!state.activeSession) return;
           state.activeSession.exercises =
             state.activeSession.exercises.filter((e) => e.id !== exerciseId);
+          
+          if (state.activeExerciseId === exerciseId) {
+            state.activeExerciseId = state.activeSession.exercises.length > 0 
+              ? state.activeSession.exercises[0].id 
+              : null;
+          }
+          
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
       },
@@ -684,6 +743,15 @@ export const useWorkoutSessionStore = create<
             state.activeRestTimer.exerciseName = normalizedValue as string;
           }
         });
+
+        if (field === "name") {
+          const timer = get().activeRestTimer;
+          if (timer?.exerciseId === exerciseId) {
+            void updateRestTimerLiveActivity(
+              buildActiveRestTimerLiveActivityProps(get().activeSession, timer)
+            );
+          }
+        }
 
         if (
           field === "restSeconds" &&
@@ -800,9 +868,6 @@ export const useWorkoutSessionStore = create<
         }
       },
 
-      /**
-       * Toggle a set between completed and in-progress.
-       */
       toggleSetCompletion: (exerciseId, setId) => {
         set((state) => {
           if (!state.activeSession) return;
@@ -817,6 +882,28 @@ export const useWorkoutSessionStore = create<
             s.completedAt = undefined;
           } else {
             s.completedAt = new Date().toISOString();
+          }
+          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+        });
+      },
+
+      toggleSetType: (exerciseId, setId) => {
+        set((state) => {
+          if (!state.activeSession) return;
+          const ex = state.activeSession.exercises.find(
+            (e) => e.id === exerciseId
+          );
+          if (!ex) return;
+          const s = ex.sets.find((s) => s.id === setId);
+          if (!s) return;
+
+          const currentType = s.type || "working";
+          if (currentType === "working") {
+            s.type = "warmup";
+          } else if (currentType === "warmup") {
+            s.type = "dropset";
+          } else {
+            s.type = "working";
           }
           state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
         });
@@ -881,12 +968,22 @@ export const useWorkoutSessionStore = create<
       startRestTimer: async (exerciseId, restSeconds, exerciseName) => {
         const current = get().activeRestTimer;
 
-        // Cancel existing timer + notification if one is active (duplicate protection).
+        // If one is already running, accumulate its progress before replacing it.
         if (current) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - current.startTime) / 1000));
+          set((state) => {
+            if (state.activeSession) {
+              state.activeSession.cumulativeRestSeconds = (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
+            }
+          });
           await cancelScheduledNotification(current.notificationId);
+          void endRestTimerLiveActivity(
+            buildActiveRestTimerLiveActivityProps(get().activeSession, current)
+          );
         }
 
-        const endTime = Date.now() + restSeconds * 1000;
+        const now = Date.now();
+        const endTime = now + restSeconds * 1000;
         const notificationId = await scheduleRestCompleteNotification(
           exerciseName,
           restSeconds
@@ -895,29 +992,56 @@ export const useWorkoutSessionStore = create<
         set((state) => {
           state.activeRestTimer = {
             endTime,
+            startTime: now,
             exerciseId,
             exerciseName,
             notificationId,
           };
         });
+
+        void startRestTimerLiveActivity(
+          buildRestTimerLiveActivityProps(
+            get().activeSession,
+            exerciseName,
+            now,
+            endTime,
+            restSeconds
+          )
+        );
       },
 
       cancelRestTimer: async () => {
         const current = get().activeRestTimer;
         if (current) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - current.startTime) / 1000));
+          set((state) => {
+            if (state.activeSession) {
+              state.activeSession.cumulativeRestSeconds = (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
+            }
+            state.activeRestTimer = null;
+          });
           await cancelScheduledNotification(current.notificationId);
+          void endRestTimerLiveActivity(
+            buildActiveRestTimerLiveActivityProps(get().activeSession, current)
+          );
         }
-        set((state) => {
-          state.activeRestTimer = null;
-        });
       },
 
       clearExpiredTimer: () => {
         const timer = get().activeRestTimer;
         if (timer && timer.endTime <= Date.now()) {
+          const elapsed = Math.max(0, Math.floor((timer.endTime - timer.startTime) / 1000));
+          const liveActivityProps = buildActiveRestTimerLiveActivityProps(
+            get().activeSession,
+            timer
+          );
           set((state) => {
+            if (state.activeSession) {
+              state.activeSession.cumulativeRestSeconds = (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
+            }
             state.activeRestTimer = null;
           });
+          void endRestTimerLiveActivity(liveActivityProps);
         }
       },
 
@@ -1401,6 +1525,7 @@ export const useWorkoutSessionStore = create<
         activeSession: state.activeSession,
         activeRestTimer: state.activeRestTimer,
         pinnedExerciseNames: state.pinnedExerciseNames,
+        activeExerciseId: state.activeExerciseId,
         lastSyncedAt: state.lastSyncedAt,
         deletedWorkoutIds: state.deletedWorkoutIds,
         dirtyWorkoutIds: state.dirtyWorkoutIds,

@@ -367,25 +367,23 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
 
   const handleEditDate = (ids: Set<string>, currentIso: string) => {
     const currentDate = new Date(currentIso).toISOString().split('T')[0];
-    if (Platform.OS === 'ios') {
-      Alert.prompt("Edit Date", "Enter new date (YYYY-MM-DD):", [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Save", 
-          onPress: (newDate?: string) => {
-            if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-              ids.forEach(id => {
-                const session = history.find(s => s._id === id);
-                if (session) {
-                  const oldTime = (session.completedAt || session.startedAt).split('T')[1] || "12:00:00.000Z";
-                  updateSessionDate(id, `${newDate}T${oldTime}`);
-                }
-              });
-            }
-          } 
-        }
-      ], "plain-text", currentDate);
-    }
+    Alert.prompt("Edit Date", "Enter new date (YYYY-MM-DD):", [
+      { text: "Cancel", style: "cancel" },
+      { 
+        text: "Save", 
+        onPress: (newDate?: string) => {
+          if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+            ids.forEach(id => {
+              const session = history.find(s => s._id === id);
+              if (session) {
+                const oldTime = (session.completedAt || session.startedAt).split('T')[1] || "12:00:00.000Z";
+                updateSessionDate(id, `${newDate}T${oldTime}`);
+              }
+            });
+          }
+        } 
+      }
+    ], "plain-text", currentDate);
   };
 
   const handleStartEdit = (sessionId: string, exId: string, setId: string, weight: number | null, reps: number | null) => {
@@ -480,7 +478,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
   );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={UI.SHARED.iconBtn}>
@@ -540,7 +538,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
 
             <View style={{ alignItems: 'center' }}>
               <Svg width={chartWidth + 60} height={CHART_HEIGHT + 40}>
-                <SvgText x="35" y="10" fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" fontFamily={FONT_FAMILIES.MEDIUM} textAnchor="start" letterSpacing="0.5">{yLabel}</SvgText>
+                <SvgText x="35" y="10" fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" fontFamily={FONT_FAMILIES.MONO} textAnchor="start" letterSpacing="0.5">{yLabel}</SvgText>
 
                 {[0, 0.5, 1].map((v) => {
                   const y = CHART_HEIGHT - (v * 150 + 20);
@@ -548,7 +546,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
                   return (
                     <React.Fragment key={v}>
                       <Line x1="40" y1={y} x2={chartWidth + 40} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                      <SvgText x="32" y={y + 4} fill={COLORS.TEXT_TERTIARY} fontSize="10" fontWeight="800" textAnchor="end" fontFamily={FONT_FAMILIES.MEDIUM}>{label >= 1000 ? `${(label / 1000).toFixed(1)}k` : label}</SvgText>
+                      <SvgText x="32" y={y + 4} fill={COLORS.TEXT_TERTIARY} fontSize="10" fontWeight="800" textAnchor="end" fontFamily={FONT_FAMILIES.MONO}>{label >= 1000 ? `${(label / 1000).toFixed(1)}k` : label}</SvgText>
                     </React.Fragment>
                   );
                 })}
@@ -576,10 +574,10 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
 
                 {buckets.map((d, i) => {
                   if (!d.label) return null;
-                  return <SvgText key={`date-${i}`} x={40 + i * (barWidth + gap) + barWidth / 2} y={CHART_HEIGHT + 10} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="800" textAnchor="middle" fontFamily={FONT_FAMILIES.MEDIUM}>{d.label}</SvgText>;
+                  return <SvgText key={`date-${i}`} x={40 + i * (barWidth + gap) + barWidth / 2} y={CHART_HEIGHT + 10} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="800" textAnchor="middle" fontFamily={FONT_FAMILIES.MONO}>{d.label}</SvgText>;
                 })}
 
-                <SvgText x={chartWidth / 2 + 40} y={CHART_HEIGHT + 30} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" textAnchor="middle" fontFamily={FONT_FAMILIES.MEDIUM} letterSpacing="1">DATE</SvgText>
+                <SvgText x={chartWidth / 2 + 40} y={CHART_HEIGHT + 30} fill={COLORS.TEXT_TERTIARY} fontSize="9" fontWeight="900" textAnchor="middle" fontFamily={FONT_FAMILIES.MONO} letterSpacing="1">DATE</SvgText>
                 {linePath ? <Path d={linePath} fill="none" stroke={COLORS.ACCENT_GREEN} strokeWidth={2.5} opacity={0.8} strokeLinecap="round" strokeLinejoin="round" /> : null}
               </Svg>
               
@@ -674,14 +672,14 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
   statItem: { flex: 1 },
   statLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },
-  statValue: { color: 'white', fontSize: 24, fontWeight: '900', letterSpacing: -1 },
-  statUnit: { fontSize: 12, color: COLORS.TEXT_TERTIARY, fontWeight: '700', marginLeft: 2 },
+  statValue: { color: 'white', fontSize: 24, fontWeight: '900', letterSpacing: -1, fontFamily: FONT_FAMILIES.MONO },
+  statUnit: { fontSize: 12, color: COLORS.TEXT_TERTIARY, fontWeight: '700', marginLeft: 2, fontFamily: FONT_FAMILIES.MONO },
   chartContainer: { alignItems: "center", marginTop: 0, marginBottom: 40 },
   tooltipPlaceholder: { height: 60, justifyContent: 'center', marginBottom: 10 },
   minimalTooltip: { alignItems: 'center' },
   minimalTooltipDate: { color: COLORS.TEXT_TERTIARY, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-  minimalTooltipValue: { color: 'white', fontSize: 28, fontWeight: '900', letterSpacing: -1 },
-  xAxisLabel: { color: COLORS.TEXT_SECONDARY, fontSize: 12, fontWeight: "700", marginTop: 20, fontFamily: FONT_FAMILIES.MEDIUM, textAlign: "center" },
+  minimalTooltipValue: { color: 'white', fontSize: 28, fontWeight: '900', letterSpacing: -1, fontFamily: FONT_FAMILIES.MONO },
+  xAxisLabel: { color: COLORS.TEXT_SECONDARY, fontSize: 12, fontWeight: "700", marginTop: 20, fontFamily: FONT_FAMILIES.MONO, textAlign: "center" },
   disclosureContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -702,15 +700,15 @@ const styles = StyleSheet.create({
   logCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   logDate: { color: COLORS.TEXT_SECONDARY, fontSize: 14, fontWeight: "600" },
-  logVolume: { color: COLORS.ACCENT_BLUE, fontSize: 14, fontWeight: "800" },
+  logVolume: { color: COLORS.ACCENT_BLUE, fontSize: 14, fontWeight: "800", fontFamily: FONT_FAMILIES.MONO },
   prBadge: { backgroundColor: "rgba(250, 204, 0, 0.15)", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: "rgba(250, 204, 0, 0.3)" },
   prBadgeText: { color: COLORS.ACCENT_YELLOW, fontSize: 10, fontWeight: "900" },
   setsList: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   setTag: { backgroundColor: "#1D1D21", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  setTagText: { color: COLORS.TEXT_PRIMARY, fontSize: 13, fontWeight: "700" },
-  setTagX: { color: COLORS.TEXT_TERTIARY, fontSize: 10, marginHorizontal: 4 },
+  setTagText: { color: COLORS.TEXT_PRIMARY, fontSize: 13, fontWeight: "700", fontFamily: FONT_FAMILIES.MONO },
+  setTagX: { color: COLORS.TEXT_TERTIARY, fontSize: 10, marginHorizontal: 4, fontFamily: FONT_FAMILIES.MONO },
   editRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#1D1D21", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: COLORS.ACCENT_BLUE },
-  editInput: { color: COLORS.TEXT_PRIMARY, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 13, fontWeight: "700", width: 35, textAlign: "center", padding: 0 },
+  editInput: { color: COLORS.TEXT_PRIMARY, fontFamily: FONT_FAMILIES.MONO, fontSize: 13, fontWeight: "700", width: 35, textAlign: "center", padding: 0 },
   editIcon: { marginLeft: 8, padding: 4 },
   emptyLogs: { padding: 40, alignItems: "center" },
   emptyLogsText: { color: COLORS.TEXT_TERTIARY, fontSize: 14, fontWeight: "600" },

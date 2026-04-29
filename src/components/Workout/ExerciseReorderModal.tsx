@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
+  Animated,
+  Easing,
 } from "react-native";
 import { Check, GripVertical, X } from "lucide-react-native";
 import DraggableFlatList, {
@@ -14,270 +15,86 @@ import DraggableFlatList, {
 import { GestureHandlerRootView, Pressable as GesturePressable } from "react-native-gesture-handler";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import { HapticFeedback } from "@/utils/haptics";
 
-interface ReorderItem {
-  id: string;
-  name: string;
-}
+interface ReorderItem { id: string; name: string; }
 
-interface ExerciseReorderModalProps {
-  visible: boolean;
-  exercises: ReorderItem[];
-  onClose: () => void;
-  onSave: (exerciseIds: string[]) => void;
-}
+const ReorderRow = React.memo(({ item, index, drag, isActive }: { item: ReorderItem; index: number; drag: () => void; isActive: boolean; }) => {
+  return (
+    <ScaleDecorator>
+      <View style={[styles.row, isActive && styles.rowActive]}>
+        <View style={styles.indexBadge}>
+          <Text style={styles.indexText}>{String(index + 1).padStart(2, "0")}</Text>
+        </View>
+        <Text style={styles.rowLabel} numberOfLines={1}>{item.name.toUpperCase()}</Text>
+        <GesturePressable onLongPress={drag} disabled={isActive} delayLongPress={120} hitSlop={12} style={styles.dragHandle}>
+          <GripVertical size={18} color={isActive ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY} />
+        </GesturePressable>
+      </View>
+    </ScaleDecorator>
+  );
+});
 
-function displayName(name: string) {
-  const trimmed = name.trim();
-  return trimmed.length > 0 ? trimmed : "Untitled Exercise";
-}
-
-export default function ExerciseReorderModal({
-  visible,
-  exercises,
-  onClose,
-  onSave,
-}: ExerciseReorderModalProps) {
+export default function ExerciseReorderModal({ visible, exercises, onClose, onSave }: { visible: boolean; exercises: ReorderItem[]; onClose: () => void; onSave: (exerciseIds: string[]) => void; }) {
   const [draftOrder, setDraftOrder] = useState<ReorderItem[]>(exercises);
-  const [isDragging, setIsDragging] = useState(false);
+  const animValue = useRef(new Animated.Value(0)).current;
+  const [renderVisible, setRenderVisible] = useState(visible);
 
   useEffect(() => {
-    if (!visible) return;
-    setDraftOrder(exercises);
-    setIsDragging(false);
-  }, [exercises, visible]);
-
-  const orderIndexById = useMemo(
-    () => new Map(draftOrder.map((exercise, index) => [exercise.id, index])),
-    [draftOrder]
-  );
+    if (visible) {
+      setDraftOrder(exercises);
+      setRenderVisible(true);
+      Animated.timing(animValue, { toValue: 1, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    } else {
+      Animated.timing(animValue, { toValue: 0, duration: 150, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => setRenderVisible(false));
+    }
+  }, [visible, exercises]);
 
   const handleSave = useCallback(() => {
-    const orderedIds = draftOrder.map((exercise) => exercise.id);
+    onSave(draftOrder.map(ex => ex.id));
     onClose();
-    requestAnimationFrame(() => {
-      onSave(orderedIds);
-    });
   }, [draftOrder, onClose, onSave]);
 
-  const renderItem = useCallback(
-    ({ item, drag, isActive }: RenderItemParams<ReorderItem>) => (
-      <ScaleDecorator>
-        <View style={[styles.row, isActive && styles.rowActive]}>
-          <View style={styles.indexBadge}>
-            <Text style={styles.indexText}>
-              {String((orderIndexById.get(item.id) ?? 0) + 1).padStart(2, "0")}
-            </Text>
-          </View>
+  const renderItem = useCallback(({ item, drag, isActive, getIndex }: RenderItemParams<ReorderItem>) => (
+    <ReorderRow item={item} index={getIndex() ?? 0} drag={drag} isActive={isActive} />
+  ), []);
 
-          <Text style={styles.rowLabel} numberOfLines={1}>
-            {displayName(item.name)}
-          </Text>
-
-          <GesturePressable
-            onLongPress={drag}
-            disabled={isActive}
-            delayLongPress={120}
-            hitSlop={12}
-            style={({ pressed }) => [
-              styles.dragHandle,
-              pressed && !isActive && styles.dragHandlePressed,
-            ]}
-          >
-            <GripVertical
-              size={18}
-              color={isActive ? COLORS.TEXT_PRIMARY : COLORS.TEXT_TERTIARY}
-            />
-          </GesturePressable>
-        </View>
-      </ScaleDecorator>
-    ),
-    [orderIndexById]
-  );
+  if (!renderVisible) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <GestureHandlerRootView style={styles.overlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          pointerEvents={isDragging ? "none" : "auto"}
-        />
-
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Pressable onPress={onClose} style={styles.headerBtn}>
-              <X size={22} color={COLORS.DANGER} />
-            </Pressable>
-            <View style={styles.headerCopy}>
-              <Text style={styles.title}>Reorder Exercises</Text>
-              <Text style={styles.subtitle}>Long press the handle and drag.</Text>
-            </View>
-            <Pressable
-              onPress={handleSave}
-              style={styles.headerBtn}
-              disabled={isDragging}
-            >
-              <Check size={22} color={COLORS.ACCENT_GREEN} />
-            </Pressable>
-          </View>
-
-          <View style={styles.listContainer}>
-            {draftOrder.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No exercises to reorder.</Text>
-              </View>
-            ) : (
-              <DraggableFlatList
-                data={draftOrder}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                onDragBegin={() => {
-                  setIsDragging(true);
-                  HapticFeedback.selection();
-                }}
-                onRelease={() => {
-                  setIsDragging(false);
-                }}
-                onDragEnd={({ data }) => {
-                  setDraftOrder(data);
-                  setIsDragging(false);
-                  HapticFeedback.selection();
-                }}
-                activationDistance={8}
-                autoscrollThreshold={64}
-                autoscrollSpeed={180}
-                dragItemOverflow
-                containerStyle={styles.dragList}
-                contentContainerStyle={styles.dragListContent}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
-          </View>
+    <View style={styles.absoluteOverlay} pointerEvents="box-none">
+      <Animated.View style={[styles.backdrop, { opacity: animValue }]}><Pressable style={StyleSheet.absoluteFill} onPress={onClose} /></Animated.View>
+      <Animated.View style={[styles.container, { transform: [{ translateY: animValue.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) }] }]}>
+        <View style={styles.header}>
+          <Pressable onPress={onClose} style={UI.SHARED.dangerBtn}><X size={20} color={COLORS.DANGER} /></Pressable>
+          <Text style={styles.title}>REORDER</Text>
+          <Pressable onPress={handleSave} style={UI.SHARED.actionBtn}><Check size={20} color={COLORS.ACCENT_GREEN} /></Pressable>
         </View>
-      </GestureHandlerRootView>
-    </Modal>
+        <DraggableFlatList
+          data={draftOrder}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          onDragBegin={() => HapticFeedback.selection()}
+          onDragEnd={({ data }) => { setDraftOrder(data); HapticFeedback.success(); }}
+          contentContainerStyle={styles.listContent}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  container: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-    padding: 22,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 20,
-  },
-  headerBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerCopy: {
-    flex: 1,
-    alignItems: "center",
-  },
-  title: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  subtitle: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginTop: 4,
-  },
-  listContainer: {
-    maxHeight: 420,
-  },
-  dragList: {
-    flexGrow: 0,
-  },
-  dragListContent: {
-    gap: 10,
-    paddingBottom: 4,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minHeight: 70,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  rowActive: {
-    backgroundColor: "rgba(11, 130, 255, 0.12)",
-    borderColor: "rgba(11, 130, 255, 0.35)",
-  },
-  indexBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: "rgba(11, 130, 255, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  indexText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 12,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  rowLabel: {
-    flex: 1,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  dragHandle: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dragHandlePressed: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  emptyState: {
-    minHeight: 80,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
+  absoluteOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10000, justifyContent: "center", paddingHorizontal: 20 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.85)" },
+  container: { backgroundColor: COLORS.CARD_BG, borderRadius: 16, borderWidth: 1, borderColor: COLORS.BORDER, padding: 16, maxHeight: '80%' },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  title: { color: COLORS.TEXT_SECONDARY, fontSize: 12, fontWeight: "900", fontFamily: FONT_FAMILIES.MONO, letterSpacing: 2 },
+  listContent: { gap: 8 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, height: 60, backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1, borderColor: COLORS.BORDER, paddingHorizontal: 12 },
+  rowActive: { borderColor: COLORS.ACCENT_BLUE, backgroundColor: "rgba(0,122,255,0.05)" },
+  indexBadge: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: COLORS.BORDER, alignItems: "center", justifyContent: "center" },
+  indexText: { color: COLORS.ACCENT_BLUE, fontSize: 12, fontWeight: "900", fontFamily: FONT_FAMILIES.MONO },
+  rowLabel: { flex: 1, color: COLORS.TEXT_PRIMARY, fontSize: 13, fontWeight: "800", fontFamily: FONT_FAMILIES.MONO },
+  dragHandle: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 });

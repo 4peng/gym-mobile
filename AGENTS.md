@@ -17,7 +17,10 @@
 - `src/storage/`: AsyncStorage/MMKV-backed persistence helpers.
 - `src/lib/api/`: API client, server converters, sync engine, and connectivity listener.
 - `src/utils/`: shared helpers for IDs, navigation, placeholders, tracking-mode normalization, notifications, and formatting.
+- `src/utils/activitySummary.ts`: shared home/dashboard activity bucketing, range labeling, and duration formatting helpers.
+- `src/utils/restTimerLiveActivity.ts`: guarded bridge for starting, updating, and ending the iOS rest-timer Live Activity from canonical workout state.
 - `src/utils/exerciseIdentity.ts`: canonical exercise identity/search normalization. Keep analytics/search consistency changes here, not scattered across screens.
+- `src/widgets/`: Expo widget and Live Activity layouts. These files are native-build surfaces and must remain compatible with `expo-widgets`.
 - `src/constants/`: design constants and shared domain constants.
 - `src/data/`: bundled exercise catalog data.
 - `shared/`: JS helpers shared across app/tooling boundaries. `shared/programs.js` is the main routine normalization boundary.
@@ -42,8 +45,9 @@
 
 ## Screen Ownership
 - `ProgramsListScreen`: home/dashboard, active session resume, quick-start, routine launch.
-- `CreateProgramScreen`: create routine wrapper around shared routine editor logic.
-- `EditProgramScreen`: edit routine wrapper around shared routine editor logic.
+- `ProgramEditorScreen`: canonical route-level controller for create, duplicate, and edit routine flows. Owns store orchestration, save/delete/start branching, and not-found handling.
+- `CreateProgramScreen`: thin wrapper that routes the create flow into `ProgramEditorScreen`.
+- `EditProgramScreen`: thin wrapper that routes the edit flow into `ProgramEditorScreen`.
 - `WorkoutSessionScreen`: live session flow, finish flow, save-as-routine flow for quick sessions.
 - `WorkoutHistoryScreen`: paginated history list, inline set/date edits, pull-to-refresh.
 - `ExerciseListStatsScreen`: searchable/pinnable exercise index.
@@ -54,9 +58,11 @@
 - `RoutineEditorScreen.tsx`: canonical UI for create/edit routine flows. Prefer extending this instead of duplicating routine form logic.
 - `ExerciseEditor.tsx`: routine-exercise row editor used by routine editing flows.
 - `ExercisePickerModal.tsx` and `ExercisePickerField.tsx`: exercise selection UI.
+- `src/components/Home/ActivityComboChart.tsx`: canonical home/dashboard activity chart renderer. Keep dashboard chart treatment changes here instead of reimplementing chart markup in screens.
 - `MuscleSelector.tsx`: shared muscle/category picker used across routine, workout, and stats flows.
 - `ExerciseTrackingModeSelector.tsx`: switching between `strength`, `timed`, and `cardio`.
 - `FloatingRestTimer.tsx`, `LiveWorkoutTimer.tsx`, `RestTimerPicker.tsx`: workout timer UI.
+- `src/widgets/RestTimerLiveActivity.tsx`: iOS Lock Screen / Dynamic Island rest-timer layout. Keep Live Activity visual/state changes here, and keep lifecycle wiring in `src/utils/restTimerLiveActivity.ts`.
 - `ProgramTile.tsx`: routine card in the programs list.
 - `Swipeable.tsx`: shared swipe actions in history/stats lists.
 - `src/components/Workout/SetRow.tsx`: canonical live-workout set input row. If weight/reps input behavior changes, change it here first.
@@ -130,10 +136,10 @@
 ## Build, Test, and Development Commands
 - `npm install`: install mobile app dependencies.
 - `npm run dev`: start Expo dev server.
-- `npm run android`: launch Android target.
-- `npm run ios`: launch iOS target.
+- `npm run ios`: launch iOS Simulator (runs `expo start --ios`).
 - `npm run routine-web`: launch the Routine Lab helper script.
-- `npx tsc --noEmit --pretty false --incremental false`: strict app type check.
+- `npx tsc --noEmit --pretty false --incremental false`: strict app type check. No ESLint or Prettier configured.
+- iOS Live Activities use `expo-widgets` and require a native/development build. They do not run in Expo Go.
 - `cd server && npm install && npm run dev`: run backend locally.
 - `cd server && npm run build && npm start`: build and run backend.
 - `cd server && npm run seed:year`: seed year-long demo data.
@@ -147,6 +153,13 @@
 - Reuse selector-wrapper stores (`activeSessionStore`, `workoutHistoryStore`) instead of scattering direct selectors in unrelated files.
 - Prefer shared normalization helpers over duplicating program/workout sanitization logic.
 - Keep Expo Router stack declarations aligned with actual route files. If a route file is added, removed, or renamed, update the relevant `_layout.tsx` in the same change.
+
+## Engineering Standards (State & Performance)
+- **The Primitive Rule**: Selectors must return primitive values or arrays of primitives wrapped in `useShallow`. Creating new objects `{...}` or running `.map()` directly inside a selector causes "Maximum update depth" errors.
+- **JSX Sanitization**: Use "Minified JSX" (zero whitespace between component tags) for HUD components to prevent raw text node crashes on iOS. Dynamic strings must be strictly wrapped in `<Text>`.
+- **Native Modal Prohibition**: Native `<Modal>` is prohibited for session HUDs. Use absolute-positioned `View`s with snappy `Animated.timing` (180ms) and `useNativeDriver: true`.
+- **Backend Set Types**: Mongoose `WorkoutSetSchema` includes `type` field: `enum: ['working', 'warmup', 'dropset']`.
+- **Session Continuity**: `activeExerciseId` must be persisted in MMKV for session continuity on app relaunch.
 
 ## Testing Guidelines
 - Automated tests are not configured yet; rely on type checks and focused manual QA.

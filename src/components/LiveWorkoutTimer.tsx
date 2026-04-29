@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Text, StyleSheet, Platform } from "react-native";
+import { Text, StyleSheet, TextStyle } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 
 interface LiveWorkoutTimerProps {
   startedAt: string;
+  textStyle?: TextStyle;
 }
 
-export default function LiveWorkoutTimer({ startedAt }: LiveWorkoutTimerProps) {
+export default function LiveWorkoutTimer({ startedAt, textStyle }: LiveWorkoutTimerProps) {
   const [elapsed, setElapsed] = useState("");
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function LiveWorkoutTimer({ startedAt }: LiveWorkoutTimerProps) {
     return () => clearInterval(interval);
   }, [startedAt]);
 
-  return <Text style={styles.timer}>{elapsed}</Text>;
+  return <Text style={[styles.timer, textStyle]}>{elapsed}</Text>;
 }
 
 const styles = StyleSheet.create({
@@ -42,7 +43,7 @@ const styles = StyleSheet.create({
     color: COLORS.ACCENT_GREEN,
     fontSize: 14,
     fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
+    fontFamily: FONT_FAMILIES.MONO,
     letterSpacing: 1,
   },
 });

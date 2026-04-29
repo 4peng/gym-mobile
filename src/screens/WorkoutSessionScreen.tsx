@@ -1,773 +1,165 @@
 'use client';
 
-import React, { startTransition, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  LayoutAnimation,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  FlatList,
-  InteractionManager,
-} from "react-native";
-import {
-  Check,
-  Copy,
-  Dumbbell,
-  Plus,
-  Save,
-  StickyNote,
-  X,
-} from "lucide-react-native";
+import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
+import { LayoutAnimation, StyleSheet, Text, View, InteractionManager, Animated, ScrollView, Alert, Pressable } from "react-native";
+import { Dumbbell, Plus } from "lucide-react-native";
+import { GestureHandlerRootView, GestureDetector, Gesture, Directions } from "react-native-gesture-handler";
 import { useAppRouter } from "@/utils/navigation";
-import { showAlert, showConfirm } from "@/utils/alerts";
-import {
-  useActiveSession,
-  useAddExercise,
-  useClearExpiredTimer,
-  useCompleteSession,
-  useDiscardSession,
-} from "@/stores/activeSessionStore";
+import { showConfirm } from "@/utils/alerts";
+import { useAddExercise, useClearExpiredTimer, useCompleteSession, useDiscardSession, useSessionExerciseIds, useSessionExerciseNames, useSessionExerciseProgress, useSessionProgress, useSessionVolume } from "@/stores/activeSessionStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
 import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
-import {
-  configureNotificationHandler,
-  requestNotificationPermissions,
-} from "@/utils/notifications";
-import FloatingRestTimer from "@/components/FloatingRestTimer";
-import LiveWorkoutTimer from "@/components/LiveWorkoutTimer";
 import { HapticFeedback } from "@/utils/haptics";
 import { ExerciseCard } from "@/components/Workout/ExerciseCard";
-import ExerciseReorderModal from "@/components/Workout/ExerciseReorderModal";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
-import { copyExercises, createRoutineSnapshot, normalizeExercises } from "@/shared/programs.js";
-import { generateId } from "@/utils/id";
-import type { ExerciseDefinition, Program, ProgramExercise, WorkoutExercise, WorkoutSession } from "@/types";
+import ExerciseNavMenu from "@/components/Workout/ExerciseNavMenu";
+import type { ExerciseDefinition } from "@/types";
 
-function areIdArraysEqual(left: string[], right: string[]) {
-  if (left.length !== right.length) return false;
-  return left.every((id, index) => id === right[index]);
-}
+// Modular HUD Components
+import { HUDHeader } from "@/components/Workout/HUD/HUDHeader";
+import { ScrubberRail } from "@/components/Workout/HUD/ScrubberRail";
+import { HUDPillNav } from "@/components/Workout/HUD/HUDPillNav";
 
-function getExerciseInitialWeight(
-  exercise: WorkoutExercise,
-  sourceExercise?: ProgramExercise
-) {
-  if (exercise.trackingMode !== "strength") {
-    return null;
-  }
-
-  if (typeof sourceExercise?.initialWeight === "number") {
-    return sourceExercise.initialWeight;
-  }
-
-  const firstLoggedWeight = exercise.sets.find(
-    (set) => typeof set.weight === "number" && Number.isFinite(set.weight)
-  )?.weight;
-
-  return typeof firstLoggedWeight === "number" ? firstLoggedWeight : null;
-}
-
-function buildRoutineExercisesFromSession(
-  session: WorkoutSession,
-  sourceProgram?: Program
-) {
-  const sourceById = new Map(
-    (sourceProgram?.exercises || []).map((exercise) => [exercise.id, exercise])
-  );
-
-  return normalizeExercises(
-    session.exercises
-      .filter((exercise) => exercise.name.trim().length > 0)
-      .map((exercise) => {
-        const sourceExercise = exercise.programExerciseId
-          ? sourceById.get(exercise.programExerciseId)
-          : undefined;
-
-        return {
-          id: sourceExercise?.id ?? generateId(),
-          exerciseDefinitionId:
-            exercise.exerciseDefinitionId ?? sourceExercise?.exerciseDefinitionId ?? "",
-          trackingMode: exercise.trackingMode ?? sourceExercise?.trackingMode ?? "strength",
-          name: exercise.name,
-          defaultSets: Math.max(1, exercise.sets.length),
-          restSeconds: exercise.restSeconds,
-          notes: exercise.notes,
-          weightUnit: exercise.weightUnit ?? sourceExercise?.weightUnit ?? "kg",
-          initialWeight: getExerciseInitialWeight(exercise, sourceExercise),
-          muscles: exercise.muscles ?? sourceExercise?.muscles ?? [],
-        };
-      })
-  );
-}
+const SCRUB_STEP = 76; // Match ScrubberRail logic: 64 + 12
+const CONDENSE_THRESHOLD = 80;
 
 export default function WorkoutSessionScreen() {
-  const activeSession = useActiveSession();
+  const router = useAppRouter();
+  const activeSessionId = useWorkoutSessionStore((s) => s.activeSession?._id);
+  const startedAt = useWorkoutSessionStore((s) => s.activeSession?.startedAt);
+  const activeExerciseId = useWorkoutSessionStore((s) => s.activeExerciseId);
+  const setActiveExerciseId = useWorkoutSessionStore((s) => s.setActiveExerciseId);
+  
+  const exerciseIds = useSessionExerciseIds();
+  const exerciseNames = useSessionExerciseNames();
+  const exerciseProgress = useSessionExerciseProgress();
+  const progressData = useSessionProgress();
+  const totalVolume = useSessionVolume();
+
   const addExercise = useAddExercise();
   const completeSession = useCompleteSession();
   const discardSession = useDiscardSession();
   const clearExpiredTimer = useClearExpiredTimer();
-  const updateWorkoutNotes = useWorkoutSessionStore((s) => s.updateWorkoutNotes);
-  const reorderExercises = useWorkoutSessionStore((s) => s.reorderExercises);
-
-  const updateProgram = useProgramStore((s) => s.updateProgram);
   const addProgram = useProgramStore((s) => s.addProgram);
-  const sourceProgram = useProgramStore((s) =>
-    activeSession?.programId ? s.programs.find((p) => p._id === activeSession.programId) : undefined
-  );
 
-  const router = useAppRouter();
-  const [localExerciseOrder, setLocalExerciseOrder] = useState<string[] | null>(null);
-  const [reorderVisible, setReorderVisible] = useState(false);
-  const [routinePromptVisible, setRoutinePromptVisible] = useState(false);
-  const [saveAsNewVisible, setSaveAsNewVisible] = useState(false);
-  const [newRoutineName, setNewRoutineName] = useState("");
   const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
+  const [navigationMenuVisible, setNavigationMenuVisible] = useState(false);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubbingIndex, setScrubbingIndex] = useState<number | null>(null);
+
+  const scrubberScrollRef = useRef<ScrollView>(null);
+  const isFirstScrubRender = useRef(true);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const currentExercise = useWorkoutSessionStore((s) => s.activeSession?.exercises.find(e => e.id === activeExerciseId));
+  const activeIndex = useMemo(() => activeExerciseId ? exerciseIds.indexOf(activeExerciseId) : -1, [activeExerciseId, exerciseIds]);
+
+  useEffect(() => { if (activeSessionId && !activeExerciseId && exerciseIds.length > 0) setActiveExerciseId(exerciseIds[0]); }, [activeSessionId, activeExerciseId, exerciseIds, setActiveExerciseId]);
+  useEffect(() => { InteractionManager.runAfterInteractions(() => { clearExpiredTimer(); }); }, [clearExpiredTimer]);
 
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      configureNotificationHandler();
-      requestNotificationPermissions();
-    });
-
-    clearExpiredTimer();
-
-    return () => task.cancel();
-  }, [clearExpiredTimer]);
-
-  useEffect(() => {
-    if (sourceProgram) {
-      setNewRoutineName(`${sourceProgram.name} Copy`);
-      return;
+    if (isScrubbing && scrubbingIndex !== null && scrubberScrollRef.current) {
+      const scrollX = scrubbingIndex * SCRUB_STEP;
+      scrubberScrollRef.current.scrollTo({ x: scrollX, animated: !isFirstScrubRender.current });
+      isFirstScrubRender.current = false;
     }
-    if (activeSession && !activeSession.programId) {
-      setNewRoutineName("Quick Workout");
-      return;
+    if (!isScrubbing) isFirstScrubRender.current = true;
+  }, [isScrubbing, scrubbingIndex]);
+
+  const handleFinishConfirmed = useCallback(() => { HapticFeedback.success(); completeSession(); setTimeout(() => router.replace("/programs/"), 100); }, [completeSession, router]);
+  const handleDiscard = useCallback(() => { showConfirm("Discard Workout", "Are you sure? This cannot be undone.", () => { discardSession(); setTimeout(() => router.replace("/programs/"), 100); }); }, [discardSession, router]);
+  
+  const handleFinish = useCallback(() => {
+    const session = useWorkoutSessionStore.getState().activeSession;
+    if (!session) return;
+    if (progressData.total === 0) {
+      Alert.alert("Empty Workout", "You haven't completed any sets. What would you like to do?", [{ text: "Resume", style: "cancel" }, { text: "Discard", style: "destructive", onPress: handleDiscard }, { text: "Finish Anyway", onPress: handleFinishConfirmed }]);
+    } else {
+      Alert.alert("Finish Workout", "Mark this workout as complete?", [{ text: "Resume", style: "cancel" }, { text: "Save as Routine", onPress: () => { 
+        Alert.prompt("Save as Routine", "Enter a name for this routine:", [
+          { text: "Cancel", style: "cancel" }, 
+          { text: "Save", onPress: (name?: string) => { 
+            const routineName = name || "New Routine"; 
+            const programExercises = session.exercises.map(ex => ({
+              id: ex.id,
+              exerciseDefinitionId: ex.exerciseDefinitionId || "",
+              trackingMode: ex.trackingMode,
+              name: ex.name,
+              defaultSets: ex.sets.map(s => ({ type: s.type || "working" })),
+              restSeconds: ex.restSeconds,
+              notes: ex.notes,
+              weightUnit: ex.weightUnit,
+              initialWeight: ex.sets[0]?.weight ?? null,
+              muscles: ex.muscles,
+              isBodyweight: ex.isBodyweight
+            }));
+            addProgram(routineName, programExercises as any); handleFinishConfirmed();
+          }}
+        ]); 
+      } }, { text: "Just Finish", onPress: handleFinishConfirmed }]);
     }
-    setNewRoutineName("");
-  }, [activeSession?._id, activeSession?.programId, sourceProgram]);
+  }, [progressData.total, handleDiscard, handleFinishConfirmed, addProgram]);
 
-  useEffect(() => {
-    if (!activeSession) {
-      setLocalExerciseOrder(null);
-      return;
-    }
-    if (!localExerciseOrder) return;
+  const navigateToId = useCallback((id: string, skipAnimation = false) => { if (id === activeExerciseId) return; if (!skipAnimation) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setActiveExerciseId(id); HapticFeedback.selection(); }, [activeExerciseId, setActiveExerciseId]);
+  const stepNavigation = useCallback((direction: 1 | -1) => { const nextIdx = activeIndex + direction; if (nextIdx >= 0 && nextIdx < exerciseIds.length) navigateToId(exerciseIds[nextIdx]); }, [activeIndex, exerciseIds, navigateToId]);
 
-    const sessionIds = activeSession.exercises.map((exercise) => exercise.id);
-    const sameMembership =
-      sessionIds.length === localExerciseOrder.length &&
-      localExerciseOrder.every((id) => sessionIds.includes(id));
+  const swipeLeft = Gesture.Fling().direction(Directions.LEFT).runOnJS(true).onStart(() => stepNavigation(1));
+  const swipeRight = Gesture.Fling().direction(Directions.RIGHT).runOnJS(true).onStart(() => stepNavigation(-1));
 
-    if (!sameMembership || areIdArraysEqual(sessionIds, localExerciseOrder)) {
-      setLocalExerciseOrder(null);
-    }
-  }, [activeSession, localExerciseOrder]);
+  const scrubStartIndex = useRef(activeIndex);
+  const scrubGesture = Gesture.Pan().activateAfterLongPress(250).runOnJS(true).onStart(() => { scrubStartIndex.current = activeIndex; setIsScrubbing(true); setScrubbingIndex(activeIndex); HapticFeedback.selection(); }).onUpdate((e) => {
+    const sensitivity = 30; const delta = Math.round(e.translationX / sensitivity); let nextIdx = scrubStartIndex.current + delta; nextIdx = Math.max(0, Math.min(nextIdx, exerciseIds.length - 1));
+    if (nextIdx !== scrubbingIndex) { setScrubbingIndex(nextIdx); navigateToId(exerciseIds[nextIdx], true); }
+  }).onEnd(() => { setIsScrubbing(false); setScrubbingIndex(null); }).onFinalize(() => { setIsScrubbing(false); setScrubbingIndex(null); });
+  
+  const composedGesture = Gesture.Race(scrubGesture, swipeLeft, swipeRight);
+  const onAddExerciseComplete = useCallback((def: ExerciseDefinition) => { addExercise(def); setExercisePickerVisible(false); }, [addExercise]);
 
-  const displayedExercises = useMemo(() => {
-    if (!activeSession) return [];
+  const toggleNavigationMenu = useCallback((visible: boolean) => {
+    LayoutAnimation.configureNext({ duration: 180, create: { type: 'easeInEaseOut', property: 'opacity' }, update: { type: 'easeInEaseOut' }, delete: { type: 'easeInEaseOut', property: 'opacity' } });
+    setNavigationMenuVisible(visible);
+  }, []);
 
-    const exercises = activeSession.exercises;
-    if (!localExerciseOrder) return exercises;
-
-    const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
-    const ordered = localExerciseOrder
-      .map((id) => byId.get(id))
-      .filter((exercise): exercise is WorkoutExercise => !!exercise);
-
-    return ordered.length === exercises.length ? ordered : exercises;
-  }, [activeSession, localExerciseOrder]);
-
-  const reorderItems = useMemo(
-    () =>
-      displayedExercises.map((exercise) => ({
-        id: exercise.id,
-        name: exercise.name,
-      })),
-    [displayedExercises]
-  );
-  const getDerivedRoutineExercises = useCallback(
-    () =>
-      activeSession
-        ? buildRoutineExercisesFromSession(
-            {
-              ...activeSession,
-              exercises: displayedExercises,
-            },
-            sourceProgram
-          )
-        : [],
-    [activeSession, displayedExercises, sourceProgram]
-  );
-  const getRoutineHasChanges = useCallback(() => {
-    if (!activeSession?.programId || !sourceProgram) return false;
-
-    const derivedRoutineExercises = getDerivedRoutineExercises();
-    return (
-      createRoutineSnapshot("", sourceProgram.exercises) !==
-      createRoutineSnapshot("", derivedRoutineExercises)
-    );
-  }, [activeSession?.programId, getDerivedRoutineExercises, sourceProgram]);
-  const isQuickSession = !activeSession?.programId;
-  const hasSavableRoutineExercises = useMemo(
-    () => getDerivedRoutineExercises().length > 0,
-    [getDerivedRoutineExercises]
-  );
-
-  const handleAddExercise = useCallback((definition: ExerciseDefinition) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    addExercise(definition);
-  }, [addExercise]);
-
-  const finishWorkout = useCallback(() => {
-    HapticFeedback.success();
-    completeSession();
-    setTimeout(() => {
-      router.replace("/programs/");
-    }, 100);
-  }, [completeSession, router]);
-
-  const handleFinishConfirmed = useCallback(() => {
-    if (getRoutineHasChanges() || (isQuickSession && hasSavableRoutineExercises)) {
-      setRoutinePromptVisible(true);
-      return;
-    }
-
-    showConfirm(
-      "Finish Workout",
-      "Complete this workout session?",
-      finishWorkout
-    );
-  }, [finishWorkout, getRoutineHasChanges, hasSavableRoutineExercises, isQuickSession]);
-
-  const handleSaveRoutineChanges = useCallback(
-    (mode: "current" | "workout-only") => {
-      const derivedRoutineExercises = getDerivedRoutineExercises();
-
-      if (mode === "current") {
-        if (!sourceProgram) {
-          showAlert("Routine Missing", "The original routine could not be found.");
-          return;
-        }
-        if (derivedRoutineExercises.length === 0) {
-          showAlert("No Routine To Save", "Add at least one named exercise before saving routine changes.");
-          return;
-        }
-        updateProgram(sourceProgram._id, { exercises: derivedRoutineExercises });
-      }
-
-      setRoutinePromptVisible(false);
-      finishWorkout();
-    },
-    [finishWorkout, getDerivedRoutineExercises, sourceProgram, updateProgram]
-  );
-
-  const handleCreateRoutineAndFinish = useCallback(() => {
-    const derivedRoutineExercises = getDerivedRoutineExercises();
-    const trimmedName = newRoutineName.trim();
-    if (trimmedName.length === 0) {
-      showAlert("Routine Name Required", "Enter a name for the new routine.");
-      return;
-    }
-    if (derivedRoutineExercises.length === 0) {
-      showAlert("No Routine To Save", "Add at least one named exercise before creating a routine.");
-      return;
-    }
-
-    addProgram(trimmedName, copyExercises(derivedRoutineExercises, generateId));
-    setSaveAsNewVisible(false);
-    setRoutinePromptVisible(false);
-    finishWorkout();
-  }, [addProgram, finishWorkout, getDerivedRoutineExercises, newRoutineName]);
-
-  const handleDiscard = useCallback(() => {
-    showConfirm(
-      "Discard Workout",
-      "Are you sure? This cannot be undone.",
-      () => {
-        discardSession();
-        setTimeout(() => {
-          router.replace("/programs/");
-        }, 100);
-      }
-    );
-  }, [discardSession, router]);
-
-  const handleReorderSave = useCallback((exerciseIds: string[]) => {
-    setLocalExerciseOrder(exerciseIds);
-    InteractionManager.runAfterInteractions(() => {
-      startTransition(() => {
-        reorderExercises(exerciseIds);
-      });
-    });
-  }, [reorderExercises]);
-
-  if (!activeSession) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Dumbbell size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
-          <Text style={styles.emptyText}>No active session</Text>
-        </View>
-      </View>
-    );
-  }
+  if (!activeSessionId) return (<View style={styles.container}><View style={styles.emptyContainer}><Dumbbell size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} /><Text style={styles.emptyText}>No active session</Text></View></View>);
 
   return (
-    <>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-      >
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <View style={styles.headerTitleGroup}>
-              <View style={styles.timerRow}>
-                <LiveWorkoutTimer startedAt={activeSession.startedAt} />
-              </View>
-              <Text style={styles.headerTitle}>Live Training</Text>
-            </View>
-            <View style={styles.headerActions}>
-              <Pressable
-                onPress={handleDiscard}
-                style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
-              >
-                <X size={24} color={COLORS.DANGER} />
-              </Pressable>
-              <Pressable
-                onPress={handleFinishConfirmed}
-                style={({ pressed }) => [UI.SHARED.actionBtn, pressed && { transform: [{ scale: 0.96 }] }]}
-              >
-                <Check size={24} color={COLORS.TEXT_PRIMARY} strokeWidth={3} />
-              </Pressable>
-            </View>
-          </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <HUDHeader 
+          scrollY={scrollY} 
+          startedAt={startedAt} 
+          progressData={progressData} 
+          condenseThreshold={CONDENSE_THRESHOLD} 
+          totalVolume={totalVolume}
+          sessionId={activeSessionId}
+        />
+        
+        <Animated.ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
+          <View style={styles.mainFocus}>{currentExercise ? (<ExerciseCard exercise={currentExercise} key={currentExercise.id} />) : (<View style={styles.noExercise}><Text style={styles.noExerciseText}>NO EXERCISES ADDED</Text><Pressable style={UI.SHARED.iconBtn} onPress={() => setExercisePickerVisible(true)}><Plus size={20} color={COLORS.ACCENT_BLUE} /></Pressable></View>)}</View>
+          <View style={{ height: 120 }} />
+        </Animated.ScrollView>
 
-          <FlatList
-            data={displayedExercises}
-            renderItem={({ item }) => <ExerciseCard exercise={item} />}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            ListFooterComponent={
-              <View style={styles.footerSection}>
-                <Text style={UI.SHARED.sectionLabel}>Workout Notes</Text>
-                <View style={styles.workoutNotesCard}>
-                  <StickyNote size={16} color={COLORS.ACCENT_BLUE} style={{ marginTop: 4 }} />
-                  <TextInput
-                    style={styles.workoutNotesInput}
-                    value={activeSession.notes}
-                    onChangeText={updateWorkoutNotes}
-                    placeholder="Add end-of-workout notes..."
-                    placeholderTextColor={COLORS.TEXT_TERTIARY}
-                    multiline
-                  />
-                </View>
-
-                <View style={styles.footerActionsRow}>
-                  <Pressable
-                    onPress={() => setExercisePickerVisible(true)}
-                    style={({ pressed }) => [
-                      styles.footerActionBtn,
-                      pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                    ]}
-                  >
-                    <Plus size={18} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
-                    <Text style={styles.footerActionText}>Add Exercise</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setReorderVisible(true)}
-                    style={({ pressed }) => [
-                      styles.footerActionBtn,
-                      pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                    ]}
-                  >
-                    <Text style={styles.footerActionText}>Reorder</Text>
-                  </Pressable>
-                </View>
-              </View>
-            }
-          />
-
-          <FloatingRestTimer />
-        </View>
-      </KeyboardAvoidingView>
-
-      <ExerciseReorderModal
-        visible={reorderVisible}
-        exercises={reorderItems}
-        onClose={() => setReorderVisible(false)}
-        onSave={handleReorderSave}
-      />
-
-      <ExercisePickerModal
-        visible={exercisePickerVisible}
-        onClose={() => setExercisePickerVisible(false)}
-        onSelect={handleAddExercise}
-        title="Add Exercise"
-        subtitle="Pick from the library or add a custom exercise."
-      />
-
-      <Modal
-        visible={routinePromptVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRoutinePromptVisible(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalKeyboardAvoider}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-        >
-          <View style={styles.modalOverlay}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setRoutinePromptVisible(false)} />
-            <View style={styles.modalSheet}>
-              <Text style={styles.modalTitle}>
-                {isQuickSession ? "Save Workout As Routine" : "Routine Changed During Workout"}
-              </Text>
-              <Text style={styles.modalDescription}>
-                {isQuickSession
-                  ? "Save this empty-start workout as a new routine before finishing, or keep it only in workout history."
-                  : "Save these exercise-stack changes back to your routine, turn them into a new routine, or keep them only in this workout."}
-              </Text>
-
-              {!isQuickSession ? (
-                <Pressable
-                  style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-                  onPress={() => handleSaveRoutineChanges("current")}
-                >
-                  <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-                    <Save size={20} color={COLORS.ACCENT_BLUE} />
-                  </View>
-                  <View style={styles.optionCopy}>
-                    <Text style={styles.optionLabel}>Save To Current Routine</Text>
-                    <Text style={styles.optionDesc}>Update the routine you started from.</Text>
-                  </View>
-                </Pressable>
-              ) : null}
-
-              <Pressable
-                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-                onPress={() => {
-                  setRoutinePromptVisible(false);
-                  setSaveAsNewVisible(true);
-                }}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
-                  <Copy size={20} color={COLORS.ACCENT_GREEN} />
-                </View>
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionLabel}>
-                    {isQuickSession ? "Save As Routine" : "Save As New Routine"}
-                  </Text>
-                  <Text style={styles.optionDesc}>
-                    {isQuickSession
-                      ? "Create a reusable routine from this workout."
-                      : "Keep the original routine untouched."}
-                  </Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-                onPress={() => handleSaveRoutineChanges("workout-only")}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: "rgba(255,255,255,0.06)" }]}>
-                  <Check size={20} color={COLORS.TEXT_PRIMARY} />
-                </View>
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionLabel}>Workout Only</Text>
-                  <Text style={styles.optionDesc}>Finish now without changing any saved routine.</Text>
-                </View>
-              </Pressable>
-
-              <Pressable style={styles.modalCancelBtn} onPress={() => setRoutinePromptVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <Modal
-        visible={saveAsNewVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setSaveAsNewVisible(false);
-          setRoutinePromptVisible(true);
-        }}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalKeyboardAvoider}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-        >
-          <View style={styles.modalOverlay}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => {
-                setSaveAsNewVisible(false);
-                setRoutinePromptVisible(true);
-              }}
-            />
-            <View style={styles.modalSheet}>
-              <Text style={styles.modalTitle}>
-                {isQuickSession ? "Routine Name" : "New Routine Name"}
-              </Text>
-              <Text style={styles.modalDescription}>
-                {isQuickSession
-                  ? "This will save the workout's exercise stack as a reusable routine."
-                  : "This will save the adjusted exercise stack as a separate routine."}
-              </Text>
-
-              <View style={styles.newRoutineInputShell}>
-                <TextInput
-                  style={styles.newRoutineInput}
-                  value={newRoutineName}
-                  onChangeText={setNewRoutineName}
-                  placeholder="Routine name"
-                  placeholderTextColor={COLORS.TEXT_TERTIARY}
-                  autoFocus
-                />
-              </View>
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.primaryModalBtn,
-                  pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] },
-                ]}
-                onPress={handleCreateRoutineAndFinish}
-              >
-                <Text style={styles.primaryModalBtnText}>
-                  {isQuickSession ? "Save Routine And Finish" : "Save New Routine And Finish"}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.modalCancelBtn}
-                onPress={() => {
-                  setSaveAsNewVisible(false);
-                  setRoutinePromptVisible(true);
-                }}
-              >
-                <Text style={styles.modalCancelText}>Back</Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </>
+        {isScrubbing && (<ScrubberRail exerciseIds={exerciseIds} exerciseNames={exerciseNames} exerciseProgress={exerciseProgress} displayIndex={scrubbingIndex ?? activeIndex} scrubberScrollRef={scrubberScrollRef} />)}
+        
+        <GestureDetector gesture={composedGesture}>
+          <HUDPillNav activeIndex={activeIndex} totalExercises={exerciseIds.length} onMenuPress={() => toggleNavigationMenu(true)} onDiscardPress={handleDiscard} onFinishPress={handleFinish} onPrevPress={() => stepNavigation(-1)} onNextPress={() => stepNavigation(1)} />
+        </GestureDetector>
+        
+        <ExerciseNavMenu visible={navigationMenuVisible} onClose={() => toggleNavigationMenu(false)} activeExerciseId={activeExerciseId} onSelect={setActiveExerciseId} onAddPress={() => setExercisePickerVisible(true)} />
+        <ExercisePickerModal visible={exercisePickerVisible} onClose={() => setExercisePickerVisible(false)} onSelect={onAddExerciseComplete} title="Add Exercise" />
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG,
-  },
-  header: {
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingTop: UI.HEADER_TOP,
-    paddingBottom: 18,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  headerTitleGroup: {
-    flex: 1,
-  },
-  timerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 2,
-  },
-  headerTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: UI.GAP,
-  },
-  listContent: {
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingBottom: 160,
-  },
-  footerSection: {
-    marginTop: 2,
-    marginBottom: 100,
-  },
-  workoutNotesCard: {
-    flexDirection: "row",
-    gap: 10,
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-    padding: 14,
-    minHeight: 96,
-  },
-  workoutNotesInput: {
-    flex: 1,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    padding: 0,
-    textAlignVertical: "top",
-  },
-  footerActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 12,
-  },
-  footerActionBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: COLORS.CARD_BG,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  footerActionText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontWeight: "700",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.82)",
-    justifyContent: "flex-end",
-  },
-  modalKeyboardAvoider: {
-    flex: 1,
-  },
-  modalSheet: {
-    backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 24,
-    paddingBottom: Platform.OS === "ios" ? 40 : 28,
-  },
-  modalTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 22,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 8,
-  },
-  modalDescription: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 20,
-  },
-  optionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 12,
-  },
-  optionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  optionCopy: {
-    flex: 1,
-  },
-  optionLabel: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  optionDesc: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
-    marginTop: 3,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  modalCancelBtn: {
-    marginTop: 8,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  modalCancelText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  newRoutineInputShell: {
-    backgroundColor: COLORS.BG,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-    paddingHorizontal: 18,
-    marginBottom: 16,
-  },
-  newRoutineInput: {
-    height: 60,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    padding: 0,
-  },
-  primaryModalBtn: {
-    height: 58,
-    borderRadius: 22,
-    backgroundColor: COLORS.ACCENT_BLUE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryModalBtnText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-    marginTop: 100,
-  },
-  emptyText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 20,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
+  container: { flex: 1, backgroundColor: COLORS.BG },
+  scrollContent: { flexGrow: 1, paddingTop: 10 },
+  mainFocus: { },
+  noExercise: { flex: 1, justifyContent: "center", alignItems: "center", gap: 20, paddingTop: 100 },
+  noExerciseText: { color: COLORS.TEXT_TERTIARY, fontSize: 14, fontFamily: UI.SHARED.sectionLabel.fontFamily, fontWeight: "800", letterSpacing: 2 },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 40 },
+  emptyText: { color: COLORS.TEXT_SECONDARY, fontSize: 18, fontWeight: "800", marginTop: 20, fontFamily: UI.SHARED.sectionLabel.fontFamily },
 });

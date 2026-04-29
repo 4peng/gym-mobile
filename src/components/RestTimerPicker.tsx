@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.CARD_BG,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -293,6 +293,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
     marginHorizontal: 15,
+    fontFamily: FONT_FAMILIES.MONO,
   },
   list: {
     flex: 1,
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_PRIMARY,
     fontSize: 28,
     fontWeight: '800',
-    fontFamily: FONT_FAMILIES.MEDIUM,
+    fontFamily: FONT_FAMILIES.MONO,
   },
   footer: {
     alignItems: 'center',

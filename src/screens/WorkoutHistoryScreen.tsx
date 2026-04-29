@@ -99,32 +99,28 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
     const currentFullDate = session.completedAt || session.startedAt;
     const currentDate = new Date(currentFullDate).toISOString().split('T')[0];
     
-    if (Platform.OS === 'ios') {
-      Alert.prompt(
-        "Edit Date",
-        "Enter new date (YYYY-MM-DD):",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Save", 
-            onPress: (newDate?: string) => {
-              if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                // Keep the time part if possible
-                const oldTime = currentFullDate.split('T')[1] || "12:00:00.000Z";
-                const updatedIso = `${newDate}T${oldTime}`;
-                updateSessionDate(session._id, updatedIso);
-              } else if (newDate) {
-                Alert.alert("Invalid format", "Please use YYYY-MM-DD");
-              }
-            } 
-          }
-        ],
-        "plain-text",
-        currentDate
-      );
-    } else {
-      Alert.alert("Feature limited", "Date editing is currently optimized for iOS. Please ensure you enter YYYY-MM-DD format if available via your system prompt.");
-    }
+    Alert.prompt(
+      "Edit Date",
+      "Enter new date (YYYY-MM-DD):",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Save", 
+          onPress: (newDate?: string) => {
+            if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+              // Keep the time part if possible
+              const oldTime = currentFullDate.split('T')[1] || "12:00:00.000Z";
+              const updatedIso = `${newDate}T${oldTime}`;
+              updateSessionDate(session._id, updatedIso);
+            } else if (newDate) {
+              Alert.alert("Invalid format", "Please use YYYY-MM-DD");
+            }
+          } 
+        }
+      ],
+      "plain-text",
+      currentDate
+    );
   };
 
   const handleStartEdit = (exerciseId: string, set: WorkoutSet) => {
@@ -324,8 +320,8 @@ export default function WorkoutHistoryScreen() {
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1 }} 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <View style={styles.container}>
         <View style={styles.header}>
@@ -449,6 +445,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_SECONDARY,
     fontSize: 13,
     fontWeight: "600",
+    fontFamily: FONT_FAMILIES.MONO,
   },
   summary: {
     color: COLORS.TEXT_TERTIARY,
@@ -512,11 +509,13 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_PRIMARY,
     fontSize: 12,
     fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MONO,
   },
   setTagX: {
     color: COLORS.TEXT_TERTIARY,
     fontSize: 10,
     marginHorizontal: 2,
+    fontFamily: FONT_FAMILIES.MONO,
   },
   editRow: {
     flexDirection: "row",
@@ -530,7 +529,7 @@ const styles = StyleSheet.create({
   },
   editInput: {
     color: COLORS.TEXT_PRIMARY,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontFamily: FONT_FAMILIES.MONO,
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",

@@ -8,9 +8,9 @@ import {
   Platform,
   FlatList,
 } from 'react-native';
-import { Check, ChevronDown } from 'lucide-react-native';
-import { COLORS } from '@/src/constants/colors';
-import { FONT_FAMILIES } from '@/src/constants/fonts';
+import { Check, ChevronDown, Activity, X } from 'lucide-react-native';
+import { COLORS } from '@/constants/colors';
+import { FONT_FAMILIES } from '@/constants/fonts';
 import {
   collapseDetailedMusclesToPrimary,
   DETAILED_MODE_MUSCLE_GROUPS,
@@ -19,30 +19,46 @@ import {
   MUSCLE_LABELS,
   MUSCLE_GROUPS,
   MuscleGroup,
-} from '@/src/constants/muscles';
+} from '@/constants/muscles';
 import { useUiPreferencesStore } from '@/stores/uiPreferencesStore';
+import { HapticFeedback } from '@/utils/haptics';
 
 interface MuscleSelectorProps {
   selectedMuscles: MuscleGroup[];
   onSelect: (muscles: MuscleGroup[]) => void;
   label?: string;
+  // External control
+  visible?: boolean;
+  onClose?: () => void;
 }
 
 export default function MuscleSelector({
   selectedMuscles,
   onSelect,
-  label = "Targeted Muscles"
+  label = "Targeted Muscles",
+  visible: externalVisible,
+  onClose: externalOnClose,
 }: MuscleSelectorProps) {
-  const [visible, setVisible] = useState(false);
+  const [internalVisible, setInternalVisible] = useState(false);
   const [draftSelectedMuscles, setDraftSelectedMuscles] = useState<MuscleGroup[]>([]);
+  
   const showDetailedMuscleGroups = useUiPreferencesStore(
     (s) => s.showDetailedMuscleGroups
   );
+  const toggleDetailedMuscleGroups = useUiPreferencesStore(
+    (s) => s.toggleDetailedMuscleGroups
+  );
+
+  const isControlled = externalVisible !== undefined;
+  const isVisible = isControlled ? externalVisible : internalVisible;
+  const hide = () => (isControlled ? externalOnClose?.() : setInternalVisible(false));
+  const show = () => (isControlled ? null : setInternalVisible(true));
 
   const detailedSet = new Set<MuscleGroup>(DETAILED_MUSCLE_GROUPS as readonly MuscleGroup[]);
   const normalizedSelectedMuscles = useMemo(() => (showDetailedMuscleGroups
     ? expandPrimaryMusclesForDetailedMode(selectedMuscles)
     : selectedMuscles), [showDetailedMuscleGroups, selectedMuscles]);
+  
   const availableMuscles = showDetailedMuscleGroups
     ? DETAILED_MODE_MUSCLE_GROUPS
     : Array.from(
@@ -53,10 +69,10 @@ export default function MuscleSelector({
       );
 
   useEffect(() => {
-    if (visible) {
+    if (isVisible) {
       setDraftSelectedMuscles(normalizedSelectedMuscles);
     }
-  }, [visible, normalizedSelectedMuscles]);
+  }, [isVisible, normalizedSelectedMuscles]);
 
   const toggleMuscle = (muscle: MuscleGroup) => {
     setDraftSelectedMuscles((prev) =>
@@ -66,23 +82,85 @@ export default function MuscleSelector({
     );
   };
 
+  const handleToggleDetailed = () => {
+    toggleDetailedMuscleGroups();
+    HapticFeedback.selection();
+  };
+
   const selectedLabels = normalizedSelectedMuscles.length > 0 
     ? normalizedSelectedMuscles.map(m => MUSCLE_LABELS[m]).join(', ')
     : 'None selected';
 
-  const closeAndApply = () => {
-    onSelect(collapseDetailedMusclesToPrimary(draftSelectedMuscles));
-    setVisible(false);
+  const applyAndClose = () => {
+    onSelect(draftSelectedMuscles);
+    hide();
   };
 
-  const closeAndCancel = () => {
-    setVisible(false);
-  };
+  const modalContent = (
+    <Modal
+      visible={isVisible}
+      transparent={false}
+      animationType="slide"
+      onRequestClose={hide}
+      presentationStyle="pageSheet"
+    >
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>{label}</Text>
+            <Pressable onPress={handleToggleDetailed} style={styles.detailedToggle}>
+              <Activity size={12} color={showDetailedMuscleGroups ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY} />
+              <Text style={[styles.detailedToggleText, showDetailedMuscleGroups && { color: COLORS.ACCENT_BLUE }]}>
+                {showDetailedMuscleGroups ? "DETAILED MODE" : "SIMPLE MODE"}
+              </Text>
+            </Pressable>
+          </View>
+          <View style={styles.headerActions}>
+             <Pressable onPress={applyAndClose} style={styles.closeBtn}>
+                <Check size={24} color={COLORS.ACCENT_GREEN} />
+              </Pressable>
+          </View>
+        </View>
+
+        <FlatList
+          data={availableMuscles}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item: m }) => {
+            const isActive = draftSelectedMuscles.includes(m);
+            return (
+              <Pressable
+                onPress={() => toggleMuscle(m)}
+                style={[
+                  styles.item,
+                  isActive && styles.itemActive
+                ]}
+              >
+                <Text style={[
+                  styles.itemText,
+                  isActive && styles.itemTextActive
+                ]}>
+                  {MUSCLE_LABELS[m]}
+                </Text>
+                {isActive && <Check size={18} color={COLORS.ACCENT_BLUE} />}
+              </Pressable>
+            );
+          }}
+        />
+      </View>
+    </Modal>
+  );
+
+  if (isControlled) {
+    return modalContent;
+  }
 
   return (
     <View style={styles.wrapper}>
       <Pressable 
-        onPress={() => setVisible(true)}
+        onPress={show}
         style={({ pressed }) => [
           styles.trigger,
           pressed && { opacity: 0.7, backgroundColor: 'rgba(255,255,255,0.05)' }
@@ -96,56 +174,7 @@ export default function MuscleSelector({
         </View>
         <ChevronDown size={18} color={COLORS.TEXT_TERTIARY} />
       </Pressable>
-
-      <Modal
-        visible={visible}
-        transparent
-        animationType="slide"
-        onRequestClose={closeAndCancel}
-      >
-        <View style={styles.overlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={closeAndCancel}
-          />
-          <View style={styles.container}>
-            <View style={styles.header}>
-              <Text style={styles.title}>{label}</Text>
-              <Pressable onPress={closeAndApply} style={styles.closeBtn}>
-                <Check size={24} color={COLORS.ACCENT_GREEN} />
-              </Pressable>
-            </View>
-
-            <FlatList
-              data={availableMuscles}
-              keyExtractor={(item) => item}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item: m }) => {
-                const isActive = draftSelectedMuscles.includes(m);
-                return (
-                  <Pressable
-                    onPress={() => toggleMuscle(m)}
-                    style={[
-                      styles.item,
-                      isActive && styles.itemActive
-                    ]}
-                  >
-                    <Text style={[
-                      styles.itemText,
-                      isActive && styles.itemTextActive
-                    ]}>
-                      {MUSCLE_LABELS[m]}
-                    </Text>
-                    {isActive && <Check size={18} color={COLORS.ACCENT_BLUE} />}
-                  </Pressable>
-                );
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
+      {modalContent}
     </View>
   );
 }
@@ -176,6 +205,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 2,
+    fontFamily: FONT_FAMILIES.MEDIUM,
   },
   triggerValue: {
     color: COLORS.TEXT_PRIMARY,
@@ -183,17 +213,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'flex-end',
-  },
   container: {
+    flex: 1,
     backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    maxHeight: '80%',
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -203,6 +226,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
+  detailedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  detailedToggleText: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 10,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MONO,
+    letterSpacing: 0.5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 16,
+  },
   title: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 18,
@@ -210,7 +250,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   closeBtn: {
-    padding: 8,
+    padding: 4,
   },
   scrollContent: {
     padding: 16,

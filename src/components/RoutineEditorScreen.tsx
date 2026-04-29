@@ -1,20 +1,23 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   TextInput,
-  FlatList,
+  ScrollView,
   Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Modal,
+  Animated,
 } from "react-native";
-import { X, Check, Plus, Layout, Play, Save, Trash2 } from "lucide-react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ArrowUpDown, Check, ChevronRight, Play, Plus, Save, Trash2, X } from "lucide-react-native";
+
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { showAlert } from "@/utils/alerts";
-import { COLORS } from "@/constants/colors";
+import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import ExerciseEditor, { type ExerciseFormData } from "@/components/ExerciseEditor";
@@ -47,6 +50,8 @@ interface RoutineEditorScreenProps {
   onDelete?: (draft: RoutineDraft) => void;
 }
 
+const SHEET_ANIMATION_DURATION = 180;
+
 export default function RoutineEditorScreen({
   mode,
   initialName = "",
@@ -58,36 +63,86 @@ export default function RoutineEditorScreen({
 }: RoutineEditorScreenProps) {
   const [name, setName] = useState(initialName);
   const [exercises, setExercises] = useState<ExerciseFormData[]>(initialExercises);
-  const [showOptions, setShowOptions] = useState(false);
   const [reorderVisible, setReorderVisible] = useState(false);
   const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
+  const [optionsVisible, setOptionsVisible] = useState(false);
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const flatListRef = useRef(null);
+  const CONDENSE_THRESHOLD = 60;
+  const optionsAnimation = useRef(new Animated.Value(0)).current;
+
+  const stickyHudOpacity = scrollY.interpolate({
+    inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const stickyHudTranslateY = scrollY.interpolate({
+    inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
+    outputRange: [-20, 0],
+    extrapolate: 'clamp',
+  });
+
+  const renderStickyHeader = () => (
+    <Animated.View style={[styles.stickyHud, { opacity: stickyHudOpacity, transform: [{ translateY: stickyHudTranslateY }] }]}>
+      <View style={styles.stickyHudContent}>
+        <Text style={styles.stickyReadout}>{isCreateLike ? "New Routine" : "Edit Routine"}</Text>
+        <Text style={styles.stickyMeta}>{hasChanges ? "Unsaved" : "Saved"}</Text>
+      </View>
+    </Animated.View>
+  );
 
   const isCreateLike = mode === "create" || mode === "duplicate";
 
   useEffect(() => {
     setName(initialName);
     setExercises(initialExercises);
-  }, [initialName, initialExercises]);
+  }, [initialExercises, initialName]);
 
   const initialSnapshot = useMemo(
     () => createRoutineSnapshot(initialName, initialExercises),
-    [initialName, initialExercises]
+    [initialExercises, initialName]
   );
-  const currentSnapshot = useMemo(
-    () => createRoutineSnapshot(name, exercises),
-    [name, exercises]
-  );
+  const currentSnapshot = useMemo(() => createRoutineSnapshot(name, exercises), [exercises, name]);
   const hasChanges = currentSnapshot !== initialSnapshot;
+
+  const exerciseCount = exercises.length;
+  const totalPlannedSets = useMemo(
+    () => exercises.reduce((total, exercise) => total + (exercise.defaultSets?.length || 0), 0),
+    [exercises]
+  );
+
+  const animateSheet = useCallback((toValue: number, onComplete?: () => void) => {
+    Animated.timing(optionsAnimation, {
+      toValue,
+      duration: SHEET_ANIMATION_DURATION,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        onComplete?.();
+      }
+    });
+  }, [optionsAnimation]);
+
+  const openOptions = useCallback(() => {
+    setOptionsVisible(true);
+    animateSheet(1);
+  }, [animateSheet]);
+
+  const closeOptions = useCallback(() => {
+    animateSheet(0, () => setOptionsVisible(false));
+  }, [animateSheet]);
 
   const handleUpdateExercise = useCallback(
     (id: string, updates: Partial<Omit<ExerciseFormData, "id">>) => {
-      setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
+      setExercises((prev) => prev.map((exercise) => (exercise.id === id ? { ...exercise, ...updates } : exercise)));
     },
     []
   );
 
   const handleRemoveExercise = useCallback((id: string) => {
-    setExercises((prev) => prev.filter((e) => e.id !== id));
+    setExercises((prev) => prev.filter((exercise) => exercise.id !== id));
   }, []);
 
   const handleAddExerciseFromPicker = useCallback((definition: ExerciseDefinition) => {
@@ -97,14 +152,11 @@ export default function RoutineEditorScreen({
     nextExercise.name = definition.name;
     nextExercise.muscles = definition.muscles;
     setExercises((prev) => [...prev, nextExercise]);
+    setExercisePickerVisible(false);
   }, []);
 
   const reorderItems = useMemo(
-    () =>
-      exercises.map((exercise) => ({
-        id: exercise.id,
-        name: exercise.name,
-      })),
+    () => exercises.map((exercise) => ({ id: exercise.id, name: exercise.name })),
     [exercises]
   );
 
@@ -127,38 +179,49 @@ export default function RoutineEditorScreen({
 
     showAlert("Error", error);
     return false;
-  }, [name, exercises]);
+  }, [exercises, name]);
 
   const doSave = useCallback(() => {
     if (!validate()) return;
     onSave(buildRoutineDraft(name, exercises) as RoutineDraft);
-  }, [validate, onSave, name, exercises]);
+  }, [exercises, name, onSave, validate]);
 
   const doSaveAndStart = useCallback(() => {
     if (!validate() || !onSaveAndStart) return;
     onSaveAndStart(buildRoutineDraft(name, exercises) as RoutineDraft);
-  }, [validate, onSaveAndStart, name, exercises]);
+  }, [exercises, name, onSaveAndStart, validate]);
 
   const doDelete = useCallback(() => {
     if (!onDelete) return;
     onDelete(buildRoutineDraft(name, exercises) as RoutineDraft);
-  }, [onDelete, name, exercises]);
+  }, [exercises, name, onDelete]);
 
   const handlePrimaryAction = useCallback(() => {
     if (isCreateLike) {
       doSave();
       return;
     }
-    setShowOptions(true);
-  }, [isCreateLike, doSave]);
+
+    openOptions();
+  }, [doSave, isCreateLike, openOptions]);
 
   const handleCancel = useCallback(() => {
     onCancel(buildRoutineDraft(name, exercises) as RoutineDraft, hasChanges);
-  }, [onCancel, name, exercises, hasChanges]);
+  }, [exercises, hasChanges, name, onCancel]);
+
+  const optionsTranslateY = optionsAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [28, 0],
+  });
+
+  const optionsOpacity = optionsAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   const renderExercise = useCallback(
     ({ item, index }: { item: ExerciseFormData; index: number }) => (
-      <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
+      <View style={styles.exerciseWrap}>
         <ExerciseEditor
           exercise={item}
           index={index}
@@ -167,205 +230,157 @@ export default function RoutineEditorScreen({
         />
       </View>
     ),
-    [handleUpdateExercise, handleRemoveExercise]
+    [handleRemoveExercise, handleUpdateExercise]
   );
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <FlatList
-        data={exercises}
-        renderItem={renderExercise}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <View>
-            <View style={styles.header}>
-              <View style={styles.headerTitleGroup}>
-                <Text style={styles.headerLabel}>
-                  {mode === "edit" ? "Editor Mode" : "Setup Mode"}
-                </Text>
-                <Text style={styles.headerTitle}>
-                  {mode === "edit"
-                    ? "Edit Routine"
-                    : mode === "duplicate"
-                      ? "Duplicate Routine"
-                      : "New Routine"}
-                </Text>
-              </View>
-              <View style={styles.headerActions}>
-                {mode === "edit" && onDelete ? (
-                  <Pressable
-                    onPress={doDelete}
-                    style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
-                  >
-                    <Trash2 size={22} color={COLORS.DANGER} />
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  onPress={handleCancel}
-                  style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <X size={24} color={COLORS.DANGER} />
-                </Pressable>
-                <Pressable
-                  onPress={handlePrimaryAction}
-                  style={({ pressed }) => [UI.SHARED.actionBtn, pressed && { transform: [{ scale: 0.96 }] }]}
-                >
-                  <Check size={24} color={COLORS.TEXT_PRIMARY} strokeWidth={3} />
-                </Pressable>
-              </View>
-            </View>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        {renderStickyHeader()}
+        <View style={styles.topBar}>
+          <Pressable onPress={handleCancel} style={({ pressed }) => [UI.SHARED.dangerBtn, pressed && styles.hudPressed]}>
+            <X size={20} color={COLORS.DANGER} strokeWidth={2.8} />
+          </Pressable>
 
-            <View style={styles.metaSection}>
-              <Text style={UI.SHARED.sectionLabel}>Routine Name</Text>
-              <View style={styles.nameInputContainer}>
-                <Layout size={24} color={COLORS.TEXT_TERTIARY} />
-                <TextInput
-                  style={styles.nameInput}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Push Day"
-                  placeholderTextColor={COLORS.TEXT_TERTIARY}
-                  autoFocus={isCreateLike}
-                />
-              </View>
-            </View>
-
-            <Text style={[UI.SHARED.sectionLabel, { paddingHorizontal: UI.LAYOUT_PADDING }]}>
-              Exercise Stack
-            </Text>
+          <View style={styles.hudReadout}>
+            <Text style={styles.hudReadoutTitle}>{isCreateLike ? "New Routine" : "Edit Routine"}</Text>
+            <Text style={styles.hudReadoutMeta}>{hasChanges ? "Unsaved changes" : "All changes saved"}</Text>
           </View>
-        }
-        ListEmptyComponent={
-          <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
-            <Pressable
-              onPress={() => setExercisePickerVisible(true)}
-              style={({ pressed }) => [styles.emptyContainer, pressed && { opacity: 0.7 }]}
-            >
-              <View style={styles.emptyIconCircle}>
-                <Plus size={32} color={COLORS.ACCENT_BLUE} strokeWidth={2.5} />
-              </View>
-              <Text style={styles.emptyText}>Empty Routine</Text>
-              <Text style={styles.emptySubtext}>Tap here to add your first exercise</Text>
-            </Pressable>
-          </View>
-        }
-        ListFooterComponent={
-          exercises.length > 0 ? (
-            <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
-              <View style={styles.footerActionsRow}>
-                <Pressable
-                  onPress={() => setExercisePickerVisible(true)}
-                  style={({ pressed }) => [
-                    styles.footerActionBtn,
-                    pressed && { backgroundColor: "#1D1D21", transform: [{ scale: 0.99 }] },
-                  ]}
-                >
-                  <Plus size={20} color={COLORS.ACCENT_BLUE} strokeWidth={3} />
-                  <Text style={styles.addBtnText}>Add Exercise</Text>
-                </Pressable>
 
-                <Pressable
-                  onPress={() => setReorderVisible(true)}
-                  disabled={exercises.length < 2}
-                  style={({ pressed }) => [
-                    styles.footerActionBtn,
-                    exercises.length < 2 && styles.footerActionBtnDisabled,
-                    pressed && exercises.length >= 2 && {
-                      backgroundColor: "#1D1D21",
-                      transform: [{ scale: 0.99 }],
-                    },
-                  ]}
-                >
-                  <Text style={styles.addBtnText}>Reorder</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null
-        }
-      />
+          <Pressable onPress={handlePrimaryAction} style={({ pressed }) => [UI.SHARED.actionBtn, pressed && styles.hudPressed]}>
+            <Check size={20} color={COLORS.ACCENT_GREEN} strokeWidth={2.8} />
+          </Pressable>
+        </View>
 
-      {mode === "edit" && (onSaveAndStart || onDelete) ? (
-        <Modal
-          visible={showOptions}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowOptions(false)}
+<AnimatedScrollView
+          ref={flatListRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setShowOptions(false)}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Save Changes</Text>
+          <View style={styles.headerArea}>
+            <View style={styles.titleRow}>
+              <TextInput
+                style={styles.nameInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Routine Name"
+                placeholderTextColor={withAlpha(COLORS.TEXT_TERTIARY, 0.4)}
+                autoFocus={isCreateLike}
+              />
+            </View>
+
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryVal}>{exerciseCount}</Text>
+                <Text style={styles.summaryLbl}>Exercises</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryVal}>{totalPlannedSets}</Text>
+                <Text style={styles.summaryLbl}>Sets</Text>
+              </View>
+            </View>
+
+            <View style={styles.actionGrid}>
+              <Pressable
+                onPress={() => setExercisePickerVisible(true)}
+                style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+              >
+                <Plus size={18} color={COLORS.ACCENT_BLUE} />
+                <Text style={styles.actionBtnText}>Add Exercise</Text>
+              </Pressable>
 
               <Pressable
-                style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-                onPress={() => {
-                  setShowOptions(false);
-                  doSave();
-                }}
+                onPress={() => setReorderVisible(true)}
+                disabled={exercises.length < 2}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  exercises.length < 2 && styles.actionBtnDisabled,
+                  pressed && exercises.length >= 2 && styles.pressed,
+                ]}
               >
-                <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-                  <Save size={20} color={COLORS.ACCENT_BLUE} />
-                </View>
-                <View>
-                  <Text style={styles.optionLabel}>Just Save</Text>
-                  <Text style={styles.optionDesc}>Update routine and return home</Text>
-                </View>
-              </Pressable>
-
-              {onSaveAndStart ? (
-                <Pressable
-                  style={({ pressed }) => [styles.optionBtn, pressed && { backgroundColor: "#1D1D21" }]}
-                  onPress={() => {
-                    setShowOptions(false);
-                    doSaveAndStart();
-                  }}
-                >
-                  <View style={[styles.optionIcon, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-                    <Play size={20} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-                  </View>
-                  <View>
-                    <Text style={styles.optionLabel}>Save & Start Training</Text>
-                    <Text style={styles.optionDesc}>Update and launch live session</Text>
-                  </View>
-                </Pressable>
-              ) : null}
-
-              {onDelete ? (
-                <>
-                  <View style={styles.modalDivider} />
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.optionBtn,
-                      pressed && { backgroundColor: "rgba(239, 68, 68, 0.1)" },
-                    ]}
-                    onPress={() => {
-                      setShowOptions(false);
-                      doDelete();
-                    }}
-                  >
-                    <View style={[styles.optionIcon, { backgroundColor: "rgba(239, 68, 68, 0.1)" }]}>
-                      <Trash2 size={20} color={COLORS.DANGER} />
-                    </View>
-                    <View>
-                      <Text style={[styles.optionLabel, { color: COLORS.DANGER }]}>Delete Routine</Text>
-                      <Text style={styles.optionDesc}>Permanently remove this program</Text>
-                    </View>
-                  </Pressable>
-                </>
-              ) : null}
-
-              <Pressable style={styles.modalCancelBtn} onPress={() => setShowOptions(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <ArrowUpDown size={18} color={COLORS.TEXT_PRIMARY} />
+                <Text style={[styles.actionBtnText, { color: COLORS.TEXT_PRIMARY }]}>Reorder</Text>
               </Pressable>
             </View>
+          </View>
+          {exercises.map((item, index) => (
+            <View style={styles.exerciseWrap}>
+              <ExerciseEditor
+                exercise={item}
+                index={index}
+                onUpdate={handleUpdateExercise}
+                onRemove={handleRemoveExercise}
+              />
+            </View>
+          ))}
+
+          {exercises.length === 0 && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No exercises yet</Text>
+            </View>
+          )}
+
+          <View style={styles.listFooterSpacer} />
+        </AnimatedScrollView>
+      </SafeAreaView>
+
+      {optionsVisible ? (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeOptions}>
+            <Animated.View style={[styles.backdrop, { opacity: optionsOpacity }]} />
           </Pressable>
-        </Modal>
+
+          <Animated.View
+            style={[
+              styles.optionsSheet,
+              { opacity: optionsOpacity, transform: [{ translateY: optionsTranslateY }] },
+            ]}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Routine Options</Text>
+              <Pressable onPress={closeOptions}>
+                <X size={20} color={COLORS.TEXT_TERTIARY} />
+              </Pressable>
+            </View>
+
+            <OptionItem
+              icon={<Save size={20} color={COLORS.ACCENT_BLUE} />}
+              title="Save Changes"
+              subtitle="Update template and return to list"
+              onPress={() => { closeOptions(); doSave(); }}
+            />
+
+            {onSaveAndStart ? (
+              <OptionItem
+                icon={<Play size={20} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />}
+                title="Save and Start"
+                subtitle="Launch this routine immediately"
+                onPress={() => { closeOptions(); doSaveAndStart(); }}
+              />
+            ) : null}
+
+            {onDelete ? (
+              <OptionItem
+                icon={<Trash2 size={20} color={COLORS.DANGER} />}
+                title="Delete Routine"
+                subtitle="Permanently remove this program"
+                danger
+                onPress={() => { closeOptions(); doDelete(); }}
+              />
+            ) : null}
+          </Animated.View>
+        </>
       ) : null}
 
       <ExerciseReorderModal
@@ -380,9 +395,27 @@ export default function RoutineEditorScreen({
         onClose={() => setExercisePickerVisible(false)}
         onSelect={handleAddExerciseFromPicker}
         title="Add Exercise"
-        subtitle="Pick from the library or add a custom exercise."
+        subtitle="Search library or create custom"
       />
     </KeyboardAvoidingView>
+  );
+}
+
+function OptionItem({ icon, title, subtitle, onPress, danger }: any) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.optionItem, pressed && styles.pressed]}
+    >
+      <View style={[styles.optionIcon, danger && styles.optionIconDanger]}>
+        {icon}
+      </View>
+      <View style={styles.optionCopy}>
+        <Text style={[styles.optionTitle, danger && { color: COLORS.DANGER }]}>{title}</Text>
+        <Text style={styles.optionSubtitle}>{subtitle}</Text>
+      </View>
+      <ChevronRight size={16} color={COLORS.TEXT_TERTIARY} />
+    </Pressable>
   );
 }
 
@@ -391,203 +424,235 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BG,
   },
-  header: {
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingTop: UI.HEADER_TOP,
-    paddingBottom: 32,
+  safeArea: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 126,
+  },
+  headerArea: {
+    paddingVertical: 24,
+  },
+  titleRow: {
+    marginBottom: 16,
+  },
+  nameInput: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 28,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    fontWeight: "700",
+    padding: 0,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: withAlpha(COLORS.CARD_BG, 0.5),
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+    marginBottom: 20,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  summaryVal: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 18,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+  },
+  summaryLbl: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    marginTop: 2,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
+  },
+  actionGrid: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 46,
+    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
+  },
+  actionBtnDisabled: {
+    opacity: 0.3,
+  },
+  actionBtnText: {
+    color: COLORS.ACCENT_BLUE,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    fontWeight: "600",
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  exerciseWrap: {
+    marginBottom: 0,
+  },
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+    borderStyle: "dashed",
+    borderRadius: 12,
+  },
+  emptyTitle: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  listFooterSpacer: {
+    height: 40,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.8)",
+  },
+  optionsSheet: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 24,
+    borderRadius: 24,
+    backgroundColor: COLORS.CARD_BG,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
+    padding: 20,
+    paddingBottom: 30,
+  },
+  sheetHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-  },
-  headerTitleGroup: {
-    flex: 1,
-  },
-  headerLabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 2,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 4,
-  },
-  headerTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 34,
-    fontWeight: "900",
-    letterSpacing: -1.5,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: UI.GAP,
-  },
-  metaSection: {
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    marginBottom: 32,
-  },
-  nameInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.CARD_BG,
-    paddingHorizontal: 24,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-    height: 80,
-  },
-  nameInput: {
-    flex: 1,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 24,
-    fontWeight: "900",
-    marginLeft: 16,
-    padding: 0,
-    letterSpacing: -1,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    includeFontPadding: false,
-    textAlignVertical: "center",
-    lineHeight: 32,
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingVertical: 60,
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 32,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: COLORS.BORDER_LIGHT,
-  },
-  emptyIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(11, 130, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: COLORS.ACCENT_BLUE,
-    borderStyle: "solid",
   },
-  emptyText: {
+  sheetTitle: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 8,
     fontFamily: FONT_FAMILIES.MEDIUM,
+    fontWeight: "700",
   },
-  emptySubtext: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 15,
-    textAlign: "center",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  addBtn: {
-    flexDirection: "row",
-    backgroundColor: "rgba(11, 130, 255, 0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.2)",
-    borderStyle: "dashed",
-    borderRadius: 24,
-    paddingVertical: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 8,
-  },
-  addBtnText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  footerActionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
-  footerActionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "rgba(11, 130, 255, 0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.2)",
-    borderStyle: "dashed",
-    borderRadius: 24,
-    paddingVertical: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  footerActionBtnDisabled: {
-    opacity: 0.45,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 24,
-    paddingBottom: Platform.OS === "ios" ? 40 : 32,
-  },
-  modalTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
-    fontWeight: "900",
-    marginBottom: 24,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  optionBtn: {
+  optionItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.02)",
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 12,
+    paddingVertical: 12,
     gap: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
   },
   optionIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
+    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
     justifyContent: "center",
     alignItems: "center",
   },
-  optionLabel: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
+  optionIconDanger: {
+    backgroundColor: withAlpha(COLORS.DANGER, 0.1),
   },
-  optionDesc: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
+  optionCopy: {
+    flex: 1,
+  },
+  optionTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 15,
+    fontFamily: FONT_FAMILIES.MEDIUM,
     fontWeight: "600",
+  },
+  optionSubtitle: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 12,
+    fontFamily: FONT_FAMILIES.MEDIUM,
     marginTop: 2,
   },
-  modalCancelBtn: {
-    marginTop: 12,
-    paddingVertical: 16,
-    alignItems: "center",
+  hudShell: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 24,
   },
-  modalCancelText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 15,
+  hud: {
+    height: 64,
+    backgroundColor: "rgba(20, 20, 20, 0.98)",
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+  },
+  hudPressed: {
+    opacity: 0.8,
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
+    backgroundColor: COLORS.BG,
+  },
+  stickyHud: {
+    position: "absolute",
+    top: UI.HEADER_TOP,
+    left: 12,
+    right: 12,
+    height: 44,
+    backgroundColor: "rgba(20, 20, 20, 0.98)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+  },
+  stickyHudContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  stickyReadout: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
     fontWeight: "700",
   },
-  modalDivider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    marginVertical: 12,
+  stickyMeta: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 12,
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  hudReadout: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  hudReadoutTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    fontWeight: "700",
+  },
+  hudReadoutMeta: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    marginTop: 1,
   },
 });

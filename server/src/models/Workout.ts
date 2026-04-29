@@ -4,6 +4,7 @@ export interface IWorkoutSet {
   id: string;
   weight: number | null;
   reps: number | null;
+  type?: 'working' | 'warmup' | 'dropset';
   durationSeconds?: number | null;
   distance?: number | null;
   completedAt?: string;
@@ -38,6 +39,7 @@ const WorkoutSetSchema = new Schema({
   id: { type: String, required: true },
   weight: { type: Number, default: null },
   reps: { type: Number, default: null },
+  type: { type: String, enum: ['working', 'warmup', 'dropset'], default: 'working' },
   durationSeconds: { type: Number, default: null },
   distance: { type: Number, default: null },
   completedAt: { type: String },

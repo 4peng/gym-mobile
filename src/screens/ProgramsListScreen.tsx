@@ -1,216 +1,80 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
-  FlatList,
   Pressable,
   StyleSheet,
-  LayoutAnimation,
-  ScrollView,
-  Animated,
   RefreshControl,
-  Modal,
-  Platform,
+  ScrollView,
 } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Play, Plus, ChevronRight, Activity, BarChart2, Clock, Settings, Pin, Zap, X } from "lucide-react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  BarChart2,
+  ChevronRight,
+  Clock3,
+  Play,
+  Plus,
+  RotateCcw,
+  Settings2,
+} from "lucide-react-native";
+import ActivityComboChart from "@/components/Home/ActivityComboChart";
 import { useAppRouter } from "@/utils/navigation";
-import { showConfirm } from "@/utils/alerts";
-import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
-import { COLORS } from "@/constants/colors";
+import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
-import { Swipeable } from "@/src/components/Swipeable";
-import { ProgramTile } from "@/src/components/ProgramTile";
-import type { Program } from "@/types";
-
-// ──────────────────────────────────────────────
-// ProgramsListScreen
-// ──────────────────────────────────────────────
+import {
+  buildActivitySummary,
+  formatDurationMinutes,
+  type ActivityPeriodMode,
+} from "@/utils/activitySummary";
 
 export default function ProgramsListScreen() {
-  const allPrograms = useProgramStore((s) => s.programs);
-  const deleteProgram = useProgramStore((s) => s.deleteProgram);
-  const togglePin = useProgramStore((s) => s.togglePin);
+  const router = useAppRouter();
 
-  const isSyncing = useSyncStore((s) => s.isSyncing);
   const isManualSync = useSyncStore((s) => s.isManualSync);
   const runFullSync = useSyncStore((s) => s.runFullSync);
-  
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  const [scrollEnabled, setScrollEnabled] = React.useState(true);
-  const [isExpanded, setIsExpanded] = React.useState(false);
-  const [selectedProgram, setSelectedProgram] = React.useState<Program | null>(null);
-  const animation = useRef(new Animated.Value(0)).current;
-
-  const toggleMenu = useCallback(() => {
-    const toValue = isExpanded ? 0 : 1;
-    Animated.spring(animation, {
-      toValue,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-    setIsExpanded(!isExpanded);
-  }, [isExpanded, animation]);
 
   const activeSession = useWorkoutSessionStore((s) => s.activeSession);
   const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
-  const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
   const allHistory = useWorkoutSessionStore((s) => s.history);
-  const history = useMemo(() => allHistory.filter(s => !s.deletedAt), [allHistory]);
 
-  const programs = useMemo(() => {
-    return [...allPrograms]
-      .filter(p => !p.deletedAt)
-      .sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return 0;
-      });
-  }, [allPrograms]);
+  const [periodMode, setPeriodMode] = useState<ActivityPeriodMode>("week");
 
-  const lastUsedByProgramId = useMemo(() => {
-    const usage = new Map<string, number>();
-
-    history.forEach((session) => {
-      if (!session.programId) return;
-      const ts = session.completedAt
-        ? new Date(session.completedAt).getTime()
-        : new Date(session.startedAt).getTime();
-      const current = usage.get(session.programId) ?? 0;
-      if (ts > current) {
-        usage.set(session.programId, ts);
-      }
-    });
-
-    return usage;
-  }, [history]);
-
-  const sortProgramsByRecentUse = useCallback((items: Program[]) => {
-    return [...items].sort((a, b) => {
-      const aLastUsed = lastUsedByProgramId.get(a._id) ?? 0;
-      const bLastUsed = lastUsedByProgramId.get(b._id) ?? 0;
-      if (aLastUsed !== bLastUsed) return bLastUsed - aLastUsed;
-
-      return b.updatedAt - a.updatedAt;
-    });
-  }, [lastUsedByProgramId]);
-
-  const recentPrograms = useMemo(
-    () => sortProgramsByRecentUse(programs),
-    [programs, sortProgramsByRecentUse]
+  const history = useMemo(
+    () => allHistory.filter((session) => !session.deletedAt),
+    [allHistory]
+  );
+  const summary = useMemo(
+    () => buildActivitySummary(history, periodMode, new Date()),
+    [history, periodMode]
   );
 
-  const router = useAppRouter();
+  const primaryTitle = activeSession ? "Resume" : "Start";
 
-  const todayStr = useMemo(() => {
-    return new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-    }).toUpperCase();
-  }, []);
-
-  const handlePress = useCallback((id: string) => router.push(`/programs/${id}`), [router]);
-
-  const handleStartProgram = useCallback((program: Program) => {
-    if (activeSession) {
-      showConfirm(
-        "Active Workout",
-        "You already have a workout in progress. Discard it and start this one?",
-        () => {
-          startFromProgram(program);
-          router.replace("/workout");
-        }
-      );
-    } else {
-      startFromProgram(program);
-      router.replace("/workout");
-    }
-  }, [activeSession, startFromProgram, router]);
-
-  const handleQuickStartAction = useCallback(() => {
-    if (isExpanded) toggleMenu();
+  const handlePrimaryAction = useCallback(() => {
     if (activeSession) {
       router.replace("/workout");
-    } else {
-      startQuickSession();
-      router.replace("/workout");
+      return;
     }
-  }, [activeSession, startQuickSession, router, isExpanded, toggleMenu]);
 
-  const handleSelectProgramAction = useCallback((program: Program) => {
-    if (isExpanded) toggleMenu();
-    handleStartProgram(program);
-  }, [handleStartProgram, isExpanded, toggleMenu]);
+    startQuickSession();
+    router.replace("/workout");
+  }, [activeSession, router, startQuickSession]);
 
-  const handleDelete = useCallback((id: string, name: string) => {
-    showConfirm(
-      "Delete Program",
-      `Are you sure you want to delete "${name}"? This cannot be undone.`,
-      () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        deleteProgram(id);
-      }
-    );
-  }, [deleteProgram]);
-
-  const handleCreate = useCallback(() => router.push("/programs/create"), [router]);
-
-  const handleOpenOptions = useCallback((program: Program) => {
-    setSelectedProgram(program);
-  }, []);
-
-  const handleCloseOptions = useCallback(() => {
-    setSelectedProgram(null);
-  }, []);
-
-  const handleEditSelected = useCallback(() => {
-    if (!selectedProgram) return;
-    const id = selectedProgram._id;
-    setSelectedProgram(null);
-    router.push(`/programs/${id}`);
-  }, [router, selectedProgram]);
-
-  const handlePin = useCallback((id: string) => {
-    // Only animate the layout specifically when pinning/unpinning
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    togglePin(id);
-  }, [togglePin]);
-
-  const handleTogglePinSelected = useCallback(() => {
-    if (!selectedProgram) return;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    togglePin(selectedProgram._id);
-    setSelectedProgram(null);
-  }, [selectedProgram, togglePin]);
-
-  const handleDeleteSelected = useCallback(() => {
-    if (!selectedProgram) return;
-    const { _id, name } = selectedProgram;
-    setSelectedProgram(null);
-    handleDelete(_id, name);
-  }, [handleDelete, selectedProgram]);
+  const handleCreate = useCallback(() => {
+    router.push("/programs/create");
+  }, [router]);
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-        <Animated.ScrollView 
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <ScrollView
           showsVerticalScrollIndicator={false}
-          style={styles.container}
           contentContainerStyle={styles.scrollContent}
-          scrollEnabled={scrollEnabled}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true }
-          )}
-          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={isManualSync}
@@ -219,244 +83,138 @@ export default function ProgramsListScreen() {
             />
           }
         >
-          {/* Dynamic Header Area */}
-          <View style={styles.header}>
+          <View style={styles.headerRow}>
             <View>
-              <Text style={styles.greeting}>{todayStr}</Text>
-              <Text style={styles.headerTitle}>My Programs</Text>
+              <Text style={styles.headerTitle}>Activities</Text>
+              <Text style={styles.headerRange}>{summary.rangeLabel}</Text>
             </View>
+
             <View style={styles.headerActions}>
-              <Pressable 
-                onPress={() => router.push("/settings")} 
-                style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
+              <Pressable
+                onPress={() => runFullSync(true)}
+                style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressed]}
               >
-                <Settings size={22} color={COLORS.TEXT_TERTIARY} />
+                <RotateCcw size={18} color={COLORS.TEXT_SECONDARY} />
               </Pressable>
-              <Pressable 
-                onPress={handleCreate} 
-                style={({ pressed }) => [UI.SHARED.iconBtn, pressed && { opacity: 0.7 }]}
+
+              <Pressable
+                onPress={() => router.push("/settings")}
+                style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressed]}
               >
-                <Plus size={24} color={COLORS.ACCENT_BLUE} strokeWidth={2.5} />
+                <Settings2 size={18} color={COLORS.TEXT_SECONDARY} />
               </Pressable>
             </View>
           </View>
 
-          {/* Activity Insights Row */}
-          <View style={styles.insightsRow}>
-            <Pressable 
-              onPress={() => router.push("/history")}
-              style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
-            >
-              <View style={[styles.insightIconCircle, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-                <Clock size={20} color={COLORS.ACCENT_BLUE} />
-              </View>
-              <View>
-                <Text style={styles.insightLabel}>History</Text>
-                <Text style={styles.insightSublabel}>{history.length} sessions</Text>
-              </View>
-            </Pressable>
-
-            <Pressable 
-              onPress={() => router.push("/stats")}
-              style={({ pressed }) => [UI.SHARED.card, { flex: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, pressed && styles.insightCardPressed]}
-            >
-              <View style={[styles.insightIconCircle, { backgroundColor: "rgba(16, 217, 75, 0.1)" }]}>
-                <BarChart2 size={20} color={COLORS.ACCENT_GREEN} />
-              </View>
-              <View>
-                <Text style={styles.insightLabel}>Insights</Text>
-                <Text style={styles.insightSublabel}>Volume & PRs</Text>
-              </View>
-            </Pressable>
+          <View style={styles.segmentRow}>
+            {(["week", "month", "year"] as ActivityPeriodMode[]).map((option) => {
+              const active = periodMode === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setPeriodMode(option)}
+                  style={({ pressed }) => [
+                    styles.segmentBtn,
+                    active && styles.segmentBtnActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                    {option[0].toUpperCase() + option.slice(1)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          {/* Active Session Card (If exists) */}
-          {activeSession && (
-            <View style={styles.activeContainer}>
-              <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Active Session</Text>
-              <Pressable
-                style={({ pressed }) => [
-                  UI.SHARED.card,
-                  { paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', borderColor: "rgba(11, 130, 255, 0.2)" },
-                  pressed && { opacity: 0.85 }
-                ]}
-                onPress={() => router.push("/workout")}
-              >
-                <View style={styles.activeIndicator} />
-                <Text style={styles.activeBannerText}>Workout in progress—resume now</Text>
-                <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
-              </Pressable>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeader}>
+              <Text style={styles.summaryLabel}>Duration</Text>
+              <Text style={styles.summaryMeta}>
+                {summary.sessions} session{summary.sessions === 1 ? "" : "s"}
+              </Text>
             </View>
-          )}
 
-          {/* Main List */}
-          <View style={{ paddingHorizontal: UI.LAYOUT_PADDING }}>
-            <Text style={[UI.SHARED.sectionLabel, { marginLeft: 8 }]}>Available Routines</Text>
-            {programs.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Activity size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
-                <Text style={styles.emptyText}>No programs yet.</Text>
-                <Text style={styles.emptySubtext}>Create your first custom workout to get started.</Text>
-              </View>
-            ) : (
-              <View style={{ gap: 0 }}>
-                {programs.map((item) => (
-                  <ProgramTile
-                    key={item._id}
-                    program={item}
-                    onPress={handlePress}
-                    onStart={handleStartProgram}
-                    onDelete={handleDelete}
-                    onPin={handlePin}
-                    onOptions={handleOpenOptions}
-                    onToggleScroll={setScrollEnabled}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-        </Animated.ScrollView>
-      </SafeAreaView>
-
-      {/* Speed Dial Menu Overlay */}
-      {isExpanded && (
-        <Pressable 
-          style={StyleSheet.absoluteFill} 
-          onPress={toggleMenu}
-        >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
-        </Pressable>
-      )}
-
-      <View style={styles.fabContainer}>
-        {/* Sub-buttons (Routines) */}
-        {recentPrograms.slice(0, 3).map((p, i) => {
-          const translateY = animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, -70 * (i + 2)],
-          });
-          const opacity = animation.interpolate({
-            inputRange: [0, 0.5, 1],
-            outputRange: [0, 0, 1],
-          });
-
-          return (
-            <Animated.View
-              key={p._id}
-              style={[
-                styles.subFabWrapper,
-                { transform: [{ translateY }], opacity }
-              ]}
-            >
-              <Text style={styles.subFabLabel}>{p.name}</Text>
-              <Pressable
-                onPress={() => handleSelectProgramAction(p)}
-                style={({ pressed }) => [
-                  styles.subFab,
-                  pressed && { opacity: 0.8 }
-                ]}
-              >
-                <Activity size={20} color={COLORS.ACCENT_BLUE} />
-              </Pressable>
-            </Animated.View>
-          );
-        })}
-
-        {/* Empty Workout Button */}
-        <Animated.View
-          style={[
-            styles.subFabWrapper,
-            {
-              transform: [{
-                translateY: animation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -70],
-                })
-              }],
-              opacity: animation
-            }
-          ]}
-        >
-          <Text style={styles.subFabLabel}>Empty Workout</Text>
-          <Pressable
-            onPress={handleQuickStartAction}
-            style={({ pressed }) => [
-              styles.subFab,
-              { backgroundColor: 'rgba(11, 130, 255, 0.1)', borderColor: 'rgba(11, 130, 255, 0.2)' },
-              pressed && { opacity: 0.8 }
-            ]}
-          >
-            <Zap size={20} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-          </Pressable>
-        </Animated.View>
-
-        {/* Main FAB */}
-        <Pressable 
-          onPress={toggleMenu} 
-          style={({ pressed }) => [
-            styles.fab,
-            pressed && { transform: [{ scale: 0.95 }] }
-          ]}
-        >
-          <Animated.View style={{
-            transform: [{
-              rotate: animation.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0deg', '45deg']
-              })
-            }]
-          }}>
-            {isExpanded ? (
-              <X size={28} color="#FFFFFF" strokeWidth={3} />
-            ) : (
-              <Play size={28} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 4 }} />
-            )}
-          </Animated.View>
-        </Pressable>
-      </View>
-
-      <Modal
-        visible={!!selectedProgram}
-        transparent
-        animationType="fade"
-        onRequestClose={handleCloseOptions}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseOptions} />
-          <View style={styles.optionsSheet}>
-            <Text style={styles.optionsTitle} numberOfLines={1}>
-              {selectedProgram?.name || "Routine"}
+            <Text style={styles.summaryValue}>
+              {formatDurationMinutes(summary.totalMinutes)}
             </Text>
 
-            <Pressable
-              onPress={handleEditSelected}
-              style={({ pressed }) => [styles.optionBtn, pressed && styles.optionBtnPressed]}
-            >
-              <Text style={styles.optionText}>Edit Routine</Text>
-            </Pressable>
+            <ActivityComboChart points={summary.points} width={UI.WIDTH - 68} />
+          </View>
 
+          {activeSession ? (
             <Pressable
-              onPress={handleTogglePinSelected}
-              style={({ pressed }) => [styles.optionBtn, pressed && styles.optionBtnPressed]}
+              onPress={() => router.push("/workout")}
+              style={({ pressed }) => [styles.resumeCard, pressed && styles.pressed]}
             >
-              <Text style={styles.optionText}>
-                {selectedProgram?.pinned ? "Unpin Routine" : "Pin Routine"}
+              <View>
+                <Text style={styles.resumeLabel}>In progress</Text>
+                <Text style={styles.resumeTitle}>Resume workout</Text>
+              </View>
+              <ChevronRight size={18} color={COLORS.ACCENT_BLUE} />
+            </Pressable>
+          ) : null}
+
+          <View style={styles.metricsGrid}>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>Sessions</Text>
+              <Text style={styles.metricValue}>{summary.sessions}</Text>
+              <Text style={styles.metricSubtext}>{periodMode}</Text>
+            </View>
+
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>Average</Text>
+              <Text style={styles.metricValue}>
+                {formatDurationMinutes(summary.averageMinutes)}
               </Text>
+              <Text style={styles.metricSubtext}>per session</Text>
+            </View>
+
+            <Pressable
+              onPress={() => router.push("/history")}
+              style={({ pressed }) => [styles.metricCard, pressed && styles.pressed]}
+            >
+              <Clock3 size={18} color={COLORS.TEXT_SECONDARY} />
+              <Text style={styles.metricActionTitle}>History</Text>
+              <Text style={styles.metricSubtext}>All workouts</Text>
             </Pressable>
 
             <Pressable
-              onPress={handleDeleteSelected}
-              style={({ pressed }) => [styles.optionBtn, pressed && styles.optionBtnPressed]}
+              onPress={() => router.push("/stats")}
+              style={({ pressed }) => [styles.metricCard, pressed && styles.pressed]}
             >
-              <Text style={[styles.optionText, styles.optionTextDanger]}>Delete Routine</Text>
-            </Pressable>
-
-            <Pressable onPress={handleCloseOptions} style={styles.cancelBtn}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <BarChart2 size={18} color={COLORS.TEXT_SECONDARY} />
+              <Text style={styles.metricActionTitle}>Insights</Text>
+              <Text style={styles.metricSubtext}>Exercise stats</Text>
             </Pressable>
           </View>
+        </ScrollView>
+      </SafeAreaView>
+
+      <View style={styles.floatingActionWrap} pointerEvents="box-none">
+        <View style={[UI.SHARED.hudPill, styles.floatingAction]}>
+          <Pressable
+            onPress={handleCreate}
+            style={({ pressed }) => [UI.SHARED.iconBtn, pressed && styles.pressed]}
+          >
+            <Plus size={20} color={COLORS.ACCENT_BLUE} />
+          </Pressable>
+
+          <View style={styles.hudCopy}>
+            <Text style={styles.hudTitle}>
+              {activeSession ? "Resume Workout" : "Quick Workout"}
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={handlePrimaryAction}
+            style={({ pressed }) => [styles.primaryActionBtn, pressed && styles.pressed]}
+          >
+            <Play size={18} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />
+            <Text style={styles.primaryActionText}>{primaryTitle}</Text>
+          </Pressable>
         </View>
-      </Modal>
+      </View>
     </View>
   );
 }
@@ -466,215 +224,211 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BG,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 120, // Space for FAB
+  safeArea: {
+    flex: 1,
   },
-  header: {
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingTop: 16, // Reduced since SafeAreaView handles the top
-    paddingBottom: 24,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 140,
+  },
+  headerRow: {
+    paddingTop: 8,
+    paddingBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  greeting: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 4,
+    alignItems: "flex-start",
   },
   headerTitle: {
     color: COLORS.TEXT_PRIMARY,
-    fontSize: 38,
-    fontWeight: "900",
-    letterSpacing: -2,
+    fontSize: 26,
     fontFamily: FONT_FAMILIES.MEDIUM,
+    marginBottom: 4,
+  },
+  headerRange: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 12,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
   },
   headerActions: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: UI.GAP,
-    marginBottom: 4,
+    gap: 10,
   },
-  insightsRow: {
-    flexDirection: "row",
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    gap: UI.GAP,
-    marginBottom: 32,
-  },
-  insightCardPressed: {
-    backgroundColor: COLORS.CARD_HOVER,
-  },
-  insightIconCircle: {
+  headerIconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  insightLabel: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  insightSublabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 1,
-  },
-  activeContainer: {
-    marginBottom: 32,
-    paddingHorizontal: UI.LAYOUT_PADDING,
-  },
-  activeIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.ACCENT_BLUE,
-    marginRight: 12,
-  },
-  activeBannerText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontWeight: "700",
-    flex: 1,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-    marginTop: 60,
-  },
-  emptyText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
-    fontWeight: "800",
-    marginTop: 20,
-    marginBottom: 8,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  emptySubtext: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 15,
-    textAlign: "center",
-    lineHeight: 22,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  fabContainer: {
-    position: "absolute",
-    bottom: 40,
-    right: 30,
-    alignItems: 'flex-end',
-  },
-  fab: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: COLORS.ACCENT_BLUE,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: COLORS.ACCENT_BLUE,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 10,
-  },
-  subFabWrapper: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    width: 250,
-    right: 0,
-    paddingRight: 8,
-  },
-  subFab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: COLORS.BORDER_LIGHT,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  subFabLabel: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontWeight: '800',
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginRight: 16,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  optionsSheet: {
-    backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-  },
-  optionsTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
-    fontWeight: '800',
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginBottom: 14,
-  },
-  optionBtn: {
-    minHeight: 54,
-    borderRadius: 16,
-    backgroundColor: COLORS.BG,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  optionBtnPressed: {
+  pressed: {
     opacity: 0.84,
   },
-  optionText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontWeight: '700',
-    fontFamily: FONT_FAMILIES.MEDIUM,
+  segmentRow: {
+    flexDirection: "row",
+    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 14,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    marginBottom: 14,
   },
-  optionTextDanger: {
-    color: COLORS.DANGER,
+  segmentBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  cancelBtn: {
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
+  segmentBtnActive: {
+    backgroundColor: COLORS.BORDER,
   },
-  cancelText: {
+  segmentText: {
     color: COLORS.TEXT_TERTIARY,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
     fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  segmentTextActive: {
+    color: COLORS.TEXT_PRIMARY,
+  },
+  summaryCard: {
+    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    padding: 16,
+    marginBottom: 14,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    color: COLORS.TEXT_SECONDARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  summaryMeta: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 12,
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  summaryValue: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 34,
+    fontFamily: FONT_FAMILIES.MONO,
+    marginBottom: 14,
+  },
+  resumeCard: {
+    minHeight: 72,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.ACCENT_BLUE, 0.4),
+    backgroundColor: COLORS.CARD_BG,
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  resumeLabel: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 11,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  resumeTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 18,
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  metricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  metricCard: {
+    width: "48%",
+    minHeight: 128,
+    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    padding: 14,
+    justifyContent: "space-between",
+  },
+  metricLabel: {
+    color: COLORS.TEXT_SECONDARY,
+    fontSize: 13,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  metricValue: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 30,
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  metricActionTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 18,
+    fontFamily: FONT_FAMILIES.MONO,
+    marginTop: 10,
+  },
+  metricSubtext: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 12,
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  floatingActionWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 28,
+    alignItems: "center",
+  },
+  floatingAction: {
+    width: UI.WIDTH - 32,
+    height: 72,
+    paddingHorizontal: 8,
+    gap: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  hudCopy: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+  hudTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 13,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  primaryActionBtn: {
+    minWidth: 96,
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: UI.RADIUS_ITEM,
+    borderWidth: 1,
+    borderColor: COLORS.ACCENT_GREEN,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  primaryActionText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 16,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
   },
 });

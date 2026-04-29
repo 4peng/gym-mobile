@@ -10,24 +10,48 @@ import ExercisePickerModal from "@/components/ExercisePickerModal";
 interface ExercisePickerFieldProps {
   label?: string;
   placeholder?: string;
-  value: string;
+  value?: string;
   selectedDefinitionId?: string;
   onSelect: (exercise: ExerciseDefinition) => void;
+  // External control
+  visible?: boolean;
+  onClose?: () => void;
 }
 
 export default function ExercisePickerField({
   label = "Exercise",
   placeholder = "Select exercise",
-  value,
+  value = "",
   selectedDefinitionId,
   onSelect,
+  visible: externalVisible,
+  onClose: externalOnClose,
 }: ExercisePickerFieldProps) {
-  const [visible, setVisible] = useState(false);
+  const [internalVisible, setInternalVisible] = useState(false);
+
+  const isControlled = externalVisible !== undefined;
+  const isVisible = isControlled ? externalVisible : internalVisible;
+  const hide = () => (isControlled ? externalOnClose?.() : setInternalVisible(false));
+  const show = () => (isControlled ? null : setInternalVisible(true));
+
+  // If used as a headless modal controller, don't render the trigger
+  if (isControlled && !value) {
+    return (
+      <ExercisePickerModal
+        visible={isVisible}
+        onClose={hide}
+        onSelect={onSelect}
+        selectedDefinitionId={selectedDefinitionId}
+      />
+    );
+  }
+
+  const safeValue = value || "";
 
   return (
     <View style={styles.wrapper}>
       <Pressable
-        onPress={() => setVisible(true)}
+        onPress={show}
         style={({ pressed }) => [
           styles.trigger,
           pressed && styles.triggerPressed,
@@ -38,20 +62,20 @@ export default function ExercisePickerField({
           <Text
             style={[
               styles.triggerValue,
-              value.trim().length === 0 && styles.triggerPlaceholder,
+              safeValue.trim().length === 0 && styles.triggerPlaceholder,
               !label && styles.triggerValueCompact,
             ]}
             numberOfLines={1}
           >
-            {value.trim().length > 0 ? toTitleCase(value) : placeholder}
+            {safeValue.trim().length > 0 ? toTitleCase(safeValue) : placeholder}
           </Text>
         </View>
         <ChevronDown size={18} color={COLORS.TEXT_TERTIARY} />
       </Pressable>
 
       <ExercisePickerModal
-        visible={visible}
-        onClose={() => setVisible(false)}
+        visible={isVisible}
+        onClose={hide}
         onSelect={onSelect}
         selectedDefinitionId={selectedDefinitionId}
       />

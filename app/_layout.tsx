@@ -1,21 +1,21 @@
 import 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import * as Font from 'expo-font';
+import { useFonts } from 'expo-font';
 import { View, ActivityIndicator, AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { COLORS } from '@/src/constants/colors';
-import { useState } from 'react';
-import { startNetworkSyncListener } from '@/src/lib/api/networkListener';
-import { initSyncEffect } from '@/src/stores/syncEffect';
+import { COLORS } from '@/constants/colors';
+import { FONT_ASSETS } from '@/constants/fonts';
+import { startNetworkSyncListener } from '@/lib/api/networkListener';
+import { initSyncEffect } from '@/stores/syncEffect';
 import {
   clearAppNotifications,
   configureNotificationHandler,
-} from '@/src/utils/notifications';
+} from '@/utils/notifications';
 
 export default function RootLayout() {
-  const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  // Pulling configuration directly from fonts.ts
+  const [loaded, error] = useFonts(FONT_ASSETS);
 
   useEffect(() => {
     configureNotificationHandler();
@@ -33,34 +33,15 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    // Break circular dependencies by initializing sync listeners here
     const stopSyncEffect = initSyncEffect();
-    
-    // Start the network sync listener on mount and cleanup on unmount
     const unsubscribe = startNetworkSyncListener();
-    
-    async function loadFonts() {
-      try {
-        await Font.loadAsync({
-          'NeueHaasUnicaPro-Medium': require('../assets/fonts/NeueHaasUnicaPro-Medium.ttf'),
-        });
-        setFontsLoaded(true);
-      } catch (e) {
-        console.warn('Font loading failed, falling back to system fonts:', e);
-        setError(e as Error);
-        setFontsLoaded(true);
-      }
-    }
-
-    loadFonts();
-    
     return () => {
       unsubscribe();
       stopSyncEffect();
     };
   }, []);
 
-  if (!fontsLoaded) {
+  if (!loaded && !error) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={{ flex: 1, backgroundColor: COLORS.BG, justifyContent: 'center', alignItems: 'center' }}>

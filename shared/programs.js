@@ -1,4 +1,4 @@
-export const DEFAULT_EXERCISE_SETS = 3;
+export const DEFAULT_EXERCISE_SETS = [{ type: "working" }, { type: "working" }, { type: "working" }];
 export const DEFAULT_EXERCISE_REST_SECONDS = 90;
 export const DEFAULT_WEIGHT_UNIT = "kg";
 export const DEFAULT_TRACKING_MODE = "strength";
@@ -15,6 +15,18 @@ function normalizeWholeNumber(value, fallback, minimum) {
 
   const rounded = Math.round(numeric);
   return rounded < minimum ? minimum : rounded;
+}
+
+function normalizeSets(sets) {
+  if (Array.isArray(sets)) {
+    return sets.map((s) => ({
+      type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working",
+    }));
+  }
+
+  // Backward compatibility: convert number to array of working sets
+  const count = normalizeWholeNumber(sets, 3, 1);
+  return Array.from({ length: count }, () => ({ type: "working" }));
 }
 
 function normalizeMuscles(muscles) {
@@ -50,7 +62,7 @@ export function createEmptyExercise(createId) {
     exerciseDefinitionId: "",
     trackingMode: DEFAULT_TRACKING_MODE,
     name: "",
-    defaultSets: DEFAULT_EXERCISE_SETS,
+    defaultSets: [...DEFAULT_EXERCISE_SETS],
     restSeconds: DEFAULT_EXERCISE_REST_SECONDS,
     notes: "",
     weightUnit: DEFAULT_WEIGHT_UNIT,
@@ -74,7 +86,7 @@ export function normalizeExercise(exercise, createId) {
         : "",
     trackingMode: normalizeTrackingMode(exercise?.trackingMode),
     name: normalizeName(exercise?.name),
-    defaultSets: normalizeWholeNumber(exercise?.defaultSets, DEFAULT_EXERCISE_SETS, 1),
+    defaultSets: normalizeSets(exercise?.defaultSets),
     restSeconds: normalizeWholeNumber(exercise?.restSeconds, DEFAULT_EXERCISE_REST_SECONDS, 0),
     notes: normalizeName(exercise?.notes),
     weightUnit: exercise?.weightUnit === "lbs" ? "lbs" : DEFAULT_WEIGHT_UNIT,

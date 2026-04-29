@@ -1,12 +1,17 @@
 export type WeightUnit = "kg" | "lbs";
 export type ExerciseTrackingMode = "strength" | "timed" | "cardio";
+export type SetType = "working" | "warmup" | "dropset";
+
+export interface ProgramSetTemplate {
+  type: SetType;
+}
 
 export interface RoutineExerciseDraft<TMuscle extends string = string> {
   id: string;
   exerciseDefinitionId: string;
   trackingMode: ExerciseTrackingMode;
   name: string;
-  defaultSets: number;
+  defaultSets: ProgramSetTemplate[];
   restSeconds: number;
   notes: string;
   weightUnit: WeightUnit;
@@ -19,7 +24,7 @@ export interface RoutineDraft<TMuscle extends string = string> {
   exercises: RoutineExerciseDraft<TMuscle>[];
 }
 
-export const DEFAULT_EXERCISE_SETS: 3;
+export const DEFAULT_EXERCISE_SETS: ProgramSetTemplate[];
 export const DEFAULT_EXERCISE_REST_SECONDS: 90;
 export const DEFAULT_WEIGHT_UNIT: "kg";
 export const DEFAULT_TRACKING_MODE: "strength";

@@ -225,194 +225,187 @@ export default function ExercisePickerModal({
     <>
       <Modal
         visible={visible}
-        transparent
+        transparent={false}
         animationType="slide"
         onRequestClose={onClose}
+        presentationStyle="pageSheet"
       >
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-          <View style={styles.container}>
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.title}>{title}</Text>
-                <Text style={styles.subtitle}>{subtitle}</Text>
-              </View>
-              <Pressable onPress={onClose} style={styles.closeBtn}>
-                <Check size={22} color={COLORS.ACCENT_GREEN} />
-              </Pressable>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
-
-            <View style={styles.searchShell}>
-              <Search size={16} color={COLORS.TEXT_TERTIARY} />
-              <TextInput
-                style={styles.searchInput}
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Search exercises..."
-                placeholderTextColor={COLORS.TEXT_TERTIARY}
-                autoFocus
-              />
-            </View>
-
-            {canAddCustomExercise ? (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.customAddBtn,
-                  pressed && styles.customAddBtnPressed,
-                ]}
-                onPress={handleAddCustomExercise}
-              >
-                <Text style={styles.customAddLabel}>Add Custom Exercise</Text>
-                <Text style={styles.customAddValue}>{normalizedSearch}</Text>
-              </Pressable>
-            ) : null}
-
-            <FlatList
-              data={filteredExercises}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              keyboardShouldPersistTaps="handled"
-              scrollEnabled={scrollEnabled}
-              renderItem={({ item }) => {
-                const isSelected = item.id === selectedDefinitionId;
-                const subtitleText =
-                  (item.muscles || []).length > 0
-                    ? item.muscles
-                        .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
-                        .join(" - ")
-                    : item.isCustom
-                      ? "Custom exercise"
-                      : "Uncategorized";
-
-                const content = (
-                  <View
-                    style={[
-                      styles.item,
-                      item.isCustom && styles.itemCustom, // Solid background for swiping
-                      isSelected && styles.itemSelected, // Selection wins background color
-                    ]}
-                  >
-                    <Pressable
-                      onPress={() => handleSelect(item)}
-                      style={styles.itemMain}
-                    >
-                      <View style={styles.itemCopy}>
-                        <Text style={styles.itemTitle}>{item.name}</Text>
-                        <Text style={styles.itemSubtitle}>{subtitleText}</Text>
-                      </View>
-                      {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
-                    </Pressable>
-
-                    {item.isCustom ? (
-                      <Pressable
-                        onPress={() => startRenameCustomExercise(item)}
-                        hitSlop={16}
-                        style={({ pressed }) => [
-                          styles.customBadge,
-                          pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
-                        ]}
-                      >
-                        <Pencil size={14} color={COLORS.ACCENT_GREEN} />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                );
-
-                if (item.isCustom) {
-                  return (
-                    <View style={styles.swipeWrapper}>
-                      <Swipeable
-                        onDelete={() => handleDeleteCustomExercise(item.id)}
-                        onToggleScroll={setScrollEnabled}
-                        borderRadius={18}
-                        marginBottom={0}
-                      >
-                        {content}
-                      </Swipeable>
-                    </View>
-                  );
-                }
-
-                return (
-                  <View style={{ marginHorizontal: 16 }}>
-                    {content}
-                  </View>
-                );
-              }}
-              ListEmptyComponent={
-                !canAddCustomExercise ? (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No exercises found.</Text>
-                  </View>
-                ) : null
-              }
-            />
-
-            <Modal
-              visible={!!renameTarget}
-              transparent
-              animationType="fade"
-              onRequestClose={cancelRenameCustomExercise}
-            >
-              <KeyboardAvoidingView
-                style={styles.renameOverlay}
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-              >
-                <Pressable style={StyleSheet.absoluteFill} onPress={cancelRenameCustomExercise} />
-
-                <View style={styles.renameSheet}>
-                  <Text style={styles.customRenameLabel}>Rename Custom Exercise</Text>
-                  <Text style={styles.renameSheetTitle}>{renameTarget?.name}</Text>
-                  <TextInput
-                    ref={renameInputRef}
-                    style={styles.customRenameInput}
-                    value={renameDraft}
-                    onChangeText={setRenameDraft}
-                    placeholder="Exercise name"
-                    placeholderTextColor={COLORS.TEXT_TERTIARY}
-                    returnKeyType="done"
-                    onSubmitEditing={handleRenameCustomExercise}
-                  />
-                  {renameValidationMessage ? (
-                    <Text style={styles.customRenameHint}>{renameValidationMessage}</Text>
-                  ) : null}
-
-                  <View style={styles.customRenameActions}>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.renameSecondaryBtn,
-                        pressed && styles.renameSecondaryBtnPressed,
-                      ]}
-                      onPress={cancelRenameCustomExercise}
-                    >
-                      <X size={14} color={COLORS.TEXT_SECONDARY} />
-                      <Text style={styles.renameSecondaryText}>Cancel</Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.renamePrimaryBtn,
-                        !canRenameCustomExercise && styles.renamePrimaryBtnDisabled,
-                        pressed && canRenameCustomExercise && styles.renamePrimaryBtnPressed,
-                      ]}
-                      onPress={handleRenameCustomExercise}
-                      disabled={!canRenameCustomExercise}
-                    >
-                      <Pencil size={14} color={COLORS.TEXT_PRIMARY} />
-                      <Text style={styles.renamePrimaryText}>Save Name</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
-            </Modal>
+            <Pressable onPress={onClose} style={styles.closeBtn}>
+              <X size={20} color={COLORS.TEXT_TERTIARY} />
+            </Pressable>
           </View>
-        </KeyboardAvoidingView>
+
+          <View style={styles.searchShell}>
+            <Search size={16} color={COLORS.TEXT_TERTIARY} />
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search exercises..."
+              placeholderTextColor={COLORS.TEXT_TERTIARY}
+              autoFocus
+            />
+          </View>
+
+          {canAddCustomExercise ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.customAddBtn,
+                pressed && styles.customAddBtnPressed,
+              ]}
+              onPress={handleAddCustomExercise}
+            >
+              <Text style={styles.customAddLabel}>Add Custom Exercise</Text>
+              <Text style={styles.customAddValue}>{normalizedSearch}</Text>
+            </Pressable>
+          ) : null}
+
+          <FlatList
+            data={filteredExercises}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={scrollEnabled}
+            renderItem={({ item }) => {
+              const isSelected = item.id === selectedDefinitionId;
+              const subtitleText =
+                (item.muscles || []).length > 0
+                  ? item.muscles
+                      .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
+                      .join(" - ")
+                  : item.isCustom
+                    ? "Custom exercise"
+                    : "Uncategorized";
+
+              const content = (
+                <View
+                  style={[
+                    styles.item,
+                    item.isCustom && styles.itemCustom, // Solid background for swiping
+                    isSelected && styles.itemSelected, // Selection wins background color
+                  ]}
+                >
+                  <Pressable
+                    onPress={() => handleSelect(item)}
+                    style={styles.itemMain}
+                  >
+                    <View style={styles.itemCopy}>
+                      <Text style={styles.itemTitle}>{item.name}</Text>
+                      <Text style={styles.itemSubtitle}>{subtitleText}</Text>
+                    </View>
+                    {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
+                  </Pressable>
+
+                  {item.isCustom ? (
+                    <Pressable
+                      onPress={() => startRenameCustomExercise(item)}
+                      hitSlop={16}
+                      style={({ pressed }) => [
+                        styles.customBadge,
+                        pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
+                      ]}
+                    >
+                      <Pencil size={14} color={COLORS.ACCENT_GREEN} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+
+              if (item.isCustom) {
+                return (
+                  <View style={styles.swipeWrapper}>
+                    <Swipeable
+                      onDelete={() => handleDeleteCustomExercise(item.id)}
+                      onToggleScroll={setScrollEnabled}
+                      borderRadius={18}
+                      marginBottom={0}
+                    >
+                      {content}
+                    </Swipeable>
+                  </View>
+                );
+              }
+
+              return (
+                <View style={{ marginHorizontal: 16 }}>
+                  {content}
+                </View>
+              );
+            }}
+            ListEmptyComponent={
+              !canAddCustomExercise ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No exercises found.</Text>
+                </View>
+              ) : null
+            }
+          />
+
+          <Modal
+            visible={!!renameTarget}
+            transparent
+            animationType="fade"
+            onRequestClose={cancelRenameCustomExercise}
+          >
+            <KeyboardAvoidingView
+              style={styles.renameOverlay}
+              behavior="padding"
+              keyboardVerticalOffset={0}
+            >
+              <Pressable style={StyleSheet.absoluteFill} onPress={cancelRenameCustomExercise} />
+
+              <View style={styles.renameSheet}>
+                <Text style={styles.customRenameLabel}>Rename Custom Exercise</Text>
+                <Text style={styles.renameSheetTitle}>{renameTarget?.name}</Text>
+                <TextInput
+                  ref={renameInputRef}
+                  style={styles.customRenameInput}
+                  value={renameDraft}
+                  onChangeText={setRenameDraft}
+                  placeholder="Exercise name"
+                  placeholderTextColor={COLORS.TEXT_TERTIARY}
+                  returnKeyType="done"
+                  onSubmitEditing={handleRenameCustomExercise}
+                />
+                {renameValidationMessage ? (
+                  <Text style={styles.customRenameHint}>{renameValidationMessage}</Text>
+                ) : null}
+
+                <View style={styles.customRenameActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.renameSecondaryBtn,
+                      pressed && styles.renameSecondaryBtnPressed,
+                    ]}
+                    onPress={cancelRenameCustomExercise}
+                  >
+                    <X size={14} color={COLORS.TEXT_SECONDARY} />
+                    <Text style={styles.renameSecondaryText}>Cancel</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.renamePrimaryBtn,
+                      !canRenameCustomExercise && styles.renamePrimaryBtnDisabled,
+                      pressed && canRenameCustomExercise && styles.renamePrimaryBtnPressed,
+                    ]}
+                    onPress={handleRenameCustomExercise}
+                    disabled={!canRenameCustomExercise}
+                  >
+                    <Pencil size={14} color={COLORS.TEXT_PRIMARY} />
+                    <Text style={styles.renamePrimaryText}>Save Name</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
+        </View>
       </Modal>
     </>
   );
@@ -425,11 +418,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   container: {
+    flex: 1,
     backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    maxHeight: "84%",
-    paddingBottom: Platform.OS === "ios" ? 40 : 20,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    maxHeight: '100%',
+    paddingBottom: 40,
   },
   header: {
     flexDirection: "row",

@@ -2,7 +2,7 @@
 // All ObjectId <-> string conversions live here.
 // No other file should import or mention ObjectId.
 
-import type { Program, WorkoutSession } from "@/types";
+import type { Program, WorkoutSession, ProgramSetTemplate } from "@/types";
 import type { ProgramServer, WorkoutServer } from "./serverTypes";
 import type { MuscleGroup } from "@/constants/muscles";
 import { normalizeTrackingMode } from "@/utils/exerciseTracking";
@@ -19,12 +19,14 @@ export function mapProgramToBackend(program: Program): ProgramServer {
       exerciseDefinitionId: e.exerciseDefinitionId,
       trackingMode: e.trackingMode,
       name: e.name,
-      defaultSets: e.defaultSets,
+      // Server currently expects number (count). We send the length.
+      defaultSets: e.defaultSets.length,
       restSeconds: e.restSeconds,
       notes: e.notes,
       weightUnit: e.weightUnit,
       initialWeight: e.initialWeight,
       muscles: e.muscles,
+      isBodyweight: e.isBodyweight,
     })),
     createdAt: program.createdAt,
     updatedAt: program.updatedAt,
@@ -39,18 +41,33 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
     _id: String(server._id),
     userId: server.userId,
     name: server.name,
-    exercises: server.exercises.map((e) => ({
-      id: e.id,
-      exerciseDefinitionId: e.exerciseDefinitionId,
-      trackingMode: normalizeTrackingMode(e.trackingMode),
-      name: e.name,
-      defaultSets: e.defaultSets,
-      restSeconds: e.restSeconds,
-      notes: e.notes,
-      weightUnit: e.weightUnit as "kg" | "lbs" | undefined,
-      initialWeight: typeof e.initialWeight === "number" ? e.initialWeight : null,
-      muscles: (e.muscles || []) as MuscleGroup[],
-    })),
+    exercises: server.exercises.map((e) => {
+      // Handle server returning either a number or (future) array
+      let defaultSets: ProgramSetTemplate[] = [];
+      if (typeof e.defaultSets === "number") {
+        defaultSets = Array.from({ length: e.defaultSets }, () => ({ type: "working" }));
+      } else if (Array.isArray(e.defaultSets)) {
+        defaultSets = (e.defaultSets as any[]).map(s => ({
+          type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working"
+        }));
+      } else {
+        defaultSets = [{ type: "working" }, { type: "working" }, { type: "working" }];
+      }
+
+      return {
+        id: e.id,
+        exerciseDefinitionId: e.exerciseDefinitionId,
+        trackingMode: normalizeTrackingMode(e.trackingMode),
+        name: e.name,
+        defaultSets,
+        restSeconds: e.restSeconds,
+        notes: e.notes,
+        weightUnit: e.weightUnit as "kg" | "lbs" | undefined,
+        initialWeight: typeof e.initialWeight === "number" ? e.initialWeight : null,
+        muscles: (e.muscles || []) as MuscleGroup[],
+        isBodyweight: e.isBodyweight,
+      };
+    }),
     createdAt: server.createdAt,
     updatedAt: server.updatedAt,
     deletedAt: server.deletedAt,
@@ -80,10 +97,12 @@ export function mapWorkoutToBackend(
       notes: ex.notes,
       weightUnit: ex.weightUnit,
       muscles: ex.muscles,
+      isBodyweight: ex.isBodyweight,
       sets: ex.sets.map((s) => ({
         id: s.id,
         weight: s.weight,
         reps: s.reps,
+        type: s.type,
         durationSeconds: s.durationSeconds,
         distance: s.distance,
         completedAt: s.completedAt,
@@ -115,10 +134,12 @@ export function mapWorkoutFromBackend(
       notes: ex.notes,
       weightUnit: ex.weightUnit as "kg" | "lbs" | undefined,
       muscles: (ex.muscles || []) as MuscleGroup[],
+      isBodyweight: ex.isBodyweight,
       sets: ex.sets.map((s) => ({
         id: s.id,
         weight: s.weight,
         reps: s.reps,
+        type: s.type as "working" | "warmup" | "dropset" | undefined,
         durationSeconds:
           typeof s.durationSeconds === "number" ? s.durationSeconds : null,
         distance: typeof s.distance === "number" ? s.distance : null,

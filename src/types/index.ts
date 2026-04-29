@@ -12,13 +12,19 @@ export interface ExerciseDefinition {
   isCustom?: boolean;
 }
 
+/** A template for a set inside a Program exercise. */
+export interface ProgramSetTemplate {
+  type: "working" | "warmup" | "dropset";
+}
+
 /** A single exercise definition inside a Program template. */
 export interface ProgramExercise {
   id: string;
   exerciseDefinitionId?: string;
   trackingMode: ExerciseTrackingMode;
   name: string;
-  defaultSets: number;
+  /** Array of set templates defining the structure (warmup, working, etc.) */
+  defaultSets: ProgramSetTemplate[];
   restSeconds: number;
   notes: string;
   weightUnit?: "kg" | "lbs";
@@ -44,6 +50,7 @@ export interface WorkoutSet {
   id: string;
   weight: number | null; // null = untouched / placeholder state
   reps: number | null; // null = untouched / placeholder state
+  type?: "working" | "warmup" | "dropset";
   durationSeconds?: number | null;
   distance?: number | null;
   completedAt?: string; // ISO-8601
@@ -76,6 +83,7 @@ export interface WorkoutSession {
   deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
   notes: string;
   exercises: WorkoutExercise[];
+  cumulativeRestSeconds?: number; // Total seconds spent resting
 }
 
 // Backend <-> Client conversion helpers

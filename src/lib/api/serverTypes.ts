@@ -15,6 +15,7 @@ export interface ProgramExerciseServer {
   weightUnit?: string;
   initialWeight?: number | null;
   muscles: string[];
+  isBodyweight?: boolean;
 }
 
 export interface ProgramServer {
@@ -31,6 +32,7 @@ export interface WorkoutSetServer {
   id: string;
   weight: number | null;
   reps: number | null;
+  type?: string;
   durationSeconds?: number | null;
   distance?: number | null;
   completedAt?: string;
@@ -46,6 +48,7 @@ export interface WorkoutExerciseServer {
   sets: WorkoutSetServer[];
   weightUnit?: string;
   muscles: string[];
+  isBodyweight?: boolean;
 }
 
 export interface WorkoutServer {

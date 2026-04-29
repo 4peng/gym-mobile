@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,26 +7,24 @@ import {
   StyleSheet,
   LayoutAnimation,
 } from "react-native";
-import { Trash2, Hash, Clock, Dumbbell } from "lucide-react-native";
-import { COLORS } from "@/constants/colors";
+import { X, Hash, Clock, Dumbbell, StickyNote, Plus, Minus } from "lucide-react-native";
+import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "./RestTimerPicker";
-import ExercisePickerField from "@/components/ExercisePickerField";
-import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelector";
-import ExerciseBodyweightSelector from "./ExerciseBodyweightSelector";
+import ExercisePickerModal from "@/components/ExercisePickerModal";
 import MuscleSelector from "@/src/components/MuscleSelector";
-import { MuscleGroup } from "@/src/constants/muscles";
+import { MuscleGroup, MUSCLE_LABELS } from "@/src/constants/muscles";
 import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
+import { HapticFeedback } from "@/utils/haptics";
 
 export interface ExerciseFormData {
   id: string;
   exerciseDefinitionId?: string;
   trackingMode: ExerciseTrackingMode;
   name: string;
-  defaultSets: number;
+  defaultSets: { type: "working" | "warmup" | "dropset" }[];
   restSeconds: number;
   notes: string;
   weightUnit?: "kg" | "lbs";
@@ -42,58 +40,20 @@ interface ExerciseEditorProps {
   onRemove: (id: string) => void;
 }
 
-function MetricCard({
-  icon,
-  label,
-  value,
-  onPress,
-  accent = COLORS.TEXT_PRIMARY,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  onPress?: () => void;
-  accent?: string;
-}) {
-  const content = (
-    <>
-      <View style={styles.metricLabelRow}>
-        {icon}
-        <Text style={styles.metricLabel}>{label}</Text>
-      </View>
-      <Text style={[styles.metricValue, { color: accent }]}>{value}</Text>
-    </>
-  );
-
-  if (!onPress) {
-    return <View style={styles.metricCard}>{content}</View>;
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.metricCard, pressed && styles.metricCardPressed]}
-    >
-      {content}
-    </Pressable>
-  );
-}
-
 const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
   exercise,
   index,
   onUpdate,
   onRemove,
 }) {
+  const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [defaultSetsText, setDefaultSetsText] = useState(String(exercise.defaultSets));
+  const [musclePickerVisible, setMusclePickerVisible] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  
   const updateCustomExerciseMuscles = useExerciseLibraryStore(
     (state) => state.updateCustomExerciseMuscles
   );
-
-  useEffect(() => {
-    setDefaultSetsText(String(exercise.defaultSets));
-  }, [exercise.defaultSets, exercise.id]);
 
   const handleExerciseSelect = useCallback(
     (selectedExercise: ExerciseDefinition) => {
@@ -102,32 +62,43 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
         name: selectedExercise.name,
         muscles: selectedExercise.muscles,
       });
+      setExercisePickerVisible(false);
     },
     [exercise.id, onUpdate]
   );
 
-  const handleDefaultSetsChange = useCallback(
-    (text: string) => {
-      if (!/^\d*$/.test(text)) {
-        return;
-      }
+  const toggleSetType = useCallback((setIndex: number) => {
+    HapticFeedback.selection();
+    const nextSets = [...exercise.defaultSets];
+    const current = nextSets[setIndex].type;
+    const nextType = current === "working" ? "warmup" : current === "warmup" ? "dropset" : "working";
+    nextSets[setIndex] = { type: nextType };
+    onUpdate(exercise.id, { defaultSets: nextSets });
+  }, [exercise.defaultSets, exercise.id, onUpdate]);
 
-      setDefaultSetsText(text);
+  const handleLongPress = useCallback(() => {
+    HapticFeedback.selection();
+    setShowLegend(true);
+  }, []);
 
-      const val = parseInt(text, 10);
-      if (!isNaN(val) && val >= 1) {
-        onUpdate(exercise.id, { defaultSets: val });
-      }
-    },
-    [exercise.id, onUpdate]
-  );
+  const handlePressOut = useCallback(() => {
+    setShowLegend(false);
+  }, []);
 
-  const commitDefaultSets = useCallback(() => {
-    const val = parseInt(defaultSetsText, 10);
-    const normalized = !isNaN(val) && val >= 1 ? val : 1;
-    setDefaultSetsText(String(normalized));
-    onUpdate(exercise.id, { defaultSets: normalized });
-  }, [defaultSetsText, exercise.id, onUpdate]);
+  const addSet = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    onUpdate(exercise.id, {
+      defaultSets: [...exercise.defaultSets, { type: "working" }]
+    });
+  }, [exercise.defaultSets, exercise.id, onUpdate]);
+
+  const removeSet = useCallback(() => {
+    if (exercise.defaultSets.length <= 1) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    onUpdate(exercise.id, {
+      defaultSets: exercise.defaultSets.slice(0, -1)
+    });
+  }, [exercise.defaultSets, exercise.id, onUpdate]);
 
   const handleRestSave = useCallback(
     (seconds: number) => {
@@ -150,13 +121,6 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     [exercise.id, onUpdate]
   );
 
-  const handleTrackingModeChange = useCallback(
-    (trackingMode: ExerciseTrackingMode) => {
-      onUpdate(exercise.id, { trackingMode });
-    },
-    [exercise.id, onUpdate]
-  );
-
   const handleMusclesChange = useCallback(
     (muscles: MuscleGroup[]) => {
       onUpdate(exercise.id, { muscles });
@@ -175,103 +139,140 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     onRemove(exercise.id);
   }, [exercise.id, onRemove]);
 
+  const muscleString = (exercise.muscles && exercise.muscles.length > 0
+    ? exercise.muscles.map(m => MUSCLE_LABELS[m as MuscleGroup] || m).join(" • ")
+    : "General").toUpperCase();
+
   return (
-    <View style={UI.SHARED.card}>
+    <View style={styles.shell}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.indexBadge}>
-            <Text style={styles.indexLabel}>{String(index + 1).padStart(2, "0")}</Text>
-          </View>
-          <Text style={styles.headerTitle}>Exercise Setup</Text>
+        <View style={styles.indexCircle}>
+          <Text style={styles.indexText}>{index + 1}</Text>
         </View>
-        <Pressable
-          onPress={handleRemove}
-          hitSlop={12}
-          style={({ pressed }) => [styles.removeBtn, pressed && styles.removeBtnPressed]}
-        >
-          <Trash2 size={18} color={COLORS.DANGER} />
+        <View style={styles.nameContainer}>
+          <Pressable onPress={() => setExercisePickerVisible(true)}>
+            <Text style={styles.exerciseNameText}>{exercise.name || "Select Exercise"}</Text>
+          </Pressable>
+          <Pressable onPress={() => setMusclePickerVisible(true)}>
+            <Text style={styles.muscleText} numberOfLines={1}>{muscleString}</Text>
+          </Pressable>
+        </View>
+        <Pressable onPress={handleRemove} style={styles.removeBtn} hitSlop={12}>
+          <X size={18} color={COLORS.DANGER} />
         </Pressable>
       </View>
 
-      <ExercisePickerField
-        value={exercise.name}
-        selectedDefinitionId={exercise.exerciseDefinitionId}
+      <View style={styles.content}>
+        {/* Sets Configuration */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.labelGroup}>
+              <Hash size={12} color={COLORS.TEXT_TERTIARY} />
+              <Text style={styles.sectionLabel}>SETS</Text>
+            </View>
+            <View style={styles.stepper}>
+              <Pressable onPress={removeSet} style={styles.stepBtn}>
+                <Minus size={14} color={COLORS.TEXT_PRIMARY} />
+              </Pressable>
+              <Text style={styles.stepCount}>{exercise.defaultSets.length}</Text>
+              <Pressable onPress={addSet} style={styles.stepBtn}>
+                <Plus size={14} color={COLORS.TEXT_PRIMARY} />
+              </Pressable>
+            </View>
+          </View>
+          
+          <View style={styles.setStrip}>
+            {exercise.defaultSets.map((set, i) => {
+              const isWarmup = set.type === "warmup";
+              const isDropset = set.type === "dropset";
+              const color = isWarmup ? COLORS.ACCENT_YELLOW : isDropset ? COLORS.ACCENT_GREEN : COLORS.ACCENT_BLUE;
+              // U = Warm-up, W = Working, D = Dropset
+              const initial = isWarmup ? "U" : isDropset ? "D" : "W";
+              
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => toggleSetType(i)}
+                  onLongPress={handleLongPress}
+                  onPressOut={handlePressOut}
+                  delayLongPress={300}
+                  style={[styles.setNode, { backgroundColor: withAlpha(color, 0.1), borderColor: withAlpha(color, 0.4) }]}
+                >
+                  <Text style={[styles.setNodeText, { color }]}>{initial}</Text>
+                </Pressable>
+              );
+            })}
+
+            {showLegend && (
+              <View style={styles.legendPopup}>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_YELLOW }]} /><Text style={styles.legendText}>WARMUP</Text></View>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_BLUE }]} /><Text style={styles.legendText}>WORKING</Text></View>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_GREEN }]} /><Text style={styles.legendText}>DROPSET</Text></View>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Row 2: Rest & Unit & BW */}
+        <View style={styles.gridRow}>
+          <Pressable onPress={() => setPickerVisible(true)} style={styles.gridCell}>
+            <View style={styles.labelGroup}>
+              <Clock size={12} color={COLORS.TEXT_TERTIARY} />
+              <Text style={styles.sectionLabel}>REST</Text>
+            </View>
+            <Text style={styles.cellValue}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
+          </Pressable>
+
+          <Pressable onPress={handleToggleBodyweight} style={styles.gridCell}>
+            <View style={styles.labelGroup}>
+              <Text style={styles.sectionLabel}>BW</Text>
+            </View>
+            <Text style={[styles.cellValue, { color: exercise.isBodyweight ? COLORS.ACCENT_GREEN : COLORS.TEXT_TERTIARY }]}>
+              {exercise.isBodyweight ? "ON" : "OFF"}
+            </Text>
+          </Pressable>
+
+          {!exercise.isBodyweight && (
+            <Pressable onPress={handleToggleUnit} style={styles.gridCell}>
+              <View style={styles.labelGroup}>
+                <Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />
+                <Text style={styles.sectionLabel}>UNIT</Text>
+              </View>
+              <Text style={[styles.cellValue, { color: COLORS.ACCENT_BLUE }]}>{exercise.weightUnit || "kg"}</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Row 3: Notes */}
+        <View style={styles.notesSection}>
+          <View style={styles.labelGroup}>
+            <StickyNote size={12} color={COLORS.TEXT_TERTIARY} />
+            <Text style={styles.sectionLabel}>NOTES</Text>
+          </View>
+          <TextInput
+            style={styles.notesInput}
+            value={exercise.notes}
+            onChangeText={handleNotesChange}
+            placeholder="Execution cues, setup, etc."
+            placeholderTextColor={withAlpha(COLORS.TEXT_TERTIARY, 0.4)}
+            multiline
+          />
+        </View>
+      </View>
+
+      <ExercisePickerModal
+        visible={exercisePickerVisible}
+        onClose={() => setExercisePickerVisible(false)}
         onSelect={handleExerciseSelect}
+        title="Select Exercise"
       />
 
-      <View style={styles.panel}>
-        <Text style={styles.panelLabel}>Tracking Format</Text>
-        <ExerciseTrackingModeSelector
-          value={exercise.trackingMode}
-          onChange={handleTrackingModeChange}
-        />
-      </View>
-
-      <View style={styles.metricsRow}>
-        <View style={styles.metricFlex}>
-          <View style={styles.metricCard}>
-            <View style={styles.metricLabelRow}>
-              <Hash size={12} color={COLORS.TEXT_TERTIARY} />
-              <Text style={styles.metricLabel}>Sets</Text>
-            </View>
-            <TextInput
-              style={styles.metricInput}
-              keyboardType="number-pad"
-              value={defaultSetsText}
-              onChangeText={handleDefaultSetsChange}
-              onBlur={commitDefaultSets}
-              onEndEditing={commitDefaultSets}
-            />
-          </View>
-        </View>
-
-        <View style={styles.metricFlex}>
-          <MetricCard
-            icon={<Clock size={12} color={COLORS.TEXT_TERTIARY} />}
-            label="Rest"
-            value={formatSecondsToMMSS(exercise.restSeconds)}
-            onPress={() => setPickerVisible(true)}
-          />
-        </View>
-
-        {exercise.trackingMode === "strength" ? (
-          <View style={styles.metricFlex}>
-            <MetricCard
-              icon={<Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />}
-              label="Unit"
-              value={exercise.weightUnit || "kg"}
-              onPress={handleToggleUnit}
-              accent={COLORS.ACCENT_BLUE}
-            />
-          </View>
-        ) : null}
-      </View>
-
-      {exercise.trackingMode === "strength" ? (
-        <View style={{ marginTop: 12 }}>
-          <ExerciseBodyweightSelector
-            isBodyweight={!!exercise.isBodyweight}
-            onToggle={handleToggleBodyweight}
-          />
-        </View>
-      ) : null}
-
-      <View style={styles.notesBlock}>
-        <Text style={styles.panelLabel}>Notes</Text>
-        <TextInput
-          style={styles.notesInput}
-          value={exercise.notes}
-          onChangeText={handleNotesChange}
-          placeholder="Execution cues, machine setup, pacing..."
-          placeholderTextColor={COLORS.TEXT_TERTIARY}
-          multiline
-          numberOfLines={3}
-        />
-      </View>
-
-      <View style={styles.muscleSection}>
-        <MuscleSelector selectedMuscles={exercise.muscles || []} onSelect={handleMusclesChange} />
-      </View>
+      <MuscleSelector
+        visible={musclePickerVisible}
+        onClose={() => setMusclePickerVisible(false)}
+        selectedMuscles={exercise.muscles || []}
+        onSelect={handleMusclesChange}
+      />
 
       <RestTimerPicker
         visible={pickerVisible}
@@ -286,141 +287,177 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
 export default ExerciseEditor;
 
 const styles = StyleSheet.create({
+  shell: {
+    backgroundColor: COLORS.CARD_BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
+    marginBottom: 16,
+    overflow: "hidden",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 18,
+    padding: 16,
+    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.03),
+    borderBottomWidth: 1,
+    borderBottomColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  headerTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 17,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    letterSpacing: -0.3,
-  },
-  indexBadge: {
-    backgroundColor: "rgba(11, 130, 255, 0.12)",
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+  indexCircle: {
+    width: 28,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: withAlpha(COLORS.ACCENT_BLUE, 0.1),
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.2)",
+    marginRight: 12,
   },
-  indexLabel: {
+  indexText: {
     color: COLORS.ACCENT_BLUE,
-    fontSize: 12,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MONO,
     fontWeight: "900",
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  exerciseNameText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: COLORS.TEXT_PRIMARY,
     fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  muscleText: {
+    color: "#FF4500",
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 2,
+    fontFamily: FONT_FAMILIES.MONO,
   },
   removeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: "rgba(239, 68, 68, 0.06)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.12)",
+    padding: 8,
   },
-  removeBtnPressed: {
-    backgroundColor: "rgba(239, 68, 68, 0.14)",
-  },
-  panel: {
-    marginTop: 18,
+  content: {
     padding: 16,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
   },
-  panelLabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 10,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    fontFamily: FONT_FAMILIES.MEDIUM,
+  section: {
+    marginBottom: 20,
   },
-  metricsRow: {
+  sectionHeader: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
-    flexWrap: "wrap",
-  },
-  metricFlex: {
-    flex: 1,
-    minWidth: 0,
-  },
-  metricCard: {
-    minHeight: 82,
-    borderRadius: 20,
-    backgroundColor: COLORS.BG,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
   },
-  metricCardPressed: {
-    opacity: 0.82,
-  },
-  metricLabelRow: {
+  labelGroup: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  metricLabel: {
+  sectionLabel: {
     color: COLORS.TEXT_TERTIARY,
     fontSize: 10,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontFamily: FONT_FAMILIES.MEDIUM,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+    letterSpacing: 1,
   },
-  metricValue: {
-    fontSize: 20,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    textTransform: "uppercase",
-    letterSpacing: -0.4,
-    marginTop: 10,
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+    borderRadius: 8,
+    paddingHorizontal: 4,
   },
-  metricInput: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    textAlign: "left",
-    padding: 0,
-    marginTop: 10,
+  stepBtn: {
+    padding: 8,
   },
-  notesBlock: {
-    marginTop: 18,
-  },
-  notesInput: {
-    backgroundColor: COLORS.BG,
+  stepCount: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 15,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: UI.RADIUS_INPUT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-    textAlignVertical: "top",
-    minHeight: 96,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    lineHeight: 22,
-    marginTop: 10,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+    minWidth: 20,
+    textAlign: "center",
   },
-  muscleSection: {
-    marginTop: 22,
+  setStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    position: "relative",
+  },
+  setNode: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  setNodeText: {
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "900",
+  },
+  legendPopup: {
+    position: "absolute",
+    left: 0,
+    top: -44,
+    backgroundColor: "rgba(18, 18, 18, 0.98)",
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    zIndex: 1000,
+    gap: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 9,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "900",
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  gridCell: {
+    flex: 1,
+    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.03),
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+  },
+  cellValue: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 16,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+    marginTop: 6,
+  },
+  notesSection: {
+    marginBottom: 4,
+  },
+  notesInput: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 13,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    paddingTop: 10,
+    paddingBottom: 4,
+    minHeight: 40,
   },
 });
