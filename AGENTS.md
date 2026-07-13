@@ -58,7 +58,7 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 - `syncStore.ts`, `syncEffect.ts`: sync actions and triggers
 
 ## Persistence & Sync
-- `zustandAsyncStorage` (MMKV) for persisted stores
+- `zustandAsyncStorage` (AsyncStorage adapter in `src/storage/mmkv.ts`) for persisted stores
 - Workouts sharded in `workoutStorage.ts`, recent in `workoutSessionStore`
 - `src/lib/api/sync.ts`: offline-first sync (push dirty → fetch deltas → merge via `updatedAt` → respect `deletedAt`)
 - `networkListener.ts` triggers sync on reconnect
@@ -98,7 +98,7 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 - **JSX Sanitization**: Minified JSX for HUDs; wrap dynamic strings in `<Text>`
 - **Native Modal Prohibition**: Use absolute `View` + `Animated.timing` (180ms, `useNativeDriver`)
 - **Backend Set Types**: `enum: ['working', 'warmup', 'dropset']`
-- **Session Continuity**: Persist `activeExerciseId` in MMKV
+- **Session Continuity**: Persist `activeExerciseId` via the persisted store (AsyncStorage)
 
 ## Testing Guidelines
 - No automated tests; rely on type checks + manual QA

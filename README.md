@@ -7,7 +7,7 @@ This repository contains a high-performance "Technical Noir" mobile workout trac
 ## 1. Technical Specification (The Gold Standard)
 
 ### 1.1 Data & Logic Layer
-*   **State Management**: Zustand with MMKV-backed persistence for synchronous, low-latency state access.
+*   **State Management**: Zustand with AsyncStorage-backed persistence (async).
 *   **Stability Rule**: All store selectors must return **stable primitives** (strings, numbers, booleans) or arrays of primitives wrapped in `useShallow`. Never generate new objects `{...}` inside a selector to prevent recursive render loops.
 *   **Conflict Resolution**: Uses `updatedAt` timestamps for last-write-wins merging and `deletedAt` tombstones for soft deletions during offline-first synchronization.
 

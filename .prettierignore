@@ -1,0 +1,12 @@
+node_modules
+dist
+.expo
+.expo-export-check
+web
+server/dist
+server/node_modules
+reference
+assets
+package-lock.json
+pnpm-lock.yaml
+*.md

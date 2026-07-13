@@ -1,14 +1,48 @@
-# v0 runtime files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-
-# Common ignores
+# dependencies
 node_modules/
-.next/
-.env*.local
-.DS_Store
-*.env
-*.log
+
+# Expo
+.expo/
+.expo-shared/
+.expo-export-check/
 dist/
+web-build/
+expo-env.d.ts
+
+# Native builds
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+ios/
+android/
+
+# Metro
+.metro-health-check*
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Environment
+.env
+.env*.local
+*.env
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Build / caches
 build/
+.DS_Store
+
+# Editor
+.idea/
+
+# Alternate package managers (this project uses npm / package-lock.json)
+pnpm-lock.yaml
+yarn.lock

@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { LayoutAnimation, StyleSheet, Text, TextInput, View, InteractionManager, Animated, ScrollView, Alert, Pressable } from "react-native";
 import { Dumbbell, Plus, Check, X } from "lucide-react-native";

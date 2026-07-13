@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useAppParams, useAppRouter } from "@/utils/navigation";

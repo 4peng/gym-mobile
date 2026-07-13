@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "expo start",
     "ios": "expo start --ios",
-    "routine-web": "powershell -ExecutionPolicy Bypass -File ./Start-RoutineLab.ps1"
+    "routine-web": "powershell -ExecutionPolicy Bypass -File ./Start-RoutineLab.ps1",
+    "typecheck": "tsc --noEmit --pretty false --incremental false",
+    "lint": "eslint .",
+    "format": "prettier --write \"{src,app,shared}/**/*.{ts,tsx,js}\"",
+    "format:check": "prettier --check \"{src,app,shared}/**/*.{ts,tsx,js}\""
   },
   "dependencies": {
     "@expo/ui": "~55.0.12",
@@ -41,6 +45,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~10.0.0",
+    "prettier": "^3.3.0",
     "typescript": "^5.9.2"
   }
 }

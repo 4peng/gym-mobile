@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useMemo, useCallback, useEffect } from "react";
 import {
   View,

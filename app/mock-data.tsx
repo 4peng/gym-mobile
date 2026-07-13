@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useWorkoutSessionStore } from '@/src/stores/workoutSessionStore';
