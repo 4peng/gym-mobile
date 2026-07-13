@@ -58,7 +58,7 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({ set, index, plac
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", minHeight: 44, backgroundColor: COLORS.BG, paddingHorizontal: 4 },
-  rowCompleted: { backgroundColor: COLORS.ACCENT_GREEN_DEEP, borderRadius: 8 },
+  rowCompleted: { backgroundColor: COLORS.ACCENT_GREEN_DEEP, borderRadius: UI.RADIUS_ITEM },
   indexCell: { width: 32, alignItems: "center", justifyContent: "center" },
   indexText: { color: COLORS.TEXT_TERTIARY, fontSize: 13, fontFamily: FONT_FAMILIES.MONO, fontWeight: "800" },
   inputsWrapper: { flex: 1, flexDirection: "row", justifyContent: "center", gap: 12 },
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   checkPlaceholder: { width: 14, height: 14 },
   removeButton: { padding: 4 },
   actionPressed: { opacity: 0.7 },
-  legendPopup: { position: "absolute", left: 40, top: -40, backgroundColor: "rgba(18, 18, 18, 0.95)", padding: 10, borderRadius: 12, borderWidth: 1, borderColor: COLORS.BORDER, zIndex: 1000, gap: 6, flexDirection: "row", alignItems: "center" },
+  legendPopup: { position: "absolute", left: 40, top: -40, backgroundColor: "rgba(18, 18, 18, 0.95)", padding: 10, borderRadius: UI.RADIUS_ITEM, borderWidth: 1, borderColor: COLORS.BORDER, zIndex: 1000, gap: 6, flexDirection: "row", alignItems: "center" },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { color: COLORS.TEXT_PRIMARY, fontSize: 9, fontFamily: FONT_FAMILIES.MONO, fontWeight: "900" },

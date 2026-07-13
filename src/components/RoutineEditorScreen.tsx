@@ -67,31 +67,7 @@ export default function RoutineEditorScreen({
   const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
 
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef(null);
-  const CONDENSE_THRESHOLD = 60;
   const optionsAnimation = useRef(new Animated.Value(0)).current;
-
-  const stickyHudOpacity = scrollY.interpolate({
-    inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-  const stickyHudTranslateY = scrollY.interpolate({
-    inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
-    outputRange: [-20, 0],
-    extrapolate: 'clamp',
-  });
-
-  const renderStickyHeader = () => (
-    <Animated.View style={[styles.stickyHud, { opacity: stickyHudOpacity, transform: [{ translateY: stickyHudTranslateY }] }]}>
-      <View style={styles.stickyHudContent}>
-        <Text style={styles.stickyReadout}>{isCreateLike ? "New Routine" : "Edit Routine"}</Text>
-        <Text style={styles.stickyMeta}>{hasChanges ? "Unsaved" : "Saved"}</Text>
-      </View>
-    </Animated.View>
-  );
 
   const isCreateLike = mode === "create" || mode === "duplicate";
 
@@ -219,27 +195,12 @@ export default function RoutineEditorScreen({
     outputRange: [0, 1],
   });
 
-  const renderExercise = useCallback(
-    ({ item, index }: { item: ExerciseFormData; index: number }) => (
-      <View style={styles.exerciseWrap}>
-        <ExerciseEditor
-          exercise={item}
-          index={index}
-          onUpdate={handleUpdateExercise}
-          onRemove={handleRemoveExercise}
-        />
-      </View>
-    ),
-    [handleRemoveExercise, handleUpdateExercise]
-  );
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-        {renderStickyHeader()}
         <View style={styles.topBar}>
           <Pressable onPress={handleCancel} style={({ pressed }) => [UI.SHARED.dangerBtn, pressed && styles.hudPressed]}>
             <X size={20} color={COLORS.DANGER} strokeWidth={2.8} />
@@ -256,16 +217,10 @@ export default function RoutineEditorScreen({
         </View>
 
 <AnimatedScrollView
-          ref={flatListRef}
           style={{ flex: 1 }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true }
-          )}
-          scrollEventThrottle={16}
         >
           <View style={styles.headerArea}>
             <View style={styles.titleRow}>
@@ -315,7 +270,7 @@ export default function RoutineEditorScreen({
             </View>
           </View>
           {exercises.map((item, index) => (
-            <View style={styles.exerciseWrap}>
+            <View key={item.id} style={styles.exerciseWrap}>
               <ExerciseEditor
                 exercise={item}
                 index={index}
@@ -449,7 +404,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: withAlpha(COLORS.CARD_BG, 0.5),
     padding: 12,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
     marginBottom: 20,
@@ -487,7 +442,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 46,
     backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
   },
@@ -512,7 +467,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
     borderStyle: "dashed",
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
   },
   emptyTitle: {
     color: COLORS.TEXT_TERTIARY,
@@ -531,7 +486,7 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 24,
-    borderRadius: 24,
+    borderRadius: UI.RADIUS_HUD,
     backgroundColor: COLORS.CARD_BG,
     borderWidth: 1,
     borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
@@ -559,7 +514,7 @@ const styles = StyleSheet.create({
   optionIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
     justifyContent: "center",
     alignItems: "center",
@@ -582,21 +537,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
     marginTop: 2,
   },
-  hudShell: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 24,
-  },
-  hud: {
-    height: 64,
-    backgroundColor: "rgba(20, 20, 20, 0.98)",
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-  },
   hudPressed: {
     opacity: 0.8,
   },
@@ -608,36 +548,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
     backgroundColor: COLORS.BG,
-  },
-  stickyHud: {
-    position: "absolute",
-    top: UI.HEADER_TOP,
-    left: 12,
-    right: 12,
-    height: 44,
-    backgroundColor: "rgba(20, 20, 20, 0.98)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 100,
-  },
-  stickyHudContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  stickyReadout: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    fontWeight: "700",
-  },
-  stickyMeta: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MONO,
   },
   hudReadout: {
     flex: 1,

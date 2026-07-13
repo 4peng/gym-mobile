@@ -41,23 +41,6 @@ export const useSessionProgress = () =>
     };
   }));
 
-/** Returns total session-wide volume (weight * reps) */
-export const useSessionVolume = () =>
-  useWorkoutSessionStore(useShallow((s) => {
-    if (!s.activeSession) return 0;
-    let totalVolume = 0;
-    for (const ex of s.activeSession.exercises) {
-      if (ex.trackingMode === 'strength') {
-        for (const st of ex.sets) {
-          if (st.completedAt && st.weight && st.reps) {
-            totalVolume += st.weight * st.reps;
-          }
-        }
-      }
-    }
-    return totalVolume;
-  }));
-
 // --- Session Actions ---
 
 export const useStartQuickSession = () =>

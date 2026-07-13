@@ -10,6 +10,7 @@ import {
 import { X, Hash, Clock, Dumbbell, StickyNote, Plus, Minus } from "lucide-react-native";
 import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "./RestTimerPicker";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
@@ -289,7 +290,7 @@ export default ExerciseEditor;
 const styles = StyleSheet.create({
   shell: {
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     borderWidth: 1,
     borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
     marginBottom: 16,
@@ -366,7 +367,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
-    borderRadius: 8,
+    borderRadius: UI.RADIUS_ITEM,
     paddingHorizontal: 4,
   },
   stepBtn: {
@@ -389,7 +390,7 @@ const styles = StyleSheet.create({
   setNode: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1.5,
     justifyContent: "center",
     alignItems: "center",
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     top: -44,
     backgroundColor: "rgba(18, 18, 18, 0.98)",
     padding: 10,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     zIndex: 1000,
@@ -438,7 +439,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.03),
     padding: 12,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
   },

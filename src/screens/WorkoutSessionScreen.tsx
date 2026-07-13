@@ -6,7 +6,7 @@ import { Dumbbell, Plus } from "lucide-react-native";
 import { GestureHandlerRootView, GestureDetector, Gesture, Directions } from "react-native-gesture-handler";
 import { useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
-import { useAddExercise, useClearExpiredTimer, useCompleteSession, useDiscardSession, useSessionExerciseIds, useSessionExerciseNames, useSessionExerciseProgress, useSessionProgress, useSessionVolume } from "@/stores/activeSessionStore";
+import { useAddExercise, useClearExpiredTimer, useCompleteSession, useDiscardSession, useSessionExerciseIds, useSessionExerciseNames, useSessionExerciseProgress, useSessionProgress } from "@/stores/activeSessionStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
 import { COLORS } from "@/constants/colors";
@@ -15,7 +15,9 @@ import { HapticFeedback } from "@/utils/haptics";
 import { ExerciseCard } from "@/components/Workout/ExerciseCard";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
 import ExerciseNavMenu from "@/components/Workout/ExerciseNavMenu";
+import MuscleSelector from "@/components/MuscleSelector";
 import type { ExerciseDefinition } from "@/types";
+import { MuscleGroup } from "@/constants/muscles";
 
 // Modular HUD Components
 import { HUDHeader } from "@/components/Workout/HUD/HUDHeader";
@@ -31,12 +33,12 @@ export default function WorkoutSessionScreen() {
   const startedAt = useWorkoutSessionStore((s) => s.activeSession?.startedAt);
   const activeExerciseId = useWorkoutSessionStore((s) => s.activeExerciseId);
   const setActiveExerciseId = useWorkoutSessionStore((s) => s.setActiveExerciseId);
+  const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
   
   const exerciseIds = useSessionExerciseIds();
   const exerciseNames = useSessionExerciseNames();
   const exerciseProgress = useSessionExerciseProgress();
   const progressData = useSessionProgress();
-  const totalVolume = useSessionVolume();
 
   const addExercise = useAddExercise();
   const completeSession = useCompleteSession();
@@ -44,10 +46,11 @@ export default function WorkoutSessionScreen() {
   const clearExpiredTimer = useClearExpiredTimer();
   const addProgram = useProgramStore((s) => s.addProgram);
 
-  const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
-  const [navigationMenuVisible, setNavigationMenuVisible] = useState(false);
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const [scrubbingIndex, setScrubbingIndex] = useState<number | null>(null);
+const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
+const [navigationMenuVisible, setNavigationMenuVisible] = useState(false);
+const [isScrubbing, setIsScrubbing] = useState(false);
+const [scrubbingIndex, setScrubbingIndex] = useState<number | null>(null);
+const [musclePicker, setMusclePicker] = useState<{ visible: boolean; exerciseId: string | null }>({ visible: false, exerciseId: null });
 
   const scrubberScrollRef = useRef<ScrollView>(null);
   const isFirstScrubRender = useRef(true);
@@ -67,6 +70,22 @@ export default function WorkoutSessionScreen() {
     }
     if (!isScrubbing) isFirstScrubRender.current = true;
   }, [isScrubbing, scrubbingIndex]);
+
+  // Muscle picker handlers
+  const handleMusclePickerOpen = useCallback((exerciseId: string) => {
+    setMusclePicker({ visible: true, exerciseId });
+  }, []);
+
+  const handleMusclePickerClose = useCallback(() => {
+    setMusclePicker({ visible: false, exerciseId: null });
+  }, []);
+
+  const handleMusclesChange = useCallback((muscles: MuscleGroup[]) => {
+    if (musclePicker.exerciseId) {
+      updateExerciseField(musclePicker.exerciseId, "muscles", muscles);
+      HapticFeedback.selection();
+    }
+  }, [musclePicker.exerciseId, updateExerciseField]);
 
   const handleFinishConfirmed = useCallback(() => { HapticFeedback.success(); completeSession(); setTimeout(() => router.replace("/programs/"), 100); }, [completeSession, router]);
   const handleDiscard = useCallback(() => { showConfirm("Discard Workout", "Are you sure? This cannot be undone.", () => { discardSession(); setTimeout(() => router.replace("/programs/"), 100); }); }, [discardSession, router]);
@@ -127,17 +146,10 @@ export default function WorkoutSessionScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
-        <HUDHeader 
-          scrollY={scrollY} 
-          startedAt={startedAt} 
-          progressData={progressData} 
-          condenseThreshold={CONDENSE_THRESHOLD} 
-          totalVolume={totalVolume}
-          sessionId={activeSessionId}
-        />
+        <HUDHeader scrollY={scrollY} startedAt={startedAt} progressData={progressData} condenseThreshold={CONDENSE_THRESHOLD} />
         
         <Animated.ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
-          <View style={styles.mainFocus}>{currentExercise ? (<ExerciseCard exercise={currentExercise} key={currentExercise.id} />) : (<View style={styles.noExercise}><Text style={styles.noExerciseText}>NO EXERCISES ADDED</Text><Pressable style={UI.SHARED.iconBtn} onPress={() => setExercisePickerVisible(true)}><Plus size={20} color={COLORS.ACCENT_BLUE} /></Pressable></View>)}</View>
+          <View style={styles.mainFocus}>{currentExercise ? (<ExerciseCard exercise={currentExercise} key={currentExercise.id} onMusclePickerOpen={handleMusclePickerOpen} />) : (<View style={styles.noExercise}><Text style={styles.noExerciseText}>NO EXERCISES ADDED</Text><Pressable style={UI.SHARED.iconBtn} onPress={() => setExercisePickerVisible(true)}><Plus size={20} color={COLORS.ACCENT_BLUE} /></Pressable></View>)}</View>
           <View style={{ height: 120 }} />
         </Animated.ScrollView>
 
@@ -149,6 +161,12 @@ export default function WorkoutSessionScreen() {
         
         <ExerciseNavMenu visible={navigationMenuVisible} onClose={() => toggleNavigationMenu(false)} activeExerciseId={activeExerciseId} onSelect={setActiveExerciseId} onAddPress={() => setExercisePickerVisible(true)} />
         <ExercisePickerModal visible={exercisePickerVisible} onClose={() => setExercisePickerVisible(false)} onSelect={onAddExerciseComplete} title="Add Exercise" />
+        <MuscleSelector
+          visible={musclePicker.visible}
+          onClose={handleMusclePickerClose}
+          onSelect={handleMusclesChange}
+          selectedMuscles={[]}
+        />
       </View>
     </GestureHandlerRootView>
   );

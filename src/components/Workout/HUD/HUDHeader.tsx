@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
-import { Timer, Clock, Check, Activity, Zap } from "lucide-react-native";
+import { Timer, Clock, Check } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -13,21 +13,13 @@ interface HUDHeaderProps {
   startedAt: string | null | undefined;
   progressData: { progress: number; completed: number; total: number };
   condenseThreshold: number;
-  totalVolume: number;
-  sessionId: string;
 }
-
-const SEGMENTS = 20;
-
-const getMissionId = (id: string) => `OP-${(id || 'X000').substring(0, 4).toUpperCase()}`;
 
 export const HUDHeader = React.memo(({ 
   scrollY, 
   startedAt, 
   progressData,
-  condenseThreshold,
-  totalVolume,
-  sessionId
+  condenseThreshold 
 }: HUDHeaderProps) => {
   const stickyHudOpacity = scrollY.interpolate({
     inputRange: [condenseThreshold - 20, condenseThreshold],
@@ -41,8 +33,6 @@ export const HUDHeader = React.memo(({
     extrapolate: 'clamp',
   });
 
-  const activeSegments = Math.round(progressData.progress * SEGMENTS);
-
   return (
     <>
       <Animated.View style={[styles.stickyHud, { opacity: stickyHudOpacity, transform: [{ translateY: stickyHudTranslateY }] }]}>
@@ -50,9 +40,6 @@ export const HUDHeader = React.memo(({
           <View style={styles.stickyTimer}>
             <Timer size={14} color={COLORS.ACCENT_GREEN} />
             {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.stickyTimerText} />}
-          </View>
-          <View style={styles.missionBadge}>
-            <Text style={styles.missionBadgeText}>{getMissionId(sessionId)}</Text>
           </View>
           <View style={styles.stickyTimer}>
             <Clock size={14} color={COLORS.TEXT_TERTIARY} />
@@ -63,29 +50,12 @@ export const HUDHeader = React.memo(({
 
       <View style={styles.header}>
         <View style={styles.headerTopLine}>
-          <View style={styles.instrumentBlock}>
-            <View style={styles.labelRow}>
-              <Activity size={10} color={COLORS.TEXT_TERTIARY} />
-              <Text style={styles.timerLabel}>ELAPSED: </Text>
-            </View>
+          <View style={styles.timerBlock}>
+            <Text style={styles.timerLabel}>ELAPSED: </Text>
             {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.timerValue} />}
           </View>
-          
-          <View style={styles.instrumentBlock}>
-            <View style={styles.labelRow}>
-              <Zap size={10} color={COLORS.ACCENT_YELLOW} />
-              <Text style={styles.timerLabel}>EST. VOL: </Text>
-            </View>
-            <Text style={[styles.timerValue, { color: COLORS.ACCENT_YELLOW }]}>
-                {totalVolume.toLocaleString()} <Text style={styles.unitText}>KG</Text>
-            </Text>
-          </View>
-
-          <View style={styles.instrumentBlock}>
-            <View style={styles.labelRow}>
-              <Clock size={10} color={COLORS.TEXT_TERTIARY} />
-              <Text style={styles.timerLabel}>TOTAL REST: </Text>
-            </View>
+          <View style={styles.timerBlock}>
+            <Text style={styles.timerLabel}>TOTAL REST: </Text>
             <LiveRestTimer textStyle={styles.timerValue} />
             <View style={styles.activeRestSlot}>
               <FloatingRestTimer />
@@ -100,20 +70,13 @@ export const HUDHeader = React.memo(({
               {Math.round(progressData.progress * 100)}% ({progressData.completed}/{progressData.total})
             </Text>
           </View>
-          <Text style={styles.missionIdText}>{getMissionId(sessionId)} // LIVE_HUD_v1.0</Text>
         </View>
 
-        <View style={styles.segmentedProgressBar}>
-          {Array.from({ length: SEGMENTS }).map((_, i) => (
-            <View 
-              key={i} 
-              style={[
-                styles.progressSegment, 
-                i < activeSegments && styles.progressSegmentActive,
-                i === activeSegments - 1 && styles.progressSegmentLeading
-              ]} 
-            />
-          ))}
+        <View style={styles.progressBarWrapper}>
+          <View style={[styles.progressBar, { width: `${progressData.progress * 100}%` }]} />
+          <View style={[styles.progressIndicator, { left: `${progressData.progress * 100}%` }]}>
+            <View style={styles.indicatorCircle} />
+          </View>
         </View>
       </View>
     </>
@@ -121,26 +84,21 @@ export const HUDHeader = React.memo(({
 });
 
 const styles = StyleSheet.create({
-  stickyHud: { position: 'absolute', top: 0, left: 0, right: 0, height: UI.HEADER_TOP + 20, backgroundColor: 'rgba(0,0,0,0.95)', zIndex: 100, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER, paddingTop: UI.HEADER_TOP - 30, justifyContent: 'center', paddingHorizontal: 20 },
+  stickyHud: { position: 'absolute', top: 0, left: 0, right: 0, height: UI.HEADER_TOP + 20, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER, paddingTop: UI.HEADER_TOP - 30, justifyContent: 'center', paddingHorizontal: 20 },
   stickyHudContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   stickyTimer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stickyTimerText: { color: COLORS.TEXT_PRIMARY, fontSize: 13, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
-  missionBadge: { backgroundColor: 'rgba(0, 122, 255, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(0, 122, 255, 0.3)' },
-  missionBadgeText: { color: COLORS.ACCENT_BLUE, fontSize: 10, fontFamily: FONT_FAMILIES.MONO, fontWeight: "800" },
   header: { paddingTop: UI.HEADER_TOP - 20, paddingHorizontal: 20, paddingBottom: 20 },
-  headerTopLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 },
-  instrumentBlock: { gap: 2 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  timerLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 10, fontFamily: 'NeoGramTrial-BoldCondensed', fontWeight: "700" },
-  timerValue: { color: COLORS.TEXT_PRIMARY, fontSize: 16, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
-  unitText: { fontSize: 10, color: COLORS.TEXT_TERTIARY },
-  activeRestSlot: { position: "absolute", top: 32, right: 0, zIndex: 20 },
-  statsLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  headerTopLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 44 },
+  timerBlock: { flexDirection: "row", marginTop: 2 },
+  timerLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 14, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
+  timerValue: { color: COLORS.TEXT_PRIMARY, fontSize: 14, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
+  activeRestSlot: { position: "absolute", top: 28, right: 0, zIndex: 20 },
+  statsLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   statsLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
   statsValue: { color: COLORS.TEXT_SECONDARY, fontSize: 11, fontFamily: FONT_FAMILIES.MONO, fontWeight: "600" },
-  missionIdText: { color: COLORS.TEXT_TERTIARY, fontSize: 9, fontFamily: FONT_FAMILIES.MONO, fontWeight: "500" },
-  segmentedProgressBar: { flexDirection: 'row', gap: 3, height: 6, marginTop: 4 },
-  progressSegment: { flex: 1, height: '100%', backgroundColor: COLORS.PROGRESS_BG, borderRadius: 1 },
-  progressSegmentActive: { backgroundColor: COLORS.ACCENT_GREEN },
-  progressSegmentLeading: { shadowColor: COLORS.ACCENT_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 4 },
+  progressBarWrapper: { height: 4, backgroundColor: COLORS.PROGRESS_BG, borderRadius: 2, position: "relative", marginTop: 4 },
+  progressBar: { height: "100%", backgroundColor: COLORS.ACCENT_GREEN, borderRadius: 2 },
+  progressIndicator: { position: "absolute", top: -4, width: 12, height: 12, marginLeft: -6, alignItems: "center", justifyContent: "center" },
+  indicatorCircle: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.ACCENT_GREEN, borderWidth: 2, borderColor: COLORS.BG },
 });

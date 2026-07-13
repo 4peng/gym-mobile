@@ -22,6 +22,6 @@ export const FONT_FAMILIES = {
   // Main UI text
   MEDIUM: 'Viga-Regular',
 
-  // Data / Instrumentation
+  // Data / Instrumentation  
   MONO: 'SpaceMono-Regular',
 };

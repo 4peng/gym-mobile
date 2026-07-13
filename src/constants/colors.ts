@@ -12,7 +12,8 @@ export const COLORS = {
   ACCENT_GREEN: "#00FF99", // Neon Success
   ACCENT_GREEN_DEEP: "#003322", // Background for completed sets
   DANGER: "#FF3B30",       // System Red
-  
+  ORANGE: "#FF4500",       // Exercise muscle text
+
   // Text
   TEXT_PRIMARY: "#FFFFFF",
   TEXT_SECONDARY: "#A1A1AA", // Muted gray

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import { useWorkoutSessionStore, type ActiveRestTimer } from "@/stores/workoutSessionStore";
 import { cancelScheduledNotification } from "@/utils/notifications";
 
@@ -38,7 +39,7 @@ export default FloatingRestTimer;
 
 const styles = StyleSheet.create({
   container: { },
-  card: { flexDirection: "row", alignItems: "center", backgroundColor: "transparent", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.BORDER, gap: 10 },
+  card: { flexDirection: "row", alignItems: "center", backgroundColor: "transparent", borderRadius: UI.RADIUS_ITEM, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.BORDER, gap: 10 },
   countdown: { color: COLORS.TEXT_PRIMARY, fontFamily: FONT_FAMILIES.MONO, fontSize: 18, fontWeight: "900", letterSpacing: 0.5 },
   cancelBtn: { width: 24, height: 24, borderRadius: 6, backgroundColor: "transparent", borderWidth: 1, borderColor: COLORS.BORDER, alignItems: "center", justifyContent: "center" },
   cancelText: { color: COLORS.DANGER, fontWeight: "900", fontSize: 12, fontFamily: FONT_FAMILIES.MONO },

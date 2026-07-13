@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ChevronDown, Dumbbell, User } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 
 interface ExerciseBodyweightSelectorProps {
   isBodyweight: boolean;
@@ -59,7 +60,7 @@ const styles = StyleSheet.create({
   compactTrigger: {
     width: 42,
     height: 42,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     backgroundColor: COLORS.BG,
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     minHeight: 46,
-    borderRadius: 14,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     backgroundColor: COLORS.BG,
@@ -94,7 +95,7 @@ const styles = StyleSheet.create({
   iconShell: {
     width: 28,
     height: 28,
-    borderRadius: 9,
+    borderRadius: 9, // Keep as is - odd size, intentional
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,

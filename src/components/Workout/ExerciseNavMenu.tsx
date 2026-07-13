@@ -15,7 +15,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface ExerciseMeta { id: string; name: string; }
 
 const NavMenuItem = React.memo(({ item, index, drag, isActive, isFocused, onPress, onDelete }: { item: ExerciseMeta; index: number; drag: () => void; isActive: boolean; isFocused: boolean; onPress: (id: string) => void; onDelete: (id: string) => void; }) => {
-  return (<ScaleDecorator><Swipeable onDelete={() => onDelete(item.id)} borderRadius={12} marginBottom={0}><Pressable onPress={() => onPress(item.id)} onLongPress={drag} delayLongPress={200} disabled={isActive} style={[styles.navMenuItem, isFocused && styles.navMenuItemActive, isActive && styles.navMenuItemDragging]}><Text style={styles.navMenuIndex}>{(index + 1).toString().padStart(2, '0')}</Text><Text style={[styles.navMenuName, isFocused && { color: COLORS.ACCENT_BLUE }]}>{item.name.toUpperCase()}</Text><Menu size={14} color={COLORS.TEXT_TERTIARY} /></Pressable></Swipeable></ScaleDecorator>);
+  return (<ScaleDecorator><Swipeable onDelete={() => onDelete(item.id)} borderRadius={UI.RADIUS_ITEM} marginBottom={0}><Pressable onPress={() => onPress(item.id)} onLongPress={drag} delayLongPress={200} disabled={isActive} style={[styles.navMenuItem, isFocused && styles.navMenuItemActive, isActive && styles.navMenuItemDragging]}><Text style={styles.navMenuIndex}>{(index + 1).toString().padStart(2, '0')}</Text><Text style={[styles.navMenuName, isFocused && { color: COLORS.ACCENT_BLUE }]}>{item.name.toUpperCase()}</Text><Menu size={14} color={COLORS.TEXT_TERTIARY} /></Pressable></Swipeable></ScaleDecorator>);
 });
 
 export default function ExerciseNavMenu({ visible, onClose, activeExerciseId, onSelect, onAddPress }: { visible: boolean; onClose: () => void; activeExerciseId: string | null; onSelect: (id: string) => void; onAddPress: () => void; }) {
@@ -49,11 +49,11 @@ const styles = StyleSheet.create({
   navMenuHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 24, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER },
   navMenuTitle: { color: COLORS.TEXT_SECONDARY, fontSize: 12, fontFamily: FONT_FAMILIES.MONO, fontWeight: "900", letterSpacing: 2 },
   navMenuList: { padding: 16, gap: 8 },
-  navMenuItem: { flexDirection: "row", alignItems: "center", padding: 16, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.03)", gap: 16 },
+  navMenuItem: { flexDirection: "row", alignItems: "center", padding: 16, borderRadius: UI.RADIUS_ITEM, backgroundColor: "rgba(255,255,255,0.03)", gap: 16 },
   navMenuItemActive: { backgroundColor: "rgba(0, 122, 255, 0.08)", borderWidth: 1, borderColor: "rgba(0, 122, 255, 0.2)" },
   navMenuItemDragging: { backgroundColor: "rgba(0, 122, 255, 0.15)", borderColor: COLORS.ACCENT_BLUE, borderWidth: 1 },
   navMenuIndex: { color: COLORS.TEXT_TERTIARY, fontSize: 12, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
   navMenuName: { flex: 1, color: COLORS.TEXT_PRIMARY, fontSize: 14, fontWeight: "800", fontFamily: FONT_FAMILIES.MONO },
-  navMenuAddBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 12, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "rgba(0, 255, 153, 0.2)", borderStyle: "dashed" },
+  navMenuAddBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 12, padding: 16, borderRadius: UI.RADIUS_ITEM, borderWidth: 1, borderColor: "rgba(0, 255, 153, 0.2)", borderStyle: "dashed" },
   navMenuAddText: { color: COLORS.ACCENT_GREEN, fontSize: 12, fontWeight: "900", fontFamily: FONT_FAMILIES.MONO },
 });

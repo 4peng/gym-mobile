@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   headerIconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 14,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     backgroundColor: "transparent",
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   segmentRow: {
     flexDirection: "row",
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 14,
+    borderRadius: UI.RADIUS_ITEM,
     padding: 4,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   segmentBtn: {
     flex: 1,
     height: 40,
-    borderRadius: 10,
+    borderRadius: UI.RADIUS_ITEM,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     padding: 16,
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   },
   resumeCard: {
     minHeight: 72,
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     borderWidth: 1,
     borderColor: withAlpha(COLORS.ACCENT_BLUE, 0.4),
     backgroundColor: COLORS.CARD_BG,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     width: "48%",
     minHeight: 128,
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     padding: 14,

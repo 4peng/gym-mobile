@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   bodyweightInputShell: {
     flex: 1,
     minHeight: 54,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     backgroundColor: COLORS.BG,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   unitToggle: {
     minWidth: 72,
     minHeight: 54,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     backgroundColor: "rgba(11, 130, 255, 0.08)",
     borderWidth: 1,
     borderColor: "rgba(11, 130, 255, 0.18)",
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: UI.RADIUS_ITEM,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     minWidth: 46,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: UI.RADIUS_HUD,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   unitToggleGroup: {
     flexDirection: "row",
     backgroundColor: COLORS.BG,
-    borderRadius: 10,
+    borderRadius: UI.RADIUS_ITEM,
     padding: 2,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   unitBtn: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: UI.RADIUS_ITEM,
   },
   unitBtnActive: {
     backgroundColor: "rgba(11, 130, 255, 0.15)",

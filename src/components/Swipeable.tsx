@@ -10,6 +10,7 @@ import {
 import { Trash2, Pin } from 'lucide-react-native';
 import { COLORS } from '@/src/constants/colors';
 import { HapticFeedback } from '@/src/utils/haptics';
+import { UI } from '@/constants/ui';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BUTTON_WIDTH = 64;
@@ -31,7 +32,7 @@ export const Swipeable = ({
   onDelete, 
   onPin, 
   onToggleScroll,
-  borderRadius = 32,
+  borderRadius = UI.RADIUS_HUD,
   marginBottom = 16
 }: SwipeableProps) => {
   const translateX = useRef(new Animated.Value(0)).current;

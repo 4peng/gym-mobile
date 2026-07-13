@@ -13,6 +13,7 @@ import {
   configureNotificationHandler,
 } from '@/utils/notifications';
 
+
 export default function RootLayout() {
   // Pulling configuration directly from fonts.ts
   const [loaded, error] = useFonts(FONT_ASSETS);
@@ -63,13 +64,12 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="programs" />
         <Stack.Screen name="workout/index" />
-        <Stack.Screen 
-          name="exercises/[name]/volume" 
-          options={{ 
-            presentation: 'modal',
+        <Stack.Screen
+          name="exercises/[name]/volume"
+          options={{
             animation: 'slide_from_bottom',
             gestureEnabled: true,
-          }} 
+          }}
         />
         <Stack.Screen name="stats/index" />
       </Stack>

@@ -15,6 +15,7 @@ import {
 import { Check, X } from 'lucide-react-native';
 import { COLORS } from '@/src/constants/colors';
 import { FONT_FAMILIES } from '@/src/constants/fonts';
+import { UI } from '@/constants/ui';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ITEM_HEIGHT = 60;
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
     backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },

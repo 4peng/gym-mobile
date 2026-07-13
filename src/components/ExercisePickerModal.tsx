@@ -2,18 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  Animated,
+  Easing,
+  PanResponder,
 } from "react-native";
 import { Check, Pencil, Search, X } from "lucide-react-native";
 import { EXERCISE_CATALOG } from "@/data/exerciseCatalog";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import type { ExerciseDefinition } from "@/types";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { MUSCLE_LABELS, type MuscleGroup } from "@/constants/muscles";
@@ -49,6 +52,11 @@ export default function ExercisePickerModal({
   const [renameTarget, setRenameTarget] = useState<ExerciseDefinition | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const renameInputRef = useRef<TextInput>(null);
+  const animValue = useRef(new Animated.Value(0)).current;
+const dragOffset = useRef(new Animated.Value(0)).current;
+  const [renderVisible, setRenderVisible] = useState(visible);
+  const renameAnimValue = useRef(new Animated.Value(0)).current;
+  const [renderRenameVisible, setRenderRenameVisible] = useState(false);
 
   const customExercises = useExerciseLibraryStore((state) => state.customExercises);
   const addCustomExercise = useExerciseLibraryStore((state) => state.addCustomExercise);
@@ -93,6 +101,66 @@ export default function ExercisePickerModal({
 
     return () => clearTimeout(timeout);
   }, [renameTarget?.id]);
+
+  useEffect(() => {
+    if (visible) {
+      setRenderVisible(true);
+      Animated.timing(animValue, { 
+        toValue: 1, 
+        duration: 180, 
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true 
+      }).start();
+    } else {
+      Animated.timing(animValue, { 
+        toValue: 0, 
+        duration: 180, 
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true 
+      }).start(() => setRenderVisible(false));
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (renameTarget) {
+      setRenderRenameVisible(true);
+      Animated.timing(renameAnimValue, { 
+        toValue: 1, 
+        duration: 180, 
+        useNativeDriver: true 
+      }).start();
+    } else {
+      Animated.timing(renameAnimValue, { 
+        toValue: 0, 
+        duration: 180, 
+        useNativeDriver: true 
+      }).start(() => setRenderRenameVisible(false));
+    }
+  }, [renameTarget]);
+
+  // Drag-to-close functionality
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 5 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          dragOffset.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150) {
+          onClose();
+        }
+        Animated.spring(dragOffset, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
 
   const allExercises = useMemo(
     () => [...customExercises, ...EXERCISE_CATALOG],
@@ -221,146 +289,165 @@ export default function ExercisePickerModal({
     }
   };
 
+  if (!renderVisible) return null;
+
   return (
-    <>
-      <Modal
-        visible={visible}
-        transparent={false}
-        animationType="slide"
-        onRequestClose={onClose}
-        presentationStyle="pageSheet"
+    <View style={styles.absoluteOverlay} pointerEvents="box-none">
+      <Animated.View style={[styles.backdrop, { opacity: animValue }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+      
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            transform: [
+              {
+                translateY: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [600, 0]
+                })
+              },
+              { translateY: dragOffset }
+            ]
+          }
+        ]}
+        {...panResponder.panHandlers}
       >
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
-            </View>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color={COLORS.TEXT_TERTIARY} />
-            </Pressable>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
+          <Pressable onPress={onClose} style={styles.closeBtn}>
+            <X size={20} color={COLORS.TEXT_TERTIARY} />
+          </Pressable>
+        </View>
 
-          <View style={styles.searchShell}>
-            <Search size={16} color={COLORS.TEXT_TERTIARY} />
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search exercises..."
-              placeholderTextColor={COLORS.TEXT_TERTIARY}
-              autoFocus
-            />
-          </View>
-
-          {canAddCustomExercise ? (
-            <Pressable
-              style={({ pressed }) => [
-                styles.customAddBtn,
-                pressed && styles.customAddBtnPressed,
-              ]}
-              onPress={handleAddCustomExercise}
-            >
-              <Text style={styles.customAddLabel}>Add Custom Exercise</Text>
-              <Text style={styles.customAddValue}>{normalizedSearch}</Text>
-            </Pressable>
-          ) : null}
-
-          <FlatList
-            data={filteredExercises}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={scrollEnabled}
-            renderItem={({ item }) => {
-              const isSelected = item.id === selectedDefinitionId;
-              const subtitleText =
-                (item.muscles || []).length > 0
-                  ? item.muscles
-                      .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
-                      .join(" - ")
-                  : item.isCustom
-                    ? "Custom exercise"
-                    : "Uncategorized";
-
-              const content = (
-                <View
-                  style={[
-                    styles.item,
-                    item.isCustom && styles.itemCustom, // Solid background for swiping
-                    isSelected && styles.itemSelected, // Selection wins background color
-                  ]}
-                >
-                  <Pressable
-                    onPress={() => handleSelect(item)}
-                    style={styles.itemMain}
-                  >
-                    <View style={styles.itemCopy}>
-                      <Text style={styles.itemTitle}>{item.name}</Text>
-                      <Text style={styles.itemSubtitle}>{subtitleText}</Text>
-                    </View>
-                    {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
-                  </Pressable>
-
-                  {item.isCustom ? (
-                    <Pressable
-                      onPress={() => startRenameCustomExercise(item)}
-                      hitSlop={16}
-                      style={({ pressed }) => [
-                        styles.customBadge,
-                        pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
-                      ]}
-                    >
-                      <Pencil size={14} color={COLORS.ACCENT_GREEN} />
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-
-              if (item.isCustom) {
-                return (
-                  <View style={styles.swipeWrapper}>
-                    <Swipeable
-                      onDelete={() => handleDeleteCustomExercise(item.id)}
-                      onToggleScroll={setScrollEnabled}
-                      borderRadius={18}
-                      marginBottom={0}
-                    >
-                      {content}
-                    </Swipeable>
-                  </View>
-                );
-              }
-
-              return (
-                <View style={{ marginHorizontal: 16 }}>
-                  {content}
-                </View>
-              );
-            }}
-            ListEmptyComponent={
-              !canAddCustomExercise ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No exercises found.</Text>
-                </View>
-              ) : null
-            }
+        <View style={styles.searchShell}>
+          <Search size={16} color={COLORS.TEXT_TERTIARY} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search exercises..."
+            placeholderTextColor={COLORS.TEXT_TERTIARY}
+            autoFocus
           />
+        </View>
 
-          <Modal
-            visible={!!renameTarget}
-            transparent
-            animationType="fade"
-            onRequestClose={cancelRenameCustomExercise}
+        {canAddCustomExercise ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.customAddBtn,
+              pressed && styles.customAddBtnPressed,
+            ]}
+            onPress={handleAddCustomExercise}
           >
+            <Text style={styles.customAddLabel}>Add Custom Exercise</Text>
+            <Text style={styles.customAddValue}>{normalizedSearch}</Text>
+          </Pressable>
+        ) : null}
+
+        <FlatList
+          data={filteredExercises}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={scrollEnabled}
+          renderItem={({ item }) => {
+            const isSelected = item.id === selectedDefinitionId;
+            const subtitleText =
+              (item.muscles || []).length > 0
+                ? item.muscles
+                    .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
+                    .join(" - ")
+                : item.isCustom
+                  ? "Custom exercise"
+                  : "Uncategorized";
+
+            const content = (
+              <View
+                style={[
+                  styles.item,
+                  item.isCustom && styles.itemCustom,
+                  isSelected && styles.itemSelected,
+                ]}
+              >
+                <Pressable
+                  onPress={() => handleSelect(item)}
+                  style={styles.itemMain}
+                >
+                  <View style={styles.itemCopy}>
+                    <Text style={styles.itemTitle}>{item.name}</Text>
+                    <Text style={styles.itemSubtitle}>{subtitleText}</Text>
+                  </View>
+                  {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
+                </Pressable>
+
+                {item.isCustom ? (
+                  <Pressable
+                    onPress={() => startRenameCustomExercise(item)}
+                    hitSlop={16}
+                    style={({ pressed }) => [
+                      styles.customBadge,
+                      pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
+                    ]}
+                  >
+                    <Pencil size={14} color={COLORS.ACCENT_GREEN} />
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+
+            if (item.isCustom) {
+              return (
+                <View style={styles.swipeWrapper}>
+                  <Swipeable
+                    onDelete={() => handleDeleteCustomExercise(item.id)}
+                    onToggleScroll={setScrollEnabled}
+                    borderRadius={UI.RADIUS_INPUT}
+                    marginBottom={0}
+                  >
+                    {content}
+                  </Swipeable>
+                </View>
+              );
+            }
+
+            return (
+              <View style={{ marginHorizontal: 16 }}>
+                {content}
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            !canAddCustomExercise ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No exercises found.</Text>
+              </View>
+            ) : null
+          }
+        />
+
+        {/* Rename Modal */}
+        {renderRenameVisible ? (
+          <Animated.View style={[styles.renameOverlay, { opacity: renameAnimValue }]}>
             <KeyboardAvoidingView
-              style={styles.renameOverlay}
+              style={styles.renameSheetWrapper}
               behavior="padding"
               keyboardVerticalOffset={0}
             >
               <Pressable style={StyleSheet.absoluteFill} onPress={cancelRenameCustomExercise} />
-
-              <View style={styles.renameSheet}>
+              
+              <Animated.View style={[styles.renameSheet, {
+                transform: [{
+                  scale: renameAnimValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1]
+                  })
+                }]
+              }]}>
                 <Text style={styles.customRenameLabel}>Rename Custom Exercise</Text>
                 <Text style={styles.renameSheetTitle}>{renameTarget?.name}</Text>
                 <TextInput
@@ -402,28 +489,36 @@ export default function ExercisePickerModal({
                     <Text style={styles.renamePrimaryText}>Save Name</Text>
                   </Pressable>
                 </View>
-              </View>
+              </Animated.View>
             </KeyboardAvoidingView>
-          </Modal>
-        </View>
-      </Modal>
-    </>
+          </Animated.View>
+        ) : null}
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
+  absoluteOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "flex-end",
+  },
+  renameSheetWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    zIndex: 10001,
   },
   container: {
     flex: 1,
+    maxHeight: '80%',
     backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    maxHeight: '100%',
-    paddingBottom: 40,
+    borderTopLeftRadius: UI.RADIUS_HUD,
+    borderTopRightRadius: UI.RADIUS_HUD,
   },
   header: {
     flexDirection: "row",
@@ -448,7 +543,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 42,
     height: 42,
-    borderRadius: 14,
+    borderRadius: UI.RADIUS_ITEM,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.03)",
@@ -459,7 +554,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     marginBottom: 16,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     backgroundColor: COLORS.BG,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
@@ -478,7 +573,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(11, 130, 255, 0.08)",
     borderWidth: 1,
     borderColor: "rgba(11, 130, 255, 0.2)",
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     padding: 16,
   },
   customAddBtnPressed: {
@@ -504,7 +599,7 @@ const styles = StyleSheet.create({
   },
   swipeWrapper: {
     marginHorizontal: 16,
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },
@@ -512,13 +607,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 18,
+    borderRadius: UI.RADIUS_INPUT,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
     marginBottom: 0, // Handled by gap or marginHorizontal wrapper
   },
   itemCustom: {
-    backgroundColor: '#161618', // Solid opaque background for swiping, slightly darker than standard
+    backgroundColor: COLORS.CARD_BG, // Solid opaque background for swiping, slightly darker than standard
   },
   itemSelected: {
     borderColor: "rgba(11, 130, 255, 0.25)",
@@ -550,7 +645,7 @@ const styles = StyleSheet.create({
   customBadge: {
     width: 32,
     height: 32,
-    borderRadius: 10,
+    borderRadius: UI.RADIUS_ITEM,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(16, 217, 75, 0.12)",
@@ -568,14 +663,13 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   renameOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    paddingHorizontal: 24,
+    zIndex: 10001,
   },
   renameSheet: {
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 22,
+    borderRadius: UI.RADIUS_HUD,
     padding: 18,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
@@ -599,7 +693,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: FONT_FAMILIES.MEDIUM,
     backgroundColor: COLORS.BG,
-    borderRadius: 14,
+    borderRadius: UI.RADIUS_ITEM,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
     paddingHorizontal: 14,
@@ -623,7 +717,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
@@ -643,7 +737,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     backgroundColor: COLORS.ACCENT_GREEN,
   },
   renamePrimaryBtnPressed: {

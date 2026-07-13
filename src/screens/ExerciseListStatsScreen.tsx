@@ -325,9 +325,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.CARD_BG,
-    marginHorizontal: UI.LAYOUT_PADDING,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
@@ -352,7 +350,7 @@ const styles = StyleSheet.create({
   filterPill: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: UI.RADIUS_ITEM,
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
@@ -403,7 +401,7 @@ const styles = StyleSheet.create({
   miniChart: {
     backgroundColor: "rgba(74, 222, 128, 0.05)",
     padding: 8,
-    borderRadius: 8,
+    borderRadius: UI.RADIUS_ITEM,
   },
   emptyContainer: {
     alignItems: "center",

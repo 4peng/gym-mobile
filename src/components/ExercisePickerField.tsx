@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ChevronDown } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import type { ExerciseDefinition } from "@/types";
 import { toTitleCase } from "@/utils/string";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: COLORS.BG,
-    borderRadius: 16,
+    borderRadius: UI.RADIUS_CONTAINER,
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,

@@ -57,7 +57,7 @@ export const UI = {
     // HUD Control Pill (The bottom bar)
     hudPill: {
       height: 64,
-      borderRadius: 16,
+      borderRadius: 32, // UI.RADIUS_HUD
       backgroundColor: "rgba(18, 18, 18, 0.8)",
       flexDirection: "row",
       alignItems: "center",

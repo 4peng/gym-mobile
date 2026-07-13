@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import Svg, { Line, Polyline } from "react-native-svg";
 import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { UI } from "@/constants/ui";
 import type { ActivityChartPoint } from "@/utils/activitySummary";
 
 interface ActivityComboChartProps {
@@ -132,7 +133,7 @@ export default function ActivityComboChart({
 const styles = StyleSheet.create({
   shell: {
     height: 190,
-    borderRadius: 14,
+    borderRadius: UI.RADIUS_ITEM,
     backgroundColor: COLORS.BG,
     borderWidth: 1,
     borderColor: COLORS.BORDER,

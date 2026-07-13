@@ -24,7 +24,7 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import MuscleSelector from "@/src/components/MuscleSelector";
-import { MuscleGroup } from "@/constants/muscles";
+import { MuscleGroup, MUSCLE_LABELS } from "@/constants/muscles";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/src/components/Swipeable";
 import { HapticFeedback } from "@/src/utils/haptics";
@@ -68,6 +68,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
     reps: string;
   } | null>(null);
   const decimalKeyboardType = "decimal-pad";
+  const [muscleSelectorVisible, setMuscleSelectorVisible] = useState(false);
   const normalizedExerciseKey = normalizeExerciseIdentityKey(exerciseKey);
 
   /**
@@ -141,6 +142,11 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
 
   const handleMusclesChange = (muscles: MuscleGroup[]) => {
     updateMusclesInHistory(normalizedExerciseKey, muscles);
+  };
+
+  const handleMusclesChangeAndClose = (muscles: MuscleGroup[]) => {
+    handleMusclesChange(muscles);
+    setMuscleSelectorVisible(false);
   };
 
   // ── Data Processing ────────────────────────
@@ -496,13 +502,18 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} scrollEnabled={scrollEnabled} onScroll={handleScroll} scrollEventThrottle={16}>
           <Text style={styles.title}>Volume Trends:{"\n"}<Text style={{ color: COLORS.ACCENT_GREEN }}>{toTitleCase(displayName)}</Text></Text>
 
-          {/* Muscle Category Editor */}
+          {/* Muscle Category Trigger */}
           <View style={styles.categorySection}>
-            <MuscleSelector 
-              selectedMuscles={currentMuscles}
-              onSelect={handleMusclesChange}
-              label="Exercise Categories"
-            />
+            <Pressable onPress={() => setMuscleSelectorVisible(true)}>
+              <View style={styles.muscleTrigger}>
+                <Text style={styles.muscleTriggerLabel}>Exercise Categories</Text>
+                <Text style={styles.muscleTriggerValue} numberOfLines={1}>
+                  {currentMuscles.length > 0
+                    ? currentMuscles.map(m => MUSCLE_LABELS[m]).join(', ')
+                    : 'None selected'}
+                </Text>
+              </View>
+            </Pressable>
           </View>
 
           {/* Strong Minimal Stats Row */}
@@ -612,8 +623,8 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
                   <Swipeable key={log.id} onDelete={() => handleDeleteSession(log.sessionIds)} onToggleScroll={setScrollEnabled}>
                     <View style={[
                       UI.SHARED.card, 
-                      { marginBottom: 0, borderRadius: 32 },
-                      log.isPR && { borderColor: COLORS.ACCENT_YELLOW, borderWidth: 3 }
+                       { marginBottom: 0, borderRadius: UI.RADIUS_CONTAINER },
+                       log.isPR && { borderColor: COLORS.ACCENT_YELLOW, borderWidth: 3 }
                     ]}>
                       <View style={styles.logCardHeader}>
                         <Pressable onPress={() => handleEditDate(log.sessionIds, log.rawDate.toISOString())} style={({ pressed }) => [styles.dateRow, pressed && { opacity: 0.6 }]}><Calendar size={14} color={COLORS.TEXT_TERTIARY} /><Text style={styles.logDate}>{log.date}</Text></Pressable>
@@ -650,17 +661,26 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
               </View>
             )}
           </View>
-        </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
+</ScrollView>
+
+          {/* Render modal outside ScrollView */}
+          <MuscleSelector
+            visible={muscleSelectorVisible}
+            onClose={() => setMuscleSelectorVisible(false)}
+            selectedMuscles={currentMuscles}
+            onSelect={handleMusclesChangeAndClose}
+            label="Exercise Categories"
+          />
+        </View>
+      </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.BG },
   header: { paddingTop: UI.HEADER_TOP - 10, paddingHorizontal: UI.LAYOUT_PADDING, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  rangeSelector: { flexDirection: "row", backgroundColor: "#1D1D21", borderRadius: 12, padding: 4 },
-  rangeBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
+  rangeSelector: { flexDirection: "row", backgroundColor: COLORS.CARD_BG, borderRadius: UI.RADIUS_ITEM, padding: 4 },
+  rangeBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: UI.RADIUS_ITEM },
   rangeBtnActive: { backgroundColor: COLORS.BG },
   rangeText: { color: COLORS.TEXT_TERTIARY, fontSize: 12, fontWeight: "800" },
   rangeTextActive: { color: COLORS.TEXT_PRIMARY },
@@ -669,9 +689,38 @@ const styles = StyleSheet.create({
   categorySection: {
     marginBottom: 32,
   },
+  muscleTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    borderRadius: UI.RADIUS_CONTAINER,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  muscleTriggerLabel: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 2,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  muscleTriggerValue: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: FONT_FAMILIES.MEDIUM,
+    flex: 1,
+    marginLeft: 12,
+    textAlign: 'right',
+  },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
   statItem: { flex: 1 },
-  statLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },
+  statLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 4, fontFamily: FONT_FAMILIES.MEDIUM },
   statValue: { color: 'white', fontSize: 24, fontWeight: '900', letterSpacing: -1, fontFamily: FONT_FAMILIES.MONO },
   statUnit: { fontSize: 12, color: COLORS.TEXT_TERTIARY, fontWeight: '700', marginLeft: 2, fontFamily: FONT_FAMILIES.MONO },
   chartContainer: { alignItems: "center", marginTop: 0, marginBottom: 40 },
@@ -684,10 +733,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 24,
+     backgroundColor: 'rgba(255,255,255,0.03)',
+     padding: 12,
+     borderRadius: UI.RADIUS_ITEM,
+     marginBottom: 24,
   },
   disclosureText: {
     color: COLORS.TEXT_TERTIARY,
@@ -704,10 +753,10 @@ const styles = StyleSheet.create({
   prBadge: { backgroundColor: "rgba(250, 204, 0, 0.15)", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: "rgba(250, 204, 0, 0.3)" },
   prBadgeText: { color: COLORS.ACCENT_YELLOW, fontSize: 10, fontWeight: "900" },
   setsList: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  setTag: { backgroundColor: "#1D1D21", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  setTag: { backgroundColor: COLORS.CARD_BG, paddingHorizontal: 10, paddingVertical: 6, borderRadius: UI.RADIUS_ITEM },
   setTagText: { color: COLORS.TEXT_PRIMARY, fontSize: 13, fontWeight: "700", fontFamily: FONT_FAMILIES.MONO },
   setTagX: { color: COLORS.TEXT_TERTIARY, fontSize: 10, marginHorizontal: 4, fontFamily: FONT_FAMILIES.MONO },
-  editRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#1D1D21", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: COLORS.ACCENT_BLUE },
+  editRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.CARD_BG, borderRadius: UI.RADIUS_ITEM, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: COLORS.ACCENT_BLUE },
   editInput: { color: COLORS.TEXT_PRIMARY, fontFamily: FONT_FAMILIES.MONO, fontSize: 13, fontWeight: "700", width: 35, textAlign: "center", padding: 0 },
   editIcon: { marginLeft: 8, padding: 4 },
   emptyLogs: { padding: 40, alignItems: "center" },
