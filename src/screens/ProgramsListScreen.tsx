@@ -20,7 +20,10 @@ import {
   Settings2,
 } from "lucide-react-native";
 import ActivityComboChart from "@/components/Home/ActivityComboChart";
+import { ProgramTile } from "@/components/ProgramTile";
 import { useAppRouter } from "@/utils/navigation";
+import { showConfirm } from "@/utils/alerts";
+import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { COLORS, withAlpha } from "@/constants/colors";
@@ -31,6 +34,7 @@ import {
   formatDurationMinutes,
   type ActivityPeriodMode,
 } from "@/utils/activitySummary";
+import type { Program } from "@/types";
 
 export default function ProgramsListScreen() {
   const router = useAppRouter();
@@ -40,9 +44,15 @@ export default function ProgramsListScreen() {
 
   const activeSession = useWorkoutSessionStore((s) => s.activeSession);
   const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
+  const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
   const allHistory = useWorkoutSessionStore((s) => s.history);
 
+  const allPrograms = useProgramStore((s) => s.programs);
+  const deleteProgram = useProgramStore((s) => s.deleteProgram);
+  const togglePin = useProgramStore((s) => s.togglePin);
+
   const [periodMode, setPeriodMode] = useState<ActivityPeriodMode>("week");
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const history = useMemo(
     () => allHistory.filter((session) => !session.deletedAt),
@@ -52,6 +62,38 @@ export default function ProgramsListScreen() {
     () => buildActivitySummary(history, periodMode, new Date()),
     [history, periodMode]
   );
+
+  const lastUsedByProgramId = useMemo(() => {
+    const usage = new Map<string, number>();
+
+    history.forEach((session) => {
+      if (!session.programId) return;
+      const ts = session.completedAt
+        ? new Date(session.completedAt).getTime()
+        : new Date(session.startedAt).getTime();
+      const current = usage.get(session.programId) ?? 0;
+      if (ts > current) {
+        usage.set(session.programId, ts);
+      }
+    });
+
+    return usage;
+  }, [history]);
+
+  const programs = useMemo(() => {
+    return allPrograms
+      .filter((program) => !program.deletedAt)
+      .sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+
+        const aLastUsed = lastUsedByProgramId.get(a._id) ?? 0;
+        const bLastUsed = lastUsedByProgramId.get(b._id) ?? 0;
+        if (aLastUsed !== bLastUsed) return bLastUsed - aLastUsed;
+
+        return b.updatedAt - a.updatedAt;
+      });
+  }, [allPrograms, lastUsedByProgramId]);
 
   const primaryTitle = activeSession ? "Resume" : "Start";
 
@@ -69,12 +111,58 @@ export default function ProgramsListScreen() {
     router.push("/programs/create");
   }, [router]);
 
+  const handleProgramPress = useCallback(
+    (id: string) => router.push(`/programs/${id}`),
+    [router]
+  );
+
+  const handleStartProgram = useCallback(
+    (program: Program) => {
+      if (activeSession) {
+        showConfirm(
+          "Active Workout",
+          "You already have a workout in progress. Discard it and start this one?",
+          () => {
+            startFromProgram(program);
+            router.replace("/workout");
+          }
+        );
+      } else {
+        startFromProgram(program);
+        router.replace("/workout");
+      }
+    },
+    [activeSession, startFromProgram, router]
+  );
+
+  const handleDeleteProgram = useCallback(
+    (id: string, name: string) => {
+      showConfirm(
+        "Delete Program",
+        `Are you sure you want to delete "${name}"? This cannot be undone.`,
+        () => deleteProgram(id)
+      );
+    },
+    [deleteProgram]
+  );
+
+  const handlePinProgram = useCallback(
+    (id: string) => togglePin(id),
+    [togglePin]
+  );
+
+  const handleOptionsProgram = useCallback(
+    (program: Program) => router.push(`/programs/${program._id}`),
+    [router]
+  );
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          scrollEnabled={scrollEnabled}
           refreshControl={
             <RefreshControl
               refreshing={isManualSync}
@@ -188,6 +276,30 @@ export default function ProgramsListScreen() {
               <Text style={styles.metricSubtext}>Exercise stats</Text>
             </Pressable>
           </View>
+
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Routines</Text>
+          </View>
+
+          {programs.length === 0 ? (
+            <View style={styles.emptyRoutines}>
+              <Text style={styles.emptyRoutinesText}>No routines yet</Text>
+            </View>
+          ) : (
+            programs.map((program) => (
+              <ProgramTile
+                key={program._id}
+                program={program}
+                lastUsedAt={lastUsedByProgramId.get(program._id)}
+                onPress={handleProgramPress}
+                onStart={handleStartProgram}
+                onDelete={handleDeleteProgram}
+                onPin={handlePinProgram}
+                onOptions={handleOptionsProgram}
+                onToggleScroll={setScrollEnabled}
+              />
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -382,6 +494,29 @@ const styles = StyleSheet.create({
   metricSubtext: {
     color: COLORS.TEXT_TERTIARY,
     fontSize: 12,
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  sectionHeaderRow: {
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 20,
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
+  emptyRoutines: {
+    minHeight: 96,
+    borderRadius: UI.RADIUS_CONTAINER,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_LIGHT,
+    backgroundColor: COLORS.CARD_BG,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyRoutinesText: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 14,
     fontFamily: FONT_FAMILIES.MONO,
   },
   floatingActionWrap: {

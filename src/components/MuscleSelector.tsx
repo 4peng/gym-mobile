@@ -16,6 +16,7 @@ import { FONT_FAMILIES } from '@/constants/fonts';
 import { UI } from '@/constants/ui';
 import {
   expandPrimaryMusclesForDetailedMode,
+  collapseDetailedMusclesToPrimary,
   DETAILED_MODE_MUSCLE_GROUPS,
   DETAILED_MUSCLE_GROUPS,
   MUSCLE_LABELS,
@@ -96,6 +97,11 @@ const dragOffset = useRef(new Animated.Value(0)).current;
   };
 
   const handleToggleDetailed = () => {
+    setDraftSelectedMuscles((prev) =>
+      showDetailedMuscleGroups
+        ? collapseDetailedMusclesToPrimary(prev)
+        : expandPrimaryMusclesForDetailedMode(prev)
+    );
     toggleDetailedMuscleGroups();
     HapticFeedback.selection();
   };
@@ -212,23 +218,32 @@ const modalContent = (
     </View>
   );
 
+  const wasVisibleRef = useRef(false);
+
   useEffect(() => {
+    const wasVisible = wasVisibleRef.current;
+    wasVisibleRef.current = isVisible;
     if (isVisible) {
-      setDraftSelectedMuscles(normalizedSelectedMuscles);
-      setRenderVisible(true);
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-    } else {
+      if (!wasVisible) {
+        // Seed the draft from committed props only on the closed->open transition,
+        // so toggling Simple/Detailed mode while open doesn't discard in-progress edits.
+        setDraftSelectedMuscles(normalizedSelectedMuscles);
+        setRenderVisible(true);
+        Animated.timing(animValue, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (wasVisible) {
       Animated.timing(animValue, {
         toValue: 0,
         duration: 180,
         useNativeDriver: true,
       }).start(() => setRenderVisible(false));
     }
-  }, [isVisible, normalizedSelectedMuscles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible]);
 
   if (isControlled) {
     return renderVisible ? modalContent : null;

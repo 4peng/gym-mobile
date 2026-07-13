@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowUpDown, Check, ChevronRight, Play, Plus, Save, Trash2, X } from "lucide-react-native";
 
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { showAlert } from "@/utils/alerts";
 import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
@@ -71,10 +70,18 @@ export default function RoutineEditorScreen({
 
   const isCreateLike = mode === "create" || mode === "duplicate";
 
+  // Seed the form from props only once, on initial mount. `initialName`/
+  // `initialExercises` are derived from the programs store and can change
+  // identity mid-edit (e.g. a background sync merge) — re-running this on
+  // every such change would clobber in-progress unsaved edits.
+  const hasSeededRef = useRef(false);
   useEffect(() => {
+    if (hasSeededRef.current) return;
+    hasSeededRef.current = true;
     setName(initialName);
     setExercises(initialExercises);
-  }, [initialExercises, initialName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const initialSnapshot = useMemo(
     () => createRoutineSnapshot(initialName, initialExercises),
@@ -216,7 +223,7 @@ export default function RoutineEditorScreen({
           </Pressable>
         </View>
 
-<AnimatedScrollView
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -287,7 +294,7 @@ export default function RoutineEditorScreen({
           )}
 
           <View style={styles.listFooterSpacer} />
-        </AnimatedScrollView>
+        </ScrollView>
       </SafeAreaView>
 
       {optionsVisible ? (
@@ -356,7 +363,15 @@ export default function RoutineEditorScreen({
   );
 }
 
-function OptionItem({ icon, title, subtitle, onPress, danger }: any) {
+interface OptionItemProps {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  danger?: boolean;
+}
+
+function OptionItem({ icon, title, subtitle, onPress, danger }: OptionItemProps) {
   return (
     <Pressable
       onPress={onPress}

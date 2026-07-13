@@ -24,6 +24,7 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { showConfirm, showAlert } from "@/utils/alerts";
+import { workoutStorage } from "@/storage/workoutStorage";
 
 export default function SettingsScreen() {
   const router = useAppRouter();
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
   const forceResync = useSyncStore((s) => s.forceResync);
   const programs = useProgramStore((s) => s.programs);
   const history = useWorkoutSessionStore((s) => s.history);
+  const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
   const showDetailedMuscleGroups = useUiPreferencesStore(
     (s) => s.showDetailedMuscleGroups
   );
@@ -97,15 +99,34 @@ export default function SettingsScreen() {
     setAnalyticsBodyweight(parsed);
   }, [analyticsBodyweight, analyticsBodyweightText, setAnalyticsBodyweight]);
 
-  const handleExport = () => {
-    const data = {
-      exportDate: new Date().toISOString(),
-      programs,
-      history,
-    };
-    const json = JSON.stringify(data, null, 2);
-    Clipboard.setString(json);
-    showAlert("Success", "Backup data copied to clipboard! Save it in a text file.");
+  const handleExport = async () => {
+    try {
+      // The in-RAM history cache is capped at MAX_MEMORY_HISTORY sessions.
+      // Hydrate every remaining session from its on-disk shard so the export
+      // is complete, not just the recent ~15 sessions.
+      const cachedIds = new Set(history.map((s) => s._id));
+      const missingIds = historyIndex.filter((id) => !cachedIds.has(id));
+      const shards = missingIds.length > 0 ? await workoutStorage.getBatch(missingIds) : [];
+
+      const mergedById = new Map<string, (typeof history)[number]>();
+      for (const session of shards) mergedById.set(session._id, session);
+      for (const session of history) mergedById.set(session._id, session);
+
+      const fullHistory = Array.from(mergedById.values()).filter((s) => !s.deletedAt);
+      const activePrograms = programs.filter((p) => !p.deletedAt);
+
+      const data = {
+        exportDate: new Date().toISOString(),
+        programs: activePrograms,
+        history: fullHistory,
+      };
+      const json = JSON.stringify(data, null, 2);
+      Clipboard.setString(json);
+      showAlert("Success", "Backup data copied to clipboard! Save it in a text file.");
+    } catch (err) {
+      console.error("Failed to export backup:", err);
+      showAlert("Export Failed", "Could not gather your full backup. Please try again.");
+    }
   };
 
   const runMergeDiagnostic = () => {

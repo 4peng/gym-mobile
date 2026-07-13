@@ -35,19 +35,33 @@ export async function syncPrograms(): Promise<boolean> {
     }
   }
 
-  // Find programs that were updated since or at the last sync time
+  // Select dirty programs by per-item tracking (dirtyProgramIds) rather than a
+  // monotonic updatedAt-vs-lastSyncedAt watermark. The watermark approach
+  // silently dropped edits made DURING an in-flight sync (their updatedAt lands
+  // below the post-sync watermark, so they were never re-detected as dirty).
+  const dirtyIdSet = new Set(store.dirtyProgramIds);
   const dirtyPrograms = store.programs.filter(
-    (p) => p.updatedAt > (store.lastSyncedAt || 0) && !p.deletedAt
+    (p) => dirtyIdSet.has(p._id) && !p.deletedAt
   );
 
+  // Capture BEFORE the network push: any edit that lands during the await gets
+  // updatedAt > pushStartedAt, so clearDirtyPrograms keeps it dirty for the
+  // next round instead of clearing it against the version we actually pushed.
+  const pushStartedAt = Date.now();
   let pushedPrograms = [] as typeof dirtyPrograms;
   if (dirtyPrograms.length > 0) {
     const result = await batchUpsertPrograms(dirtyPrograms);
     if (!result) return false;
     pushedPrograms = result;
+    useProgramStore
+      .getState()
+      .clearDirtyPrograms(dirtyPrograms.map((p) => p._id), pushStartedAt);
   }
 
-  const since = store.lastSyncedAt ? Math.max(0, store.lastSyncedAt - 10000) : undefined;
+  // Use Math.max(1, ...) rather than 0 so a computed "since" of 0 is never
+  // sent — fetchPrograms/fetchWorkouts treat `since` truthiness inconsistently
+  // downstream, and a since=0 would be silently dropped by the programs path.
+  const since = store.lastSyncedAt ? Math.max(1, store.lastSyncedAt - 10000) : undefined;
   const remote = await fetchPrograms(since);
   if (!remote) return false;
 
@@ -117,7 +131,7 @@ export async function syncWorkouts(): Promise<boolean> {
       .clearDirtyWorkouts(dirtyWorkouts.map((workout) => workout._id));
   }
 
-  const since = store.lastSyncedAt ? Math.max(0, store.lastSyncedAt - 10000) : undefined;
+  const since = store.lastSyncedAt ? Math.max(1, store.lastSyncedAt - 10000) : undefined;
   const remote = await fetchWorkouts(undefined, undefined, since);
   if (!remote) return false;
 
@@ -136,28 +150,38 @@ export async function syncWorkouts(): Promise<boolean> {
 // Root Orchestrator
 // ──────────────────────────────────────────────
 
+let _syncPromise: Promise<boolean> | null = null;
+
 export async function runFullSync(): Promise<boolean> {
   if (_syncing) {
     _pendingSync = true;
-    return true;
+    // A sync is already in flight — piggyback on its result instead of
+    // falsely reporting success, so callers (e.g. pull-to-refresh) see the
+    // real outcome.
+    return _syncPromise ?? false;
   }
   _syncing = true;
-  let allSuccessful = true;
 
-  try {
-    do {
-      _pendingSync = false;
-      const [programsOk, workoutsOk] = await Promise.all([
-        syncPrograms(),
-        syncWorkouts(),
-      ]);
-      allSuccessful = allSuccessful && programsOk && workoutsOk;
-    } while (_pendingSync);
+  _syncPromise = (async () => {
+    let allSuccessful = true;
+    try {
+      do {
+        _pendingSync = false;
+        const [programsOk, workoutsOk] = await Promise.all([
+          syncPrograms(),
+          syncWorkouts(),
+        ]);
+        allSuccessful = allSuccessful && programsOk && workoutsOk;
+      } while (_pendingSync);
 
-    return allSuccessful;
-  } finally {
-    _syncing = false;
-  }
+      return allSuccessful;
+    } finally {
+      _syncing = false;
+      _syncPromise = null;
+    }
+  })();
+
+  return _syncPromise;
 }
 
 export function isSyncing(): boolean {

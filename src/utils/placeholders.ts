@@ -1,5 +1,6 @@
 import type { WorkoutSession, WorkoutSet, WorkoutExercise } from "@/types";
 import { convertWeight } from "./conversions";
+import { getExerciseIdentityKey, normalizeExerciseIdentityKey } from "./exerciseIdentity";
 
 /**
  * Placeholder values to show in the UI for a set whose weight/reps are null.
@@ -68,24 +69,6 @@ export function resolveExercisePlaceholders(
 }
 
 /**
- * When the user taps "Add Set" during a workout, the new set's placeholder
- * should mirror the immediately preceding set in the *current* exercise
- * (not from history). If there is no preceding set, returns nulls.
- */
-export function resolveAddSetPlaceholder(
-  currentSets: WorkoutSet[]
-): SetPlaceholder {
-  if (currentSets.length === 0) {
-    return { weight: null, reps: null };
-  }
-  const last = currentSets[currentSets.length - 1];
-  return {
-    weight: last.weight,
-    reps: last.reps,
-  };
-}
-
-/**
  * When the user completes a set without editing, we must resolve the
  * placeholder into a concrete value. Returns the resolved weight/reps
  * pair; the caller should write them to the store before marking complete.
@@ -112,15 +95,11 @@ function findMostRecentExercise(
   exerciseIdentityKey: string,
   history: WorkoutSession[]
 ): WorkoutExercise | null {
+  const normalizedTargetKey = normalizeExerciseIdentityKey(exerciseIdentityKey);
   for (const session of history) {
     if (!session.completedAt) continue; // skip incomplete
     const match = session.exercises.find(
-      (e) => {
-        const key =
-          (typeof e.exerciseDefinitionId === "string" && e.exerciseDefinitionId.trim()) ||
-          e.name;
-        return key.toLowerCase() === exerciseIdentityKey.toLowerCase();
-      }
+      (e) => getExerciseIdentityKey(e) === normalizedTargetKey
     );
     if (match) return match;
   }

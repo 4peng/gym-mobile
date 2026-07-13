@@ -1,11 +1,19 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IProgramSetTemplate {
+  type: 'working' | 'warmup' | 'dropset';
+}
+
 export interface IProgramExercise {
   id: string;
   exerciseDefinitionId?: string;
   trackingMode?: 'strength' | 'timed' | 'cardio';
   name: string;
-  defaultSets: number;
+  // Legacy docs store a plain set count (number). Current docs store the
+  // set-type template array so warmup/dropset markers survive sync. The
+  // schema field below uses Mixed so hydrating old numeric documents
+  // doesn't throw a cast error.
+  defaultSets: number | IProgramSetTemplate[];
   restSeconds: number;
   notes: string;
   weightUnit?: 'kg' | 'lbs';
@@ -28,7 +36,11 @@ const ProgramExerciseSchema = new Schema({
   exerciseDefinitionId: { type: String },
   trackingMode: { type: String, enum: ['strength', 'timed', 'cardio'], default: 'strength' },
   name: { type: String, required: true },
-  defaultSets: { type: Number, required: true },
+  // Mixed (not a typed array of subdocuments) so that legacy documents
+  // storing a plain number don't fail to cast/hydrate. New writes are the
+  // array-of-{type} shape ('working' | 'warmup' | 'dropset'); converters.ts
+  // on the client tolerantly reads both.
+  defaultSets: { type: Schema.Types.Mixed, required: true },
   restSeconds: { type: Number, required: true },
   notes: { type: String, default: '' },
   weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },

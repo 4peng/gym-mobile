@@ -15,7 +15,7 @@ import {
   Platform,
   PanResponder,
 } from "react-native";
-import { ChevronLeft, Calendar, Zap, Check, X, ChevronDown, Trophy, Activity, TrendingUp } from "lucide-react-native";
+import { Calendar, Check, X, ChevronDown, TrendingUp } from "lucide-react-native";
 import Svg, { Path, Line, Text as SvgText, Rect, G } from "react-native-svg";
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -54,7 +54,6 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
   
-  const [loading, setLoading] = useState(true);
   const [localFullHistory, setLocalFullHistory] = useState<WorkoutSession[]>([]);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [range, setRange] = useState<TimeRange>("30D");
@@ -79,7 +78,6 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
   useEffect(() => {
     let isMounted = true;
     const loadShards = async () => {
-      setLoading(true);
       try {
         // 1. Identify which IDs we already have in the 15-session RAM cache
         const cachedIds = new Set(historyCache.map(s => s._id));
@@ -105,11 +103,9 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
 
         if (isMounted) {
           setLocalFullHistory(combined);
-          setLoading(false);
         }
       } catch (err) {
         console.error("Failed to hydrate shards for trends:", err);
-        if (isMounted) setLoading(false);
       }
     };
 
@@ -174,6 +170,14 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
     let maxDailyVolume = 0;
     let lastVolume = 0;
 
+    const lastSessionWithEx = [...history].reverse().find((s) =>
+      s.exercises.find((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
+    );
+    const targetUnit =
+      lastSessionWithEx?.exercises.find(
+        (e) => getExerciseIdentityKey(e) === normalizedExerciseKey
+      )?.weightUnit || "kg";
+
     // First pass: Global maxes
     history.forEach(s => {
       s.exercises.forEach(ex => {
@@ -184,7 +188,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
                 ex,
                 set.weight,
                 ex.weightUnit || "kg",
-                ex.weightUnit || "kg",
+                targetUnit,
                 analyticsBodyweight,
                 analyticsBodyweightUnit
               );
@@ -224,14 +228,6 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
         hasPR: false
       });
     }
-
-    const lastSessionWithEx = [...history].reverse().find((s) => 
-      s.exercises.find((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
-    );
-    const targetUnit =
-      lastSessionWithEx?.exercises.find(
-        (e) => getExerciseIdentityKey(e) === normalizedExerciseKey
-      )?.weightUnit || "kg";
 
     // Second pass: Group logs by local date
     const logsByDate: { [key: string]: any } = {};
@@ -484,7 +480,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
   );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={UI.SHARED.iconBtn}>

@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
+  Animated,
   FlatList,
   ListRenderItem,
   Pressable,
@@ -56,10 +56,30 @@ export default function RestTimerPicker({
   const initialSelection = getPickerSelection(initialSeconds);
   const [selectedMin, setSelectedMin] = useState(initialSelection.minuteValue);
   const [selectedSec, setSelectedSec] = useState(initialSelection.secondValue);
+  const [renderVisible, setRenderVisible] = useState(visible);
 
   const minListRef = useRef<FlatList<number>>(null);
   const secListRef = useRef<FlatList<number>>(null);
   const isInitializingScroll = useRef(false);
+  const animValue = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  // Drive the backdrop/sheet animation on open/close.
+  useEffect(() => {
+    if (visible) {
+      setRenderVisible(true);
+      Animated.timing(animValue, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(animValue, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => setRenderVisible(false));
+    }
+  }, [visible]);
 
   // Sync wheel position to the current value every time the modal opens.
   useEffect(() => {
@@ -116,6 +136,16 @@ export default function RestTimerPicker({
     }
   };
 
+  const backdropOpacity = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.85],
+  });
+
+  const slideUp = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [PICKER_HEIGHT + 200, 0],
+  });
+
   const renderItem: ListRenderItem<number> = ({ item }) => (
     <View style={styles.item}>
       <Text style={styles.itemText}>
@@ -124,106 +154,109 @@ export default function RestTimerPicker({
     </View>
   );
 
+  if (!renderVisible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        {/* Sibling backdrop for closing on tap outside */}
-        <Pressable 
-          style={StyleSheet.absoluteFill} 
-          onPress={onClose} 
+    <View style={styles.overlay} pointerEvents="box-none">
+      {/* Sibling backdrop for closing on tap outside */}
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
         />
-        
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <X size={24} color={COLORS.DANGER} />
-            </Pressable>
-            <Text style={styles.title}>Rest Duration</Text>
-            <Pressable onPress={handleSave} style={styles.saveBtn}>
-              <Check size={24} color={COLORS.ACCENT_GREEN} />
-            </Pressable>
-          </View>
+      </Animated.View>
 
-          <View style={styles.pickerWrapper}>
-            {/* The absolute centered selection window */}
-            <View style={styles.selectionWindow} pointerEvents="none" />
+      <Animated.View
+        style={[styles.container, { transform: [{ translateY: slideUp }] }]}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={onClose} style={styles.closeBtn}>
+            <X size={24} color={COLORS.DANGER} />
+          </Pressable>
+          <Text style={styles.title}>Rest Duration</Text>
+          <Pressable onPress={handleSave} style={styles.saveBtn}>
+            <Check size={24} color={COLORS.ACCENT_GREEN} />
+          </Pressable>
+        </View>
 
-            <View style={styles.pickerContainer}>
-              {/* Minutes Column */}
-              <View style={styles.column}>
-                <Text style={styles.columnLabel}>MIN</Text>
-                <FlatList
-                  ref={minListRef}
-                  data={MINUTES}
-                  keyExtractor={(i) => `min-${i}`}
-                  style={styles.list}
-                  contentContainerStyle={styles.listContent}
-                  showsVerticalScrollIndicator={false}
-                  snapToInterval={ITEM_HEIGHT}
-                  snapToAlignment="center"
-                  decelerationRate="normal"
-                  bounces={false}
-                  onScroll={handleMinScroll}
-                  onMomentumScrollEnd={handleMinScroll}
-                  onScrollEndDrag={handleMinScroll}
-                  renderItem={renderItem}
-                  getItemLayout={(_, index) => (
-                    { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
-                  )}
-                  scrollEventThrottle={16}
-                />
-              </View>
+        <View style={styles.pickerWrapper}>
+          {/* The absolute centered selection window */}
+          <View style={styles.selectionWindow} pointerEvents="none" />
 
-              <Text style={styles.separator}>:</Text>
+          <View style={styles.pickerContainer}>
+            {/* Minutes Column */}
+            <View style={styles.column}>
+              <Text style={styles.columnLabel}>MIN</Text>
+              <FlatList
+                ref={minListRef}
+                data={MINUTES}
+                keyExtractor={(i) => `min-${i}`}
+                style={styles.list}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                snapToAlignment="center"
+                decelerationRate="normal"
+                bounces={false}
+                onScroll={handleMinScroll}
+                onMomentumScrollEnd={handleMinScroll}
+                onScrollEndDrag={handleMinScroll}
+                renderItem={renderItem}
+                getItemLayout={(_, index) => (
+                  { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
+                )}
+                scrollEventThrottle={16}
+              />
+            </View>
 
-              {/* Seconds Column */}
-              <View style={styles.column}>
-                <Text style={styles.columnLabel}>SEC</Text>
-                <FlatList
-                  ref={secListRef}
-                  data={SECONDS}
-                  keyExtractor={(i) => `sec-${i}`}
-                  style={styles.list}
-                  contentContainerStyle={styles.listContent}
-                  showsVerticalScrollIndicator={false}
-                  snapToInterval={ITEM_HEIGHT}
-                  snapToAlignment="center"
-                  decelerationRate="normal"
-                  bounces={false}
-                  onScroll={handleSecScroll}
-                  onMomentumScrollEnd={handleSecScroll}
-                  onScrollEndDrag={handleSecScroll}
-                  renderItem={renderItem}
-                  getItemLayout={(_, index) => (
-                    { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
-                  )}
-                  scrollEventThrottle={16}
-                />
-              </View>
+            <Text style={styles.separator}>:</Text>
+
+            {/* Seconds Column */}
+            <View style={styles.column}>
+              <Text style={styles.columnLabel}>SEC</Text>
+              <FlatList
+                ref={secListRef}
+                data={SECONDS}
+                keyExtractor={(i) => `sec-${i}`}
+                style={styles.list}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                snapToAlignment="center"
+                decelerationRate="normal"
+                bounces={false}
+                onScroll={handleSecScroll}
+                onMomentumScrollEnd={handleSecScroll}
+                onScrollEndDrag={handleSecScroll}
+                renderItem={renderItem}
+                getItemLayout={(_, index) => (
+                  { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
+                )}
+                scrollEventThrottle={16}
+              />
             </View>
           </View>
-          
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Selected: <Text style={{color: COLORS.ACCENT_BLUE}}>{selectedMin}m {selectedSec}s</Text>
-            </Text>
-          </View>
         </View>
-      </View>
-    </Modal>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Selected: <Text style={{color: COLORS.ACCENT_BLUE}}>{selectedMin}m {selectedSec}s</Text>
+          </Text>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10000,
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,1)',
   },
   container: {
     backgroundColor: COLORS.CARD_BG,

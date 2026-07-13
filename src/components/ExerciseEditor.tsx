@@ -19,6 +19,7 @@ import { MuscleGroup, MUSCLE_LABELS } from "@/src/constants/muscles";
 import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { HapticFeedback } from "@/utils/haptics";
+import { inferTrackingModeFromExerciseDefinition } from "@/utils/exerciseTracking";
 
 export interface ExerciseFormData {
   id: string;
@@ -62,6 +63,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
         exerciseDefinitionId: selectedExercise.id,
         name: selectedExercise.name,
         muscles: selectedExercise.muscles,
+        trackingMode: inferTrackingModeFromExerciseDefinition(selectedExercise),
       });
       setExercisePickerVisible(false);
     },

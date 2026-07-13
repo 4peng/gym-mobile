@@ -7,11 +7,12 @@ import { generateId } from "@/utils/id";
 import type { Program, ProgramExercise } from "@/types";
 import { normalizeExercises } from "@/shared/programs.js";
 
-const PROGRAM_STORE_VERSION = 5;
+const PROGRAM_STORE_VERSION = 6;
 
 interface ProgramState {
   programs: Program[];
   deletedProgramIds: string[];
+  dirtyProgramIds: string[];
   isDirty: boolean;
   lastSyncedAt: number | null;
 }
@@ -26,8 +27,8 @@ interface ProgramActions {
   getProgramById: (id: string) => Program | undefined;
   markDirty: () => void;
   clearDeletedPrograms: (ids: string[]) => void;
+  clearDirtyPrograms: (ids: string[], pushedAt: number) => void;
   applySyncMerge: (remote: Program[], syncStartTime: number) => void;
-  repairCorruptedData: () => void;
 }
 
 function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
@@ -60,25 +61,9 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
     immer((set, get) => ({
       programs: [],
       deletedProgramIds: [],
+      dirtyProgramIds: [],
       isDirty: false,
       lastSyncedAt: null,
-
-      repairCorruptedData: () => {
-        set((state) => {
-          state.programs.forEach((p) => {
-            if (typeof p.name === "object" && p.name !== null) {
-              const corrupted = p.name as any;
-              p.name = corrupted.name || "Untitled Program";
-              if (corrupted.exercises && (!p.exercises || p.exercises.length === 0)) {
-                p.exercises = corrupted.exercises;
-              }
-            }
-            if (!p.exercises) {
-              p.exercises = [];
-            }
-          });
-        });
-      },
 
       addProgram: (name, exercises) => {
         const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
@@ -92,6 +77,9 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
         };
         set((state) => {
           state.programs.push(newProgram);
+          if (!state.dirtyProgramIds.includes(newProgram._id)) {
+            state.dirtyProgramIds.push(newProgram._id);
+          }
           state.isDirty = true;
         });
       },
@@ -106,6 +94,9 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
             if (updates.exercises !== undefined) current.exercises = updates.exercises;
             if (updates.pinned !== undefined) current.pinned = updates.pinned;
             current.updatedAt = updatedAt;
+            if (!state.dirtyProgramIds.includes(id)) {
+              state.dirtyProgramIds.push(id);
+            }
             state.isDirty = true;
           }
         });
@@ -122,6 +113,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           if (!state.deletedProgramIds.includes(id)) {
             state.deletedProgramIds.push(id);
           }
+          state.dirtyProgramIds = state.dirtyProgramIds.filter((dirtyId) => dirtyId !== id);
           state.isDirty = true;
         });
       },
@@ -133,6 +125,9 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           if (program) {
             program.pinned = !program.pinned;
             program.updatedAt = updatedAt;
+            if (!state.dirtyProgramIds.includes(id)) {
+              state.dirtyProgramIds.push(id);
+            }
             state.isDirty = true;
           }
         });
@@ -217,13 +212,26 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
         });
       },
 
+      clearDirtyPrograms: (ids, pushedAt) => {
+        set((state) => {
+          if (ids.length === 0) return;
+          state.dirtyProgramIds = state.dirtyProgramIds.filter((id) => {
+            if (!ids.includes(id)) return true;
+            const program = state.programs.find((p) => p._id === id);
+            // Keep the id dirty if it was edited again after the snapshot we
+            // just pushed — otherwise that later edit would never get pushed.
+            return !!program && program.updatedAt > pushedAt;
+          });
+          state.isDirty = state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
+        });
+      },
+
       applySyncMerge: (remote, syncStartTime) => {
         set((state) => {
           if (remote.length === 0) {
             state.lastSyncedAt = syncStartTime;
             state.isDirty =
-              state.programs.some((p) => p.updatedAt > syncStartTime) ||
-              state.deletedProgramIds.length > 0;
+              state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
             return;
           }
 
@@ -257,8 +265,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
 
           state.lastSyncedAt = syncStartTime;
           state.isDirty =
-            state.programs.some((p) => p.updatedAt > syncStartTime) ||
-            state.deletedProgramIds.length > 0;
+            state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
         });
       },
     })),
@@ -274,6 +281,11 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
             : [],
           deletedProgramIds: Array.isArray(state?.deletedProgramIds)
             ? state!.deletedProgramIds
+                .map((id) => String(id))
+                .filter((id) => id.length > 0)
+            : [],
+          dirtyProgramIds: Array.isArray(state?.dirtyProgramIds)
+            ? state!.dirtyProgramIds
                 .map((id) => String(id))
                 .filter((id) => id.length > 0)
             : [],

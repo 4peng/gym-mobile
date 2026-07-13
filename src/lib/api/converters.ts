@@ -19,8 +19,10 @@ export function mapProgramToBackend(program: Program): ProgramServer {
       exerciseDefinitionId: e.exerciseDefinitionId,
       trackingMode: e.trackingMode,
       name: e.name,
-      // Server currently expects number (count). We send the length.
-      defaultSets: e.defaultSets.length,
+      // Send the full set-type template array (warmup/working/dropset) so
+      // set-type markers survive the sync round-trip instead of being
+      // collapsed to a bare count.
+      defaultSets: e.defaultSets,
       restSeconds: e.restSeconds,
       notes: e.notes,
       weightUnit: e.weightUnit,

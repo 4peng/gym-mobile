@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
-import { LayoutAnimation, StyleSheet, Text, View, InteractionManager, Animated, ScrollView, Alert, Pressable } from "react-native";
-import { Dumbbell, Plus } from "lucide-react-native";
+import { LayoutAnimation, StyleSheet, Text, TextInput, View, InteractionManager, Animated, ScrollView, Alert, Pressable } from "react-native";
+import { Dumbbell, Plus, Check, X } from "lucide-react-native";
 import { GestureHandlerRootView, GestureDetector, Gesture, Directions } from "react-native-gesture-handler";
 import { useAppRouter } from "@/utils/navigation";
 import { showConfirm } from "@/utils/alerts";
@@ -16,7 +16,7 @@ import { ExerciseCard } from "@/components/Workout/ExerciseCard";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
 import ExerciseNavMenu from "@/components/Workout/ExerciseNavMenu";
 import MuscleSelector from "@/components/MuscleSelector";
-import type { ExerciseDefinition } from "@/types";
+import type { ExerciseDefinition, ProgramExercise } from "@/types";
 import { MuscleGroup } from "@/constants/muscles";
 
 // Modular HUD Components
@@ -26,6 +26,7 @@ import { HUDPillNav } from "@/components/Workout/HUD/HUDPillNav";
 
 const SCRUB_STEP = 76; // Match ScrubberRail logic: 64 + 12
 const CONDENSE_THRESHOLD = 80;
+const EMPTY_MUSCLES: MuscleGroup[] = [];
 
 export default function WorkoutSessionScreen() {
   const router = useAppRouter();
@@ -51,12 +52,16 @@ const [navigationMenuVisible, setNavigationMenuVisible] = useState(false);
 const [isScrubbing, setIsScrubbing] = useState(false);
 const [scrubbingIndex, setScrubbingIndex] = useState<number | null>(null);
 const [musclePicker, setMusclePicker] = useState<{ visible: boolean; exerciseId: string | null }>({ visible: false, exerciseId: null });
+const [routineNamePrompt, setRoutineNamePrompt] = useState(false);
+const [routineNameDefault, setRoutineNameDefault] = useState("");
 
   const scrubberScrollRef = useRef<ScrollView>(null);
   const isFirstScrubRender = useRef(true);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const currentExercise = useWorkoutSessionStore((s) => s.activeSession?.exercises.find(e => e.id === activeExerciseId));
+  const musclePickerExercise = useWorkoutSessionStore((s) => s.activeSession?.exercises.find(e => e.id === musclePicker.exerciseId));
+  const musclePickerMuscles = musclePickerExercise?.muscles ?? EMPTY_MUSCLES;
   const activeIndex = useMemo(() => activeExerciseId ? exerciseIds.indexOf(activeExerciseId) : -1, [activeExerciseId, exerciseIds]);
 
   useEffect(() => { if (activeSessionId && !activeExerciseId && exerciseIds.length > 0) setActiveExerciseId(exerciseIds[0]); }, [activeSessionId, activeExerciseId, exerciseIds, setActiveExerciseId]);
@@ -89,51 +94,57 @@ const [musclePicker, setMusclePicker] = useState<{ visible: boolean; exerciseId:
 
   const handleFinishConfirmed = useCallback(() => { HapticFeedback.success(); completeSession(); setTimeout(() => router.replace("/programs/"), 100); }, [completeSession, router]);
   const handleDiscard = useCallback(() => { showConfirm("Discard Workout", "Are you sure? This cannot be undone.", () => { discardSession(); setTimeout(() => router.replace("/programs/"), 100); }); }, [discardSession, router]);
-  
+
+  const handleSaveRoutine = useCallback((name: string) => {
+    const session = useWorkoutSessionStore.getState().activeSession;
+    if (session) {
+      const programExercises: ProgramExercise[] = session.exercises.map((ex): ProgramExercise => ({
+        id: ex.id,
+        exerciseDefinitionId: ex.exerciseDefinitionId || "",
+        trackingMode: ex.trackingMode,
+        name: ex.name,
+        defaultSets: ex.sets.map((s) => ({ type: s.type || "working" })),
+        restSeconds: ex.restSeconds,
+        notes: ex.notes,
+        weightUnit: ex.weightUnit,
+        initialWeight: ex.sets[0]?.weight ?? null,
+        muscles: ex.muscles,
+        isBodyweight: ex.isBodyweight,
+      }));
+      addProgram(name, programExercises);
+    }
+    setRoutineNamePrompt(false);
+    handleFinishConfirmed();
+  }, [addProgram, handleFinishConfirmed]);
+
+  const handleCancelRoutinePrompt = useCallback(() => setRoutineNamePrompt(false), []);
+
   const handleFinish = useCallback(() => {
     const session = useWorkoutSessionStore.getState().activeSession;
     if (!session) return;
     if (progressData.total === 0) {
       Alert.alert("Empty Workout", "You haven't completed any sets. What would you like to do?", [{ text: "Resume", style: "cancel" }, { text: "Discard", style: "destructive", onPress: handleDiscard }, { text: "Finish Anyway", onPress: handleFinishConfirmed }]);
     } else {
-      Alert.alert("Finish Workout", "Mark this workout as complete?", [{ text: "Resume", style: "cancel" }, { text: "Save as Routine", onPress: () => { 
-        Alert.prompt("Save as Routine", "Enter a name for this routine:", [
-          { text: "Cancel", style: "cancel" }, 
-          { text: "Save", onPress: (name?: string) => { 
-            const routineName = name || "New Routine"; 
-            const programExercises = session.exercises.map(ex => ({
-              id: ex.id,
-              exerciseDefinitionId: ex.exerciseDefinitionId || "",
-              trackingMode: ex.trackingMode,
-              name: ex.name,
-              defaultSets: ex.sets.map(s => ({ type: s.type || "working" })),
-              restSeconds: ex.restSeconds,
-              notes: ex.notes,
-              weightUnit: ex.weightUnit,
-              initialWeight: ex.sets[0]?.weight ?? null,
-              muscles: ex.muscles,
-              isBodyweight: ex.isBodyweight
-            }));
-            addProgram(routineName, programExercises as any); handleFinishConfirmed();
-          }}
-        ]); 
+      Alert.alert("Finish Workout", "Mark this workout as complete?", [{ text: "Resume", style: "cancel" }, { text: "Save as Routine", onPress: () => {
+        setRoutineNameDefault(`Routine ${new Date().toLocaleDateString()}`);
+        setRoutineNamePrompt(true);
       } }, { text: "Just Finish", onPress: handleFinishConfirmed }]);
     }
-  }, [progressData.total, handleDiscard, handleFinishConfirmed, addProgram]);
+  }, [progressData.total, handleDiscard, handleFinishConfirmed]);
 
   const navigateToId = useCallback((id: string, skipAnimation = false) => { if (id === activeExerciseId) return; if (!skipAnimation) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setActiveExerciseId(id); HapticFeedback.selection(); }, [activeExerciseId, setActiveExerciseId]);
   const stepNavigation = useCallback((direction: 1 | -1) => { const nextIdx = activeIndex + direction; if (nextIdx >= 0 && nextIdx < exerciseIds.length) navigateToId(exerciseIds[nextIdx]); }, [activeIndex, exerciseIds, navigateToId]);
 
-  const swipeLeft = Gesture.Fling().direction(Directions.LEFT).runOnJS(true).onStart(() => stepNavigation(1));
-  const swipeRight = Gesture.Fling().direction(Directions.RIGHT).runOnJS(true).onStart(() => stepNavigation(-1));
+  const swipeLeft = useMemo(() => Gesture.Fling().direction(Directions.LEFT).runOnJS(true).onStart(() => stepNavigation(1)), [stepNavigation]);
+  const swipeRight = useMemo(() => Gesture.Fling().direction(Directions.RIGHT).runOnJS(true).onStart(() => stepNavigation(-1)), [stepNavigation]);
 
   const scrubStartIndex = useRef(activeIndex);
-  const scrubGesture = Gesture.Pan().activateAfterLongPress(250).runOnJS(true).onStart(() => { scrubStartIndex.current = activeIndex; setIsScrubbing(true); setScrubbingIndex(activeIndex); HapticFeedback.selection(); }).onUpdate((e) => {
+  const scrubGesture = useMemo(() => Gesture.Pan().activateAfterLongPress(250).runOnJS(true).onStart(() => { scrubStartIndex.current = activeIndex; setIsScrubbing(true); setScrubbingIndex(activeIndex); HapticFeedback.selection(); }).onUpdate((e) => {
     const sensitivity = 30; const delta = Math.round(e.translationX / sensitivity); let nextIdx = scrubStartIndex.current + delta; nextIdx = Math.max(0, Math.min(nextIdx, exerciseIds.length - 1));
     if (nextIdx !== scrubbingIndex) { setScrubbingIndex(nextIdx); navigateToId(exerciseIds[nextIdx], true); }
-  }).onEnd(() => { setIsScrubbing(false); setScrubbingIndex(null); }).onFinalize(() => { setIsScrubbing(false); setScrubbingIndex(null); });
-  
-  const composedGesture = Gesture.Race(scrubGesture, swipeLeft, swipeRight);
+  }).onEnd(() => { setIsScrubbing(false); setScrubbingIndex(null); }).onFinalize(() => { setIsScrubbing(false); setScrubbingIndex(null); }), [activeIndex, exerciseIds, scrubbingIndex, navigateToId]);
+
+  const composedGesture = useMemo(() => Gesture.Race(scrubGesture, swipeLeft, swipeRight), [scrubGesture, swipeLeft, swipeRight]);
   const onAddExerciseComplete = useCallback((def: ExerciseDefinition) => { addExercise(def); setExercisePickerVisible(false); }, [addExercise]);
 
   const toggleNavigationMenu = useCallback((visible: boolean) => {
@@ -165,10 +176,74 @@ const [musclePicker, setMusclePicker] = useState<{ visible: boolean; exerciseId:
           visible={musclePicker.visible}
           onClose={handleMusclePickerClose}
           onSelect={handleMusclesChange}
-          selectedMuscles={[]}
+          selectedMuscles={musclePickerMuscles}
+        />
+        <RoutineNamePrompt
+          visible={routineNamePrompt}
+          initialName={routineNameDefault}
+          onCancel={handleCancelRoutinePrompt}
+          onSave={handleSaveRoutine}
         />
       </View>
     </GestureHandlerRootView>
+  );
+}
+
+interface RoutineNamePromptProps {
+  visible: boolean;
+  initialName: string;
+  onCancel: () => void;
+  onSave: (name: string) => void;
+}
+
+function RoutineNamePrompt({ visible, initialName, onCancel, onSave }: RoutineNamePromptProps) {
+  const [name, setName] = useState(initialName);
+  const [renderVisible, setRenderVisible] = useState(false);
+  const animValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setName(initialName);
+      setRenderVisible(true);
+      Animated.timing(animValue, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    } else {
+      Animated.timing(animValue, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setRenderVisible(false));
+    }
+  }, [visible, initialName, animValue]);
+
+  const backdropOpacity = animValue.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] });
+  const slideUp = animValue.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
+
+  const handleSave = useCallback(() => {
+    const trimmed = name.trim();
+    onSave(trimmed.length > 0 ? trimmed : initialName);
+  }, [name, initialName, onSave]);
+
+  if (!renderVisible) return null;
+
+  return (
+    <View style={styles.promptOverlay} pointerEvents="box-none">
+      <Animated.View style={[styles.promptBackdrop, { opacity: backdropOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+      </Animated.View>
+      <Animated.View style={[styles.promptContainer, { transform: [{ translateY: slideUp }] }]}>
+        <View style={styles.promptHeader}>
+          <Pressable onPress={onCancel} style={styles.promptIconBtn} hitSlop={12}><X size={22} color={COLORS.DANGER} /></Pressable>
+          <Text style={styles.promptTitle}>Save as Routine</Text>
+          <Pressable onPress={handleSave} style={styles.promptIconBtn} hitSlop={12}><Check size={22} color={COLORS.ACCENT_GREEN} /></Pressable>
+        </View>
+        <TextInput
+          style={styles.promptInput}
+          value={name}
+          onChangeText={setName}
+          placeholder="Routine name"
+          placeholderTextColor={COLORS.TEXT_TERTIARY}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={handleSave}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
@@ -180,4 +255,11 @@ const styles = StyleSheet.create({
   noExerciseText: { color: COLORS.TEXT_TERTIARY, fontSize: 14, fontFamily: UI.SHARED.sectionLabel.fontFamily, fontWeight: "800", letterSpacing: 2 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 40 },
   emptyText: { color: COLORS.TEXT_SECONDARY, fontSize: 18, fontWeight: "800", marginTop: 20, fontFamily: UI.SHARED.sectionLabel.fontFamily },
+  promptOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10000, justifyContent: "flex-end" },
+  promptBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,1)" },
+  promptContainer: { backgroundColor: COLORS.CARD_BG, borderTopLeftRadius: UI.RADIUS_HUD, borderTopRightRadius: UI.RADIUS_HUD, paddingBottom: 40 },
+  promptHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 24, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  promptTitle: { color: COLORS.TEXT_PRIMARY, fontSize: 18, fontWeight: "800", fontFamily: UI.SHARED.sectionLabel.fontFamily },
+  promptIconBtn: { padding: 4 },
+  promptInput: { color: COLORS.TEXT_PRIMARY, fontSize: 16, fontWeight: "700", fontFamily: UI.SHARED.sectionLabel.fontFamily, paddingHorizontal: 24, paddingVertical: 20 },
 });

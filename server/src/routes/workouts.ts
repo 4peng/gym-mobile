@@ -26,7 +26,8 @@ router.get('/', async (req, res) => {
     
     if (since) {
       // Delta Sync: Fetch everything modified since last sync (including deleted)
-      query.updatedAt = { $gt: parseInt(since as string) };
+      const sinceNum = parseInt(since as string, 10);
+      query.updatedAt = { $gt: Number.isFinite(sinceNum) && sinceNum > 0 ? sinceNum : 0 };
     } else {
       // Initial Sync: Only fetch active (non-deleted) workouts
       query.deletedAt = null;
@@ -122,13 +123,28 @@ router.put('/batch', async (req, res) => {
 // DELETE a workout (Soft Delete)
 router.delete('/:id', async (req, res) => {
   try {
-    await Workout.updateOne(
-      { _id: req.params.id },
-      { 
+    const requestedUserId =
+      typeof req.query.userId === 'string'
+        ? req.query.userId
+        : typeof req.headers['x-user-id'] === 'string'
+          ? req.headers['x-user-id']
+          : undefined;
+    const filter: Record<string, string> = { _id: req.params.id };
+    if (requestedUserId) {
+      filter.userId = requestedUserId;
+    }
+
+    const updated = await Workout.findOneAndUpdate(
+      filter,
+      {
         deletedAt: Date.now(),
         updatedAt: Date.now()
-      }
+      },
+      { new: true }
     );
+    if (!updated) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to soft delete workout' });

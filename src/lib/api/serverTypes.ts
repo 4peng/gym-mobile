@@ -9,7 +9,11 @@ export interface ProgramExerciseServer {
   exerciseDefinitionId?: string;
   trackingMode?: string;
   name: string;
-  defaultSets: number;
+  // Legacy docs (pre-template-sync-fix) store a plain set count (number).
+  // Current docs store the full set-type template array so warmup/dropset
+  // markers survive the sync round-trip. converters.ts tolerantly reads
+  // both shapes.
+  defaultSets: number | Array<{ type: "working" | "warmup" | "dropset" }>;
   restSeconds: number;
   notes: string;
   weightUnit?: string;

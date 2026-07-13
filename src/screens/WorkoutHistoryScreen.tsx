@@ -315,8 +315,6 @@ export default function WorkoutHistoryScreen() {
     }
   };
 
-  const hasMoreToShow = history.length > displayLimit || hasMoreHistoryOnServer;
-
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1 }} 
@@ -539,18 +537,6 @@ const styles = StyleSheet.create({
   editIcon: {
     marginLeft: 4,
     padding: 2,
-  },
-  loadMoreBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 20,
-  },
-  loadMoreText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 14,
-    fontWeight: "700",
   },
   footerLoader: {
     paddingVertical: 40,

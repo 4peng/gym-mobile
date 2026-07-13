@@ -12,7 +12,6 @@ import { WORKOUT_STATS_KEY } from "@/storage/workoutStatsStorage";
 const APP_STORAGE_KEYS = [
   "program-store",
   "workout-session-store",
-  "exercise-library-store",
   WORKOUT_STATS_KEY,
 ] as const;
 const APP_STORAGE_PREFIXES = ["workout_"] as const;
@@ -81,7 +80,6 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
   forceResync: async () => {
     const { useProgramStore } = await import("./programStore");
     const { useWorkoutSessionStore } = await import("./workoutSessionStore");
-    const { useExerciseLibraryStore } = await import("./exerciseLibraryStore");
     const { runFullSync: engineRunFullSync } = await import("@/lib/api/sync");
 
     if (get().isSyncing) return false;
@@ -99,6 +97,9 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
       }
 
       // 2. Reset in-memory state
+      // Custom exercises and pinned exercise names are local-only and have
+      // no server source, so they must survive a resync rather than being wiped.
+      const { pinnedExerciseNames } = useWorkoutSessionStore.getState();
       useProgramStore.setState({
         programs: [],
         deletedProgramIds: [],
@@ -113,12 +114,9 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
         dirtyWorkoutIds: [],
         hasMoreHistory: true,
         activeRestTimer: null,
-        pinnedExerciseNames: [],
+        pinnedExerciseNames,
         isDirty: false,
         lastSyncedAt: null,
-      });
-      useExerciseLibraryStore.setState({
-        customExercises: [],
       });
 
       // 3. Run sync (it will now be a full sync because local is empty)

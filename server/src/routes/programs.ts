@@ -26,7 +26,8 @@ router.get('/', async (req, res) => {
     
     if (since) {
       // Delta Sync: Return everything modified since 'since' (including soft-deleted ones)
-      query.updatedAt = { $gt: parseInt(since as string) };
+      const sinceNum = parseInt(since as string, 10);
+      query.updatedAt = { $gt: Number.isFinite(sinceNum) && sinceNum > 0 ? sinceNum : 0 };
     } else {
       // Initial Sync: Only return active (non-deleted) programs
       query.deletedAt = null;

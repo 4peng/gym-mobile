@@ -28,6 +28,10 @@ export default function ActivityComboChart({
   );
   const chartCeil = Math.ceil(chartMax * 1.15); // Add 15% headroom
 
+  if (points.length === 0) {
+    return <View style={[styles.shell, { width }]} />;
+  }
+
   const drawWidth = Math.max(width - padding * 2, 0);
   const plotWidth = Math.max(drawWidth - horizontalInset * 2, 0);
   const chartStep = points.length > 1 ? plotWidth / (points.length - 1) : 0;

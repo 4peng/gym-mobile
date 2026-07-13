@@ -104,17 +104,7 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
 
   const handleSaveAndStart = useCallback((draft: RoutineDraft) => {
     try {
-      let nextProgram: Program | null = null;
-
-      if (variant === "edit") {
-        nextProgram = applyUpdate(draft);
-      } else {
-        const previousIds = new Set(useProgramStore.getState().programs.map((item) => item._id));
-        addProgram(draft.name, copyExercises(draft.exercises as any, generateId) as any);
-        const state = useProgramStore.getState();
-        nextProgram =
-          state.programs.find((item) => !item.deletedAt && !previousIds.has(item._id)) || null;
-      }
+      const nextProgram = applyUpdate(draft);
 
       if (!nextProgram) return;
 
@@ -135,7 +125,7 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
     } catch {
       showAlert("Error", "An unexpected error occurred while saving.");
     }
-  }, [activeSession, addProgram, applyUpdate, router, startFromProgram, variant]);
+  }, [activeSession, applyUpdate, router, startFromProgram]);
 
   const handleDelete = useCallback((_draft: RoutineDraft) => {
     if (variant !== "edit" || !id || !program) return;

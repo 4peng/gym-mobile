@@ -70,6 +70,7 @@ export const useUiPreferencesStore = create<
         showDetailedMuscleGroups: state.showDetailedMuscleGroups,
         analyticsBodyweight: state.analyticsBodyweight,
         analyticsBodyweightUnit: state.analyticsBodyweightUnit,
+        preferredWeightUnit: state.preferredWeightUnit,
       }),
     }
   )

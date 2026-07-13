@@ -31,14 +31,24 @@ if (!MONGODB_URI) {
 app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-// 2. Database connection middleware (MUST be before routes)
+// 2. Health check (reachable even when Mongo is down; reports real connection state)
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    readyState: mongoose.connection.readyState
+  });
+});
+
+// 3. Database connection middleware (MUST be before routes, but after /health)
 app.use(async (req, res, next) => {
   if (mongoose.connection.readyState === 1) {
     return next();
   }
-  
+
   try {
     console.log('Database not connected. Connecting now...');
     await mongoose.connect(MONGODB_URI!, {
@@ -50,16 +60,6 @@ app.use(async (req, res, next) => {
     console.error('Database connection error in middleware:', err);
     res.status(500).json({ error: 'Database connection failed' });
   }
-});
-
-// 3. Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    readyState: mongoose.connection.readyState
-  });
 });
 
 // 4. Routes

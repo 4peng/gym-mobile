@@ -15,11 +15,13 @@ import Svg, { Rect } from "react-native-svg";
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
+import { workoutStorage } from "@/storage/workoutStorage";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/src/components/Swipeable";
+import { WorkoutSession } from "@/src/types";
 import {
   DETAILED_MODE_MUSCLE_GROUPS,
   expandPrimaryMusclesForDetailedMode,
@@ -71,7 +73,12 @@ const MiniChart = ({ data }: { data: number[] }) => {
 export default function ExerciseListStatsScreen() {
   const router = useAppRouter();
   const rawHistory = useWorkoutSessionStore((s) => s.history);
-  const pinnedExerciseNames = useWorkoutSessionStore((s) => s.pinnedExerciseNames || []);
+  const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
+  const pinnedExerciseNamesRaw = useWorkoutSessionStore((s) => s.pinnedExerciseNames);
+  const pinnedExerciseNames = useMemo(
+    () => pinnedExerciseNamesRaw || [],
+    [pinnedExerciseNamesRaw]
+  );
   const togglePinExercise = useWorkoutSessionStore((s) => s.togglePinExercise);
   const showDetailedMuscleGroups = useUiPreferencesStore(
     (s) => s.showDetailedMuscleGroups
@@ -84,9 +91,36 @@ export default function ExerciseListStatsScreen() {
   const selectableMuscles: readonly MuscleGroup[] = showDetailedMuscleGroups
     ? (DETAILED_MODE_MUSCLE_GROUPS as readonly MuscleGroup[])
     : (MUSCLE_GROUPS as readonly MuscleGroup[]);
+  const [fullHistory, setFullHistory] = React.useState<WorkoutSession[]>(rawHistory);
+
+  /**
+   * Shard Hydration Strategy:
+   * The store only keeps ~15 sessions in RAM, so we load ALL shards from
+   * disk to make sure the aggregate stats reflect the entire history.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    const loadShards = async () => {
+      try {
+        const cachedIds = new Set(rawHistory.map((s) => s._id));
+        const missingIds = historyIndex.filter((id) => !cachedIds.has(id));
+        const shards = await workoutStorage.getBatch(missingIds);
+        if (isMounted) {
+          setFullHistory([...rawHistory, ...shards]);
+        }
+      } catch (err) {
+        console.error("Failed to hydrate shards for exercise stats:", err);
+        if (isMounted) setFullHistory(rawHistory);
+      }
+    };
+
+    loadShards();
+    return () => { isMounted = false; };
+  }, [rawHistory, historyIndex]);
+
   const history = useMemo(
-    () => rawHistory.filter((session) => !session.deletedAt),
-    [rawHistory]
+    () => fullHistory.filter((session) => !session.deletedAt),
+    [fullHistory]
   );
 
   useEffect(() => {
