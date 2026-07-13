@@ -704,9 +704,10 @@ export const useWorkoutSessionStore = create<
             }
             state.isDirty = true;
 
-            // Keep the RAM copy in sync if it got paged in while we awaited.
+            // Keep the RAM copy in sync if it got paged in while we awaited —
+            // but never clobber a newer edit that landed in the meantime.
             const cached = state.history.find((s) => s._id === sessionId);
-            if (cached) {
+            if (cached && cached.updatedAt <= session.updatedAt) {
               cached.completedAt = newDate;
               cached.updatedAt = session.updatedAt;
               state.history.sort(byCompletedAtDesc);
@@ -998,11 +999,13 @@ export const useWorkoutSessionStore = create<
             }
             state.isDirty = true;
 
-            // Keep the RAM copy in sync if it got paged in while we awaited.
+            // Keep the RAM copy in sync if it got paged in while we awaited —
+            // but never clobber a newer edit that landed via the RAM path in
+            // the meantime (compare updatedAt to avoid a lost-write race).
             const cached = state.history.find((s2) => s2._id === sessionId);
             const cachedEx = cached?.exercises.find((e) => e.id === exerciseId);
             const cachedSet = cachedEx?.sets.find((s2) => s2.id === setId);
-            if (cached && cachedSet) {
+            if (cached && cachedSet && cached.updatedAt <= session.updatedAt) {
               cachedSet[field] = value;
               cached.updatedAt = session.updatedAt;
             }
@@ -1480,6 +1483,11 @@ export const useWorkoutSessionStore = create<
           let historyChanged = false;
           const shardsToSave: WorkoutSession[] = [];
           const deletedIds = new Set<string>();
+          // How many sessions are currently paged into RAM. A full sync
+          // (since=undefined) returns the ENTIRE history; we must not keep all
+          // of it in memory, but we also must not evict what the user already
+          // paged in — so the post-merge cap is the larger of the two.
+          const priorLoadedCount = state.history.length;
 
           for (let i = 0; i < state.history.length; i++) {
             const lw = state.history[i];
@@ -1534,9 +1542,15 @@ export const useWorkoutSessionStore = create<
           if (historyChanged) {
             state.history = state.history.filter(w => !w.deletedAt);
             state.history.sort(byCompletedAtDesc);
-            // Note: intentionally NOT capping state.history here — a delta
-            // sync must not evict already-paged-in history (that would strand
-            // shard-backed sessions behind a permanently-disabled "Load More").
+            // Bound the RAM cache to what was already loaded (min MAX_MEMORY_HISTORY)
+            // so a full sync doesn't hold the entire history in memory, while
+            // never evicting sessions the user paged in. Anything trimmed here
+            // is still on disk shards + in historyIndex, so hasMoreHistory stays
+            // true and fetchMoreHistory can restore it.
+            const cap = Math.max(MAX_MEMORY_HISTORY, priorLoadedCount);
+            if (state.history.length > cap) {
+              state.history = state.history.slice(0, cap);
+            }
           }
 
           if (shardsToSave.length > 0) {

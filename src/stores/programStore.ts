@@ -155,6 +155,11 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
 
             if (programChanged) {
               program.updatedAt = updatedAt;
+              // Must mark the program dirty by id: syncPrograms pushes strictly
+              // by dirtyProgramIds, so an updatedAt bump alone would never sync.
+              if (!state.dirtyProgramIds.includes(program._id)) {
+                state.dirtyProgramIds.push(program._id);
+              }
               changed = true;
             }
           });
@@ -185,6 +190,11 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
 
             if (programChanged) {
               program.updatedAt = updatedAt;
+              // Must mark the program dirty by id: syncPrograms pushes strictly
+              // by dirtyProgramIds, so an updatedAt bump alone would never sync.
+              if (!state.dirtyProgramIds.includes(program._id)) {
+                state.dirtyProgramIds.push(program._id);
+              }
               changed = true;
             }
           });
