@@ -31,7 +31,7 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 - `app/programs/_layout.tsx` → programs stack
 
 ## Screen/Component/State Ownership
-- `ProgramsListScreen`: home/dashboard
+- `ProgramsListScreen`: home/dashboard + saved-routine list (start/edit/delete/pin via `ProgramTile`)
 - `ProgramEditorScreen`: routine create/edit
 - `CreateProgramScreen`, `EditProgramScreen`: wrappers to `ProgramEditorScreen`
 - `WorkoutSessionScreen`: live session
@@ -52,7 +52,7 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 - `SetRow.tsx`, `ExerciseCard.tsx`: live-workout components
 - `workoutSessionStore.ts`: workout state, history, sync metadata
 - `activeSessionStore.ts`, `workoutHistoryStore.ts`: selector wrappers
-- `programStore.ts`: program state, tombstones
+- `programStore.ts`: program state, per-item dirty tracking (`dirtyProgramIds`), tombstones
 - `exerciseLibraryStore.ts`: custom exercises
 - `uiPreferencesStore.ts`: UI preferences
 - `syncStore.ts`, `syncEffect.ts`: sync actions and triggers
@@ -60,9 +60,9 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 ## Persistence & Sync
 - `zustandAsyncStorage` (AsyncStorage adapter in `src/storage/mmkv.ts`) for persisted stores
 - Workouts sharded in `workoutStorage.ts`, recent in `workoutSessionStore`
-- `src/lib/api/sync.ts`: offline-first sync (push dirty → fetch deltas → merge via `updatedAt` → respect `deletedAt`)
+- `src/lib/api/sync.ts`: offline-first sync (push dirty → fetch deltas → merge via `updatedAt` → respect `deletedAt`). Programs push by `dirtyProgramIds`, workouts by `dirtyWorkoutIds` (per-item, not a timestamp watermark)
 - `networkListener.ts` triggers sync on reconnect
-- `forceResync()` clears app keys, reloads from server
+- `forceResync()` clears server-backed app keys and reloads; preserves local-only data (custom exercises, pinned exercises)
 
 ## Data Invariants
 - `updatedAt` is conflict-resolution field; `deletedAt` is tombstone flag
@@ -72,6 +72,8 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 - Exercise identity: prefer `exerciseDefinitionId`, fallback to canonical name
 - Tracking modes: `strength`, `timed`, `cardio`
 - Custom exercise IDs: `custom-` prefix; propagate renames globally
+- Custom exercises & pinned exercises are local-only (no server source); never wiped by sync/`forceResync`
+- Program `defaultSets` is a set-type template array (`working`/`warmup`/`dropset`), preserved through sync; legacy numeric counts are backfilled on read
 
 ## API & Backend
 - Mobile API: `src/lib/api/programs.ts`, `workouts.ts`, `converters.ts`
