@@ -27,7 +27,7 @@ export type PrimaryMuscleGroup = (typeof PRIMARY_MUSCLE_GROUPS)[number];
 export type DetailedMuscleGroup = (typeof DETAILED_MUSCLE_GROUPS)[number];
 export type MuscleGroup = PrimaryMuscleGroup | DetailedMuscleGroup;
 
-export const PRIMARY_TO_DETAILED_MAP: Readonly<Record<PrimaryMuscleGroup, readonly MuscleGroup[]>>;
+export const PRIMARY_TO_DETAILED_MAP: Readonly<Partial<Record<PrimaryMuscleGroup, readonly MuscleGroup[]>>>;
 export const DETAILED_TO_PRIMARY_MAP: Readonly<Record<DetailedMuscleGroup, PrimaryMuscleGroup>>;
 export const MUSCLE_GROUPS: typeof PRIMARY_MUSCLE_GROUPS;
 export const DETAILED_MODE_MUSCLE_GROUPS: readonly MuscleGroup[];
