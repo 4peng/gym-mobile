@@ -25,7 +25,6 @@ interface ProgramActions {
   renameExerciseDefinitionReferences: (exerciseDefinitionId: string, nextName: string) => void;
   removeExerciseDefinitionReferences: (exerciseDefinitionId: string) => void;
   getProgramById: (id: string) => Program | undefined;
-  markDirty: () => void;
   clearDeletedPrograms: (ids: string[]) => void;
   clearDirtyPrograms: (ids: string[], pushedAt: number) => void;
   applySyncMerge: (remote: Program[], syncStartTime: number) => void;
@@ -143,6 +142,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           let changed = false;
 
           state.programs.forEach((program) => {
+            if (program.deletedAt) return; // don't re-dirty tombstoned programs
             let programChanged = false;
 
             program.exercises.forEach((exercise) => {
@@ -179,6 +179,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           let changed = false;
 
           state.programs.forEach((program) => {
+            if (program.deletedAt) return; // don't re-dirty tombstoned programs
             let programChanged = false;
 
             program.exercises.forEach((exercise) => {
@@ -207,12 +208,6 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
 
       getProgramById: (id) => {
         return get().programs.find((p) => p._id === id && !p.deletedAt);
-      },
-
-      markDirty: () => {
-        set((state) => {
-          state.isDirty = true;
-        });
       },
 
       clearDeletedPrograms: (ids) => {
@@ -285,25 +280,32 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       version: PROGRAM_STORE_VERSION,
       migrate: (persistedState) => {
         const state = persistedState as Partial<ProgramState> | undefined;
+        const programs = Array.isArray(state?.programs)
+          ? state!.programs.map(normalizeProgram)
+          : [];
+        const deletedProgramIds = Array.isArray(state?.deletedProgramIds)
+          ? state!.deletedProgramIds.map((id) => String(id)).filter((id) => id.length > 0)
+          : [];
+        const lastSyncedAt =
+          typeof state?.lastSyncedAt === "number" && Number.isFinite(state.lastSyncedAt)
+            ? state.lastSyncedAt
+            : null;
+        // dirtyProgramIds was introduced in v6. When upgrading from an older
+        // persisted state that predates it, backfill from the previous
+        // watermark criterion (updatedAt > lastSyncedAt) so a pending offline
+        // edit made on the old build is not silently dropped at the version
+        // boundary (syncPrograms now pushes strictly by dirtyProgramIds).
+        const dirtyProgramIds = Array.isArray(state?.dirtyProgramIds)
+          ? state!.dirtyProgramIds.map((id) => String(id)).filter((id) => id.length > 0)
+          : programs
+              .filter((p) => !p.deletedAt && p.updatedAt > (lastSyncedAt || 0))
+              .map((p) => p._id);
         return {
-          programs: Array.isArray(state?.programs)
-            ? state!.programs.map(normalizeProgram)
-            : [],
-          deletedProgramIds: Array.isArray(state?.deletedProgramIds)
-            ? state!.deletedProgramIds
-                .map((id) => String(id))
-                .filter((id) => id.length > 0)
-            : [],
-          dirtyProgramIds: Array.isArray(state?.dirtyProgramIds)
-            ? state!.dirtyProgramIds
-                .map((id) => String(id))
-                .filter((id) => id.length > 0)
-            : [],
-          isDirty: !!state?.isDirty,
-          lastSyncedAt:
-            typeof state?.lastSyncedAt === "number" && Number.isFinite(state.lastSyncedAt)
-              ? state.lastSyncedAt
-              : null,
+          programs,
+          deletedProgramIds,
+          dirtyProgramIds,
+          isDirty: dirtyProgramIds.length > 0 || deletedProgramIds.length > 0,
+          lastSyncedAt,
         } as ProgramState;
       },
     }
