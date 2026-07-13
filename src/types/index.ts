@@ -85,25 +85,3 @@ export interface WorkoutSession {
   exercises: WorkoutExercise[];
   cumulativeRestSeconds?: number; // Total seconds spent resting
 }
-
-// Backend <-> Client conversion helpers
-// The canonical conversion boundary now lives in lib/api/converters.ts.
-// The helpers below are kept for backward compatibility but delegate to
-// the same logic: stringify _id / programId.
-
-export function toClientSession(raw: Record<string, unknown>): WorkoutSession {
-  return {
-    ...raw,
-    _id: String(raw._id),
-    programId: raw.programId ? String(raw.programId) : undefined,
-    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
-  } as WorkoutSession;
-}
-
-export function toClientProgram(raw: Record<string, unknown>): Program {
-  return {
-    ...raw,
-    _id: String(raw._id),
-    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
-  } as Program;
-}

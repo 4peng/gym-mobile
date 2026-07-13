@@ -32,19 +32,3 @@ export function formatSecondsToMMSS(totalSeconds: number): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-/**
- * Parses MM:SS or M:SS string into total seconds.
- */
-export function parseMMSSToSeconds(mmss: string): number {
-  const parts = mmss.split(":");
-  if (parts.length === 1) {
-    // Treat as seconds if no colon
-    const secs = parseInt(parts[0], 10);
-    return isNaN(secs) ? 0 : secs;
-  }
-  
-  const mins = parseInt(parts[0], 10) || 0;
-  const secs = parseInt(parts[1], 10) || 0;
-  
-  return mins * 60 + secs;
-}

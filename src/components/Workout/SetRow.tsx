@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, LayoutAnimation, Keyboard, Platform } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, LayoutAnimation, Keyboard } from "react-native";
 import { Check, X } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { COLORS } from "@/constants/colors";

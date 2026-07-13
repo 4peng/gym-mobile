@@ -118,12 +118,3 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   { id: "timed-exercise", name: "Timed Exercise", muscles: ["mobility"], aliases: ["time based exercise", "time based"] },
   { id: "cardio", name: "Cardio", muscles: ["core"], aliases: ["conditioning"] },
 ];
-
-export const EXERCISE_CATALOG_BY_ID = new Map(
-  EXERCISE_CATALOG.map((exercise) => [exercise.id, exercise])
-);
-
-export function getExerciseCatalogDefinitionById(id?: string | null) {
-  if (!id) return undefined;
-  return EXERCISE_CATALOG_BY_ID.get(id);
-}

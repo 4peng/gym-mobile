@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { zustandAsyncStorage } from "@/storage/mmkv";
 import { workoutStorage } from "@/storage/workoutStorage";
-import { workoutStatsStorage } from "@/storage/workoutStatsStorage";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import { MuscleGroup } from "@/constants/muscles";
@@ -599,7 +598,6 @@ export const useWorkoutSessionStore = create<
 
         // Shard the full session to dedicated storage (Async, performance win)
         workoutStorage.save(finalSession);
-        void workoutStatsStorage.upsertSession(finalSession);
 
         set((state) => {
           // Add to index and recent history cache
@@ -644,7 +642,6 @@ export const useWorkoutSessionStore = create<
       deleteHistorySession: (sessionId) => {
         // Remove from sharded storage
         workoutStorage.remove(sessionId);
-        void workoutStatsStorage.removeSessions([sessionId]);
 
         set((state) => {
           const workout = state.history.find(s => s._id === sessionId);
@@ -687,7 +684,6 @@ export const useWorkoutSessionStore = create<
 
           if (updatedSession) {
             workoutStorage.save(updatedSession);
-            void workoutStatsStorage.upsertSession(updatedSession);
           }
           return;
         }
@@ -701,7 +697,6 @@ export const useWorkoutSessionStore = create<
           session.updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
 
           await workoutStorage.save(session);
-          void workoutStatsStorage.upsertSession(session);
 
           set((state) => {
             if (!state.dirtyWorkoutIds.includes(sessionId)) {
@@ -979,7 +974,6 @@ export const useWorkoutSessionStore = create<
 
           if (updatedSession) {
             workoutStorage.save(updatedSession);
-            void workoutStatsStorage.upsertSession(updatedSession);
           }
           return;
         }
@@ -997,7 +991,6 @@ export const useWorkoutSessionStore = create<
           session.updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
 
           await workoutStorage.save(session);
-          void workoutStatsStorage.upsertSession(session);
 
           set((state) => {
             if (!state.dirtyWorkoutIds.includes(sessionId)) {
@@ -1212,7 +1205,6 @@ export const useWorkoutSessionStore = create<
           state.history = state.history.filter(s => !ids.includes(s._id) || !s.deletedAt);
           state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => !ids.includes(id));
         });
-        void workoutStatsStorage.removeSessions(ids);
       },
 
       clearDirtyWorkouts: (ids) => {
@@ -1473,7 +1465,6 @@ export const useWorkoutSessionStore = create<
       },
 
       applySyncMerge: (remote, syncStartTime) => {
-        let syncedSessions: WorkoutSession[] = [];
         let deletedSessionIds: string[] = [];
         set((state) => {
           if (remote.length === 0) {
@@ -1550,7 +1541,6 @@ export const useWorkoutSessionStore = create<
 
           if (shardsToSave.length > 0) {
             workoutStorage.saveBatch(shardsToSave);
-            syncedSessions = shardsToSave;
           }
 
           state.lastSyncedAt = syncStartTime;
@@ -1564,17 +1554,12 @@ export const useWorkoutSessionStore = create<
           state.hasMoreHistory = state.historyIndex.length > state.history.length;
         });
 
-        if (syncedSessions.length > 0) {
-          void workoutStatsStorage.upsertBatch(syncedSessions);
-        }
         if (deletedSessionIds.length > 0) {
           void workoutStorage.removeBatch(deletedSessionIds);
-          void workoutStatsStorage.removeSessions(deletedSessionIds);
         }
       },
 
       mergeRemoteWorkouts: (remote) => {
-        let newEntriesForStats: WorkoutSession[] = [];
         set((state) => {
           const localIds = new Set(state.history.map((w) => w._id));
           const newEntries = remote.filter((w) => !localIds.has(w._id) && !w.deletedAt);
@@ -1588,7 +1573,6 @@ export const useWorkoutSessionStore = create<
             
             // Batch save to shards
             workoutStorage.saveBatch(newEntries);
-            newEntriesForStats = safeClone(newEntries);
 
             // Grow the visible history cache with the newly fetched page.
             // Not capped here — this action's job is pagination growth; capping
@@ -1597,10 +1581,6 @@ export const useWorkoutSessionStore = create<
             state.history.sort(byCompletedAtDesc);
           }
         });
-
-        if (newEntriesForStats.length > 0) {
-          void workoutStatsStorage.upsertBatch(newEntriesForStats);
-        }
       },
     })),
     {

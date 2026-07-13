@@ -43,11 +43,6 @@ export const DETAILED_TO_PRIMARY_MAP = {
 
 export const MUSCLE_GROUPS = PRIMARY_MUSCLE_GROUPS;
 
-export const ALL_MUSCLE_GROUPS = [
-  ...PRIMARY_MUSCLE_GROUPS,
-  ...DETAILED_MUSCLE_GROUPS,
-];
-
 export const DETAILED_MODE_MUSCLE_GROUPS = PRIMARY_MUSCLE_GROUPS.flatMap((muscle) => {
   const mapped = PRIMARY_TO_DETAILED_MAP[muscle];
   return mapped ? [...mapped] : [muscle];

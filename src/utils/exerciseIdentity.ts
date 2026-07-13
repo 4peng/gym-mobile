@@ -88,13 +88,6 @@ export function getExerciseIdentityKey(exercise: ExerciseIdentityLike): string {
   );
 }
 
-export function matchesExerciseIdentity(
-  exercise: ExerciseIdentityLike,
-  identityKey: string
-): boolean {
-  return getExerciseIdentityKey(exercise) === normalizeExerciseIdentityKey(identityKey);
-}
-
 export function matchesExerciseSearchQuery(
   exercise: Pick<ExerciseIdentityLike, "name"> & { aliases?: string[] },
   query: string

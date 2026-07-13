@@ -1,5 +1,4 @@
 import type { ExerciseDefinition, ExerciseTrackingMode, WorkoutSet } from "@/types";
-import { formatSecondsToMMSS } from "@/utils/conversions";
 
 export const EXERCISE_TRACKING_OPTIONS: ExerciseTrackingMode[] = [
   "strength",
@@ -92,42 +91,3 @@ export function normalizeSetForTrackingMode(
   };
 }
 
-export function formatDistance(distance: number | null | undefined): string {
-  if (typeof distance !== "number" || !Number.isFinite(distance)) {
-    return "—";
-  }
-
-  const rounded = distance >= 10 ? distance.toFixed(1) : distance.toFixed(2);
-  return rounded.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
-}
-
-export function formatExerciseSetSummary(
-  set: WorkoutSet,
-  trackingMode: ExerciseTrackingMode
-): string {
-  const mode = normalizeTrackingMode(trackingMode);
-
-  if (mode === "timed") {
-    const seconds =
-      typeof set.durationSeconds === "number" && Number.isFinite(set.durationSeconds)
-        ? Math.max(0, Math.round(set.durationSeconds))
-        : null;
-    return seconds === null ? "—" : formatSecondsToMMSS(seconds);
-  }
-
-  if (mode === "cardio") {
-    const seconds =
-      typeof set.durationSeconds === "number" && Number.isFinite(set.durationSeconds)
-        ? Math.max(0, Math.round(set.durationSeconds))
-        : null;
-    const durationText = seconds === null ? "—" : formatSecondsToMMSS(seconds);
-    const distanceText = formatDistance(set.distance);
-    return `${durationText} • ${distanceText}`;
-  }
-
-  const weightText =
-    typeof set.weight === "number" && Number.isFinite(set.weight) ? String(set.weight) : "—";
-  const repsText =
-    typeof set.reps === "number" && Number.isFinite(set.reps) ? String(set.reps) : "—";
-  return `${weightText} × ${repsText}`;
-}

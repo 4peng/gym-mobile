@@ -13,7 +13,11 @@ import type { WorkoutSession } from '@/src/types';
 export default function MockDataInjector() {
   const router = useRouter();
   const [status, setStatus] = useState('Ready to inject 90 days of data');
-  
+
+  if (!__DEV__) {
+    return null;
+  }
+
   const injectData = () => {
     setStatus('Injecting...');
     

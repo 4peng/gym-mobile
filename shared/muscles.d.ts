@@ -30,7 +30,6 @@ export type MuscleGroup = PrimaryMuscleGroup | DetailedMuscleGroup;
 export const PRIMARY_TO_DETAILED_MAP: Readonly<Record<PrimaryMuscleGroup, readonly MuscleGroup[]>>;
 export const DETAILED_TO_PRIMARY_MAP: Readonly<Record<DetailedMuscleGroup, PrimaryMuscleGroup>>;
 export const MUSCLE_GROUPS: typeof PRIMARY_MUSCLE_GROUPS;
-export const ALL_MUSCLE_GROUPS: readonly MuscleGroup[];
 export const DETAILED_MODE_MUSCLE_GROUPS: readonly MuscleGroup[];
 export const MUSCLE_LABELS: Readonly<Record<MuscleGroup, string>>;
 

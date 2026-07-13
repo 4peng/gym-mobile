@@ -11,6 +11,7 @@ import { initSyncEffect } from '@/stores/syncEffect';
 import {
   clearAppNotifications,
   configureNotificationHandler,
+  requestNotificationPermissions,
 } from '@/utils/notifications';
 
 
@@ -21,6 +22,7 @@ export default function RootLayout() {
   useEffect(() => {
     configureNotificationHandler();
     void clearAppNotifications();
+    void requestNotificationPermissions();
 
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
