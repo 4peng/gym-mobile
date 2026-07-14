@@ -115,6 +115,12 @@ const dragOffset = useRef(new Animated.Value(0)).current;
     hide();
   };
 
+  // Latest-value ref so the PanResponder (created once below) always invokes
+  // the current applyAndClose (which closes over the latest draft selection,
+  // onSelect, and hide) instead of the one captured on first mount.
+  const applyAndCloseRef = useRef(applyAndClose);
+  applyAndCloseRef.current = applyAndClose;
+
   const backdropOpacity = animValue.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.85],
@@ -125,9 +131,10 @@ const slideUp = animValue.interpolate({
   outputRange: [600, 0],
 });
 
-// Drag-to-close functionality
-const panResponder = useRef(
-  PanResponder.create({
+// Drag-to-close functionality (PanResponder.create runs exactly once via lazy ref init)
+const panResponderRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+if (!panResponderRef.current) {
+  panResponderRef.current = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_, gestureState) => {
       // Only respond to vertical downward drags
@@ -142,7 +149,7 @@ const panResponder = useRef(
     onPanResponderRelease: (_, gestureState) => {
       if (gestureState.dy > 150) {
         // Close if dragged down more than 150px
-        applyAndClose();
+        applyAndCloseRef.current();
       }
       // Reset drag offset with spring animation
       Animated.spring(dragOffset, {
@@ -150,8 +157,9 @@ const panResponder = useRef(
         useNativeDriver: true,
       }).start();
     },
-  })
-).current;
+  });
+}
+const panResponder = panResponderRef.current;
 
 const modalContent = (
     <View style={styles.absoluteOverlay} pointerEvents="box-none">

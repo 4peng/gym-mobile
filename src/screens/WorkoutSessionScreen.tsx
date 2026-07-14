@@ -150,6 +150,10 @@ const [routineNameDefault, setRoutineNameDefault] = useState("");
     setNavigationMenuVisible(visible);
   }, []);
 
+  const handleOpenNavigationMenu = useCallback(() => toggleNavigationMenu(true), [toggleNavigationMenu]);
+  const handleStepPrev = useCallback(() => stepNavigation(-1), [stepNavigation]);
+  const handleStepNext = useCallback(() => stepNavigation(1), [stepNavigation]);
+
   if (!activeSessionId) return (<View style={styles.container}><View style={styles.emptyContainer}><Dumbbell size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} /><Text style={styles.emptyText}>No active session</Text></View></View>);
 
   return (
@@ -165,7 +169,7 @@ const [routineNameDefault, setRoutineNameDefault] = useState("");
         {isScrubbing && (<ScrubberRail exerciseIds={exerciseIds} exerciseNames={exerciseNames} exerciseProgress={exerciseProgress} displayIndex={scrubbingIndex ?? activeIndex} scrubberScrollRef={scrubberScrollRef} />)}
         
         <GestureDetector gesture={composedGesture}>
-          <HUDPillNav activeIndex={activeIndex} totalExercises={exerciseIds.length} onMenuPress={() => toggleNavigationMenu(true)} onDiscardPress={handleDiscard} onFinishPress={handleFinish} onPrevPress={() => stepNavigation(-1)} onNextPress={() => stepNavigation(1)} />
+          <HUDPillNav activeIndex={activeIndex} totalExercises={exerciseIds.length} onMenuPress={handleOpenNavigationMenu} onDiscardPress={handleDiscard} onFinishPress={handleFinish} onPrevPress={handleStepPrev} onNextPress={handleStepNext} />
         </GestureDetector>
         
         <ExerciseNavMenu visible={navigationMenuVisible} onClose={() => toggleNavigationMenu(false)} activeExerciseId={activeExerciseId} onSelect={setActiveExerciseId} onAddPress={() => setExercisePickerVisible(true)} />

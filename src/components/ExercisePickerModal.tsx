@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -138,9 +138,15 @@ const dragOffset = useRef(new Animated.Value(0)).current;
     }
   }, [renameTarget]);
 
-  // Drag-to-close functionality
-  const panResponder = useRef(
-    PanResponder.create({
+  // Latest-value ref so the PanResponder (created once below) always calls
+  // the current onClose prop instead of whatever was passed on first mount.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Drag-to-close functionality (PanResponder.create runs exactly once via lazy ref init)
+  const panResponderRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+  if (!panResponderRef.current) {
+    panResponderRef.current = PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return gestureState.dy > 5 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
@@ -152,15 +158,16 @@ const dragOffset = useRef(new Animated.Value(0)).current;
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150) {
-          onClose();
+          onCloseRef.current();
         }
         Animated.spring(dragOffset, {
           toValue: 0,
           useNativeDriver: true,
         }).start();
       },
-    })
-  ).current;
+    });
+  }
+  const panResponder = panResponderRef.current;
 
   const allExercises = useMemo(
     () => [...customExercises, ...EXERCISE_CATALOG],
@@ -289,6 +296,76 @@ const dragOffset = useRef(new Animated.Value(0)).current;
     }
   };
 
+  const renderExerciseItem = useCallback(
+    ({ item }: { item: ExerciseDefinition }) => {
+      const isSelected = item.id === selectedDefinitionId;
+      const subtitleText =
+        (item.muscles || []).length > 0
+          ? item.muscles
+              .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
+              .join(" - ")
+          : item.isCustom
+            ? "Custom exercise"
+            : "Uncategorized";
+
+      const content = (
+        <View
+          style={[
+            styles.item,
+            item.isCustom && styles.itemCustom,
+            isSelected && styles.itemSelected,
+          ]}
+        >
+          <Pressable
+            onPress={() => handleSelect(item)}
+            style={styles.itemMain}
+          >
+            <View style={styles.itemCopy}>
+              <Text style={styles.itemTitle}>{item.name}</Text>
+              <Text style={styles.itemSubtitle}>{subtitleText}</Text>
+            </View>
+            {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
+          </Pressable>
+
+          {item.isCustom ? (
+            <Pressable
+              onPress={() => startRenameCustomExercise(item)}
+              hitSlop={16}
+              style={({ pressed }) => [
+                styles.customBadge,
+                pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
+              ]}
+            >
+              <Pencil size={14} color={COLORS.ACCENT_GREEN} />
+            </Pressable>
+          ) : null}
+        </View>
+      );
+
+      if (item.isCustom) {
+        return (
+          <View style={styles.swipeWrapper}>
+            <Swipeable
+              onDelete={() => handleDeleteCustomExercise(item.id)}
+              onToggleScroll={setScrollEnabled}
+              borderRadius={UI.RADIUS_INPUT}
+              marginBottom={0}
+            >
+              {content}
+            </Swipeable>
+          </View>
+        );
+      }
+
+      return (
+        <View style={{ marginHorizontal: 16 }}>
+          {content}
+        </View>
+      );
+    },
+    [selectedDefinitionId, handleSelect, startRenameCustomExercise, handleDeleteCustomExercise]
+  );
+
   if (!renderVisible) return null;
 
   return (
@@ -355,72 +432,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           scrollEnabled={scrollEnabled}
-          renderItem={({ item }) => {
-            const isSelected = item.id === selectedDefinitionId;
-            const subtitleText =
-              (item.muscles || []).length > 0
-                ? item.muscles
-                    .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
-                    .join(" - ")
-                : item.isCustom
-                  ? "Custom exercise"
-                  : "Uncategorized";
-
-            const content = (
-              <View
-                style={[
-                  styles.item,
-                  item.isCustom && styles.itemCustom,
-                  isSelected && styles.itemSelected,
-                ]}
-              >
-                <Pressable
-                  onPress={() => handleSelect(item)}
-                  style={styles.itemMain}
-                >
-                  <View style={styles.itemCopy}>
-                    <Text style={styles.itemTitle}>{item.name}</Text>
-                    <Text style={styles.itemSubtitle}>{subtitleText}</Text>
-                  </View>
-                  {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
-                </Pressable>
-
-                {item.isCustom ? (
-                  <Pressable
-                    onPress={() => startRenameCustomExercise(item)}
-                    hitSlop={16}
-                    style={({ pressed }) => [
-                      styles.customBadge,
-                      pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
-                    ]}
-                  >
-                    <Pencil size={14} color={COLORS.ACCENT_GREEN} />
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-
-            if (item.isCustom) {
-              return (
-                <View style={styles.swipeWrapper}>
-                  <Swipeable
-                    onDelete={() => handleDeleteCustomExercise(item.id)}
-                    onToggleScroll={setScrollEnabled}
-                    borderRadius={UI.RADIUS_INPUT}
-                    marginBottom={0}
-                  >
-                    {content}
-                  </Swipeable>
-                </View>
-              );
-            }
-
-            return (
-              <View style={{ marginHorizontal: 16 }}>
-                {content}
-              </View>
-            );
-          }}
+          renderItem={renderExerciseItem}
           ListEmptyComponent={
             !canAddCustomExercise ? (
               <View style={styles.emptyState}>

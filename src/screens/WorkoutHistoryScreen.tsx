@@ -75,7 +75,7 @@ interface WorkoutSessionCardProps {
   onToggleScroll: (enabled: boolean) => void;
 }
 
-const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: WorkoutSessionCardProps) => {
+const WorkoutSessionCard = React.memo(function WorkoutSessionCard({ session, programName, onDelete, onToggleScroll }: WorkoutSessionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const updateHistorySet = useUpdateHistorySet();
   const updateSessionDate = useUpdateSessionDate();
@@ -141,9 +141,9 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
     setEditingSet(null);
   };
 
-  const exerciseSummary = session.exercises
+  const exerciseSummary = useMemo(() => session.exercises
     .map(e => `${e.sets.length} × ${toTitleCase(e.name)}`)
-    .join(", ");
+    .join(", "), [session.exercises]);
 
   return (
     <Swipeable onDelete={() => onDelete(session._id)} onToggleScroll={onToggleScroll}>
@@ -246,7 +246,7 @@ const WorkoutSessionCard = ({ session, programName, onDelete, onToggleScroll }: 
       </View>
     </Swipeable>
   );
-};
+});
 
 
 // ──────────────────────────────────────────────
@@ -269,20 +269,28 @@ export default function WorkoutHistoryScreen() {
   const hasMoreHistoryOnServer = useHasMoreWorkoutHistory();
   const deleteHistorySession = useDeleteHistorySession();
   const fetchMoreHistory = useFetchMoreWorkoutHistory();
-  const getProgramById = useProgramStore((s) => s.getProgramById);
-  
+  const programs = useProgramStore((s) => s.programs);
+  const programsById = useMemo(() => {
+    const map = new Map<string, (typeof programs)[number]>();
+    for (const p of programs) {
+      if (p.deletedAt) continue;
+      map.set(p._id, p);
+    }
+    return map;
+  }, [programs]);
+
   const [displayLimit, setDisplayLimit] = useState(10);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     Alert.alert(
       "Delete Workout",
       "Are you sure you want to remove this session from your history?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
+        {
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             deleteHistorySession(id);
@@ -290,7 +298,7 @@ export default function WorkoutHistoryScreen() {
         }
       ]
     );
-  };
+  }, [deleteHistorySession]);
 
   const handleLoadMore = async () => {
     if (loadingMore) return;
@@ -313,9 +321,18 @@ export default function WorkoutHistoryScreen() {
     }
   };
 
+  const renderItem = useCallback(({ item }: { item: WorkoutSession }) => (
+    <WorkoutSessionCard
+      session={item}
+      programName={item.programId ? programsById.get(item.programId)?.name : undefined}
+      onDelete={handleDelete}
+      onToggleScroll={setScrollEnabled}
+    />
+  ), [programsById, handleDelete]);
+
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
       behavior="padding"
       keyboardVerticalOffset={0}
     >
@@ -352,14 +369,7 @@ export default function WorkoutHistoryScreen() {
               <Text style={styles.emptySubtext}>Complete your first workout to see it here.</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <WorkoutSessionCard
-              session={item}
-              programName={item.programId ? getProgramById(item.programId)?.name : undefined}
-              onDelete={handleDelete}
-              onToggleScroll={setScrollEnabled}
-            />
-          )}
+          renderItem={renderItem}
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>

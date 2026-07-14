@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect } from "react";
+import React, { useMemo, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -28,7 +28,45 @@ import {
   MuscleGroup,
 } from "@/constants/muscles";
 import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
-import { resolveEffectiveStrengthLoad } from "@/utils/bodyweightAnalytics";
+import { isBodyweightStrengthExercise, type WeightUnit } from "@/utils/bodyweightAnalytics";
+import { convertWeight } from "@/utils/conversions";
+
+// Mirrors resolveEffectiveStrengthLoad from utils/bodyweightAnalytics, but takes the
+// bodyweight-exercise flag as a precomputed input instead of resolving exercise
+// identity on every call, since that resolution only depends on the exercise (not
+// the individual set) and previously ran once per set in a per-exercise loop.
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function resolveEffectiveLoadForKnownBodyweight(
+  isBodyweightExercise: boolean,
+  loggedWeight: number | null,
+  loggedWeightUnit: WeightUnit,
+  targetUnit: WeightUnit,
+  analyticsBodyweight: number | null,
+  analyticsBodyweightUnit: WeightUnit
+): number | null {
+  if (!isBodyweightExercise) {
+    return isFiniteNumber(loggedWeight)
+      ? convertWeight(loggedWeight, loggedWeightUnit, targetUnit)
+      : loggedWeight;
+  }
+
+  const extraLoad = isFiniteNumber(loggedWeight)
+    ? convertWeight(loggedWeight, loggedWeightUnit, targetUnit) ?? loggedWeight
+    : 0;
+
+  if (!isFiniteNumber(analyticsBodyweight)) {
+    return extraLoad;
+  }
+
+  const convertedBodyweight =
+    convertWeight(analyticsBodyweight, analyticsBodyweightUnit, targetUnit) ??
+    analyticsBodyweight;
+
+  return convertedBodyweight + extraLoad;
+}
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -89,32 +127,67 @@ export default function ExerciseListStatsScreen() {
   const selectableMuscles: readonly MuscleGroup[] = showDetailedMuscleGroups
     ? (DETAILED_MODE_MUSCLE_GROUPS as readonly MuscleGroup[])
     : (MUSCLE_GROUPS as readonly MuscleGroup[]);
-  const [fullHistory, setFullHistory] = React.useState<WorkoutSession[]>(rawHistory);
+  // Shards already fetched from disk, keyed by session _id, so repeated
+  // hydration passes never re-request a shard we already have in memory.
+  const hydratedShardsRef = useRef<Map<string, WorkoutSession>>(new Map());
+  const [diskShards, setDiskShards] = React.useState<WorkoutSession[]>([]);
 
   /**
    * Shard Hydration Strategy:
-   * The store only keeps ~15 sessions in RAM, so we load ALL shards from
-   * disk to make sure the aggregate stats reflect the entire history.
+   * The store only keeps ~15 sessions in RAM, so we load the remaining
+   * shards from disk to make sure the aggregate stats reflect the entire
+   * history. This only needs to run when the set of known session ids
+   * actually grows/shrinks (historyIndex.length) — not on every store
+   * write, which would otherwise re-read every shard from disk each time
+   * (e.g. on every pin toggle or unrelated store mutation).
    */
+  // Depend on the historyIndex ARRAY (not just its length): its reference is
+  // stable across per-keystroke store writes (those mutate activeSession/history,
+  // not historyIndex) but changes whenever a session is added OR removed — so
+  // this stays perf-safe while correctly reacting to deletions and same-length
+  // membership swaps (e.g. a sync that drops N deleted ids and adds N new ones).
   useEffect(() => {
     let isMounted = true;
+    // Evict cached shards whose session is no longer in the index (deleted),
+    // so removed workouts stop contributing to aggregates.
+    const validIds = new Set(historyIndex);
+    for (const id of Array.from(hydratedShardsRef.current.keys())) {
+      if (!validIds.has(id)) hydratedShardsRef.current.delete(id);
+    }
     const loadShards = async () => {
       try {
         const cachedIds = new Set(rawHistory.map((s) => s._id));
-        const missingIds = historyIndex.filter((id) => !cachedIds.has(id));
-        const shards = await workoutStorage.getBatch(missingIds);
+        const missingIds = historyIndex.filter(
+          (id) => !cachedIds.has(id) && !hydratedShardsRef.current.has(id)
+        );
+        if (missingIds.length > 0) {
+          const shards = await workoutStorage.getBatch(missingIds);
+          shards.forEach((s) => hydratedShardsRef.current.set(s._id, s));
+        }
         if (isMounted) {
-          setFullHistory([...rawHistory, ...shards]);
+          setDiskShards(Array.from(hydratedShardsRef.current.values()));
         }
       } catch (err) {
         console.error("Failed to hydrate shards for exercise stats:", err);
-        if (isMounted) setFullHistory(rawHistory);
       }
     };
 
     loadShards();
     return () => { isMounted = false; };
-  }, [rawHistory, historyIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyIndex]);
+
+  const fullHistory = useMemo(() => {
+    // Only merge cached shards that are still live in the index — guards
+    // against a deleted session lingering in diskShards before the effect
+    // eviction publishes.
+    const validIds = new Set(historyIndex);
+    const cachedIds = new Set(rawHistory.map((s) => s._id));
+    const extraShards = diskShards.filter(
+      (s) => validIds.has(s._id) && !cachedIds.has(s._id)
+    );
+    return [...rawHistory, ...extraShards];
+  }, [rawHistory, diskShards, historyIndex]);
 
   const history = useMemo(
     () => fullHistory.filter((session) => !session.deletedAt),
@@ -158,14 +231,19 @@ export default function ExerciseListStatsScreen() {
           );
         }
         
+        // Resolved once per exercise (not per set) since it only depends on
+        // the exercise's identity, not on any individual set's data.
+        const exWeightUnit = ex.weightUnit || "kg";
+        const exIsBodyweight = isBodyweightStrengthExercise(ex);
+
         let vol = 0;
         ex.sets.forEach(s => {
           if (!s.completedAt || s.reps === null || !Number.isFinite(s.reps)) return;
-          const effectiveLoad = resolveEffectiveStrengthLoad(
-            ex,
+          const effectiveLoad = resolveEffectiveLoadForKnownBodyweight(
+            exIsBodyweight,
             s.weight,
-            ex.weightUnit || "kg",
-            ex.weightUnit || "kg",
+            exWeightUnit,
+            exWeightUnit,
             analyticsBodyweight,
             analyticsBodyweightUnit
           );
@@ -219,6 +297,76 @@ export default function ExerciseListStatsScreen() {
     togglePinExercise(identityKey);
   }, [togglePinExercise]);
 
+  const renderMuscleFilterItem = useCallback(
+    ({ item }: { item: string }) => {
+      const isAllChip = item === "all";
+      const isActive = isAllChip
+        ? selectedMuscles.length === 0
+        : selectedMuscles.includes(item as MuscleGroup);
+      return (
+        <Pressable
+          onPress={() => toggleMuscleFilter(item as MuscleGroup | "all")}
+          style={[
+            styles.filterPill,
+            isActive && styles.filterPillActive
+          ]}
+        >
+          <Text style={[
+            styles.filterText,
+            isActive && styles.filterTextActive
+          ]}>
+            {isAllChip ? "All" : MUSCLE_LABELS[item as MuscleGroup]}
+          </Text>
+        </Pressable>
+      );
+    },
+    [selectedMuscles, toggleMuscleFilter]
+  );
+
+  const renderExerciseItem = useCallback(
+    ({ item }: { item: (typeof exerciseStats)[number] }) => (
+      <Swipeable
+        onDelete={() => {}} // No delete on insights page
+        onPin={() => handlePin(item.key)}
+        onToggleScroll={setScrollEnabled}
+      >
+        <Pressable
+          style={({ pressed }) => [
+            UI.SHARED.card,
+            { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 0, borderRadius: 0 },
+            pressed && { backgroundColor: COLORS.CARD_HOVER }
+          ]}
+          onPress={() => router.push(`/exercises/${encodeURIComponent(item.key)}/volume`)}
+        >
+          <View style={styles.itemInfo}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.itemName}>{toTitleCase(item.name)}</Text>
+              {item.isPinned && (
+                <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+              )}
+            </View>
+            <View style={styles.muscleRow}>
+              {item.muscles.length > 0 ? (
+                item.muscles.map((m, i) => (
+                  <Text key={m} style={styles.muscleLabel}>
+                    {MUSCLE_LABELS[m]}{i < item.muscles.length - 1 ? " • " : ""}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.itemSub}>No category</Text>
+              )}
+            </View>
+          </View>
+
+          <MiniChart data={item.recentVolume} />
+
+          <ChevronRight size={20} color={COLORS.BORDER_LIGHT} style={{ marginLeft: 16 }} />
+        </Pressable>
+      </Swipeable>
+    ),
+    [handlePin, router, setScrollEnabled]
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -249,28 +397,7 @@ export default function ExerciseListStatsScreen() {
           data={["all", ...selectableMuscles]}
           keyExtractor={(item) => item}
           contentContainerStyle={styles.filterContainer}
-          renderItem={({ item }) => {
-            const isAllChip = item === "all";
-            const isActive = isAllChip
-              ? selectedMuscles.length === 0
-              : selectedMuscles.includes(item as MuscleGroup);
-            return (
-              <Pressable
-                onPress={() => toggleMuscleFilter(item as MuscleGroup | "all")}
-                style={[
-                  styles.filterPill,
-                  isActive && styles.filterPillActive
-                ]}
-              >
-                <Text style={[
-                  styles.filterText,
-                  isActive && styles.filterTextActive
-                ]}>
-                  {isAllChip ? "All" : MUSCLE_LABELS[item as MuscleGroup]}
-                </Text>
-              </Pressable>
-            );
-          }}
+          renderItem={renderMuscleFilterItem}
         />
       </View>
 
@@ -288,46 +415,7 @@ export default function ExerciseListStatsScreen() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <Swipeable 
-            onDelete={() => {}} // No delete on insights page
-            onPin={() => handlePin(item.key)} 
-            onToggleScroll={setScrollEnabled}
-          >
-            <Pressable
-              style={({ pressed }) => [
-                UI.SHARED.card,
-                { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 0, borderRadius: 0 },
-                pressed && { backgroundColor: COLORS.CARD_HOVER }
-              ]}
-              onPress={() => router.push(`/exercises/${encodeURIComponent(item.key)}/volume`)}
-            >
-              <View style={styles.itemInfo}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.itemName}>{toTitleCase(item.name)}</Text>
-                  {item.isPinned && (
-                    <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-                  )}
-                </View>
-                <View style={styles.muscleRow}>
-                  {item.muscles.length > 0 ? (
-                    item.muscles.map((m, i) => (
-                      <Text key={m} style={styles.muscleLabel}>
-                        {MUSCLE_LABELS[m]}{i < item.muscles.length - 1 ? " • " : ""}
-                      </Text>
-                    ))
-                  ) : (
-                    <Text style={styles.itemSub}>No category</Text>
-                  )}
-                </View>
-              </View>
-              
-              <MiniChart data={item.recentVolume} />
-              
-              <ChevronRight size={20} color={COLORS.BORDER_LIGHT} style={{ marginLeft: 16 }} />
-            </Pressable>
-          </Swipeable>
-        )}
+        renderItem={renderExerciseItem}
       />
     </View>
   );

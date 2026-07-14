@@ -1605,8 +1605,13 @@ export const useWorkoutSessionStore = create<
         normalizePersistedWorkoutState(
           persistedState as Partial<WorkoutSessionState> | undefined
         ),
-      // Optimization: Only persist structural metadata and the recent history cache.
-      // Full session objects are sharded to workoutStorage.
+      // Persist the recent-history cache (kept sorted+capped to MAX_MEMORY_HISTORY
+      // elsewhere) alongside structural metadata. NOTE: write COST is controlled
+      // by the per-key debounce in src/storage/mmkv.ts (coalesces the many
+      // per-keystroke writes during an active workout into ~one write / 400ms),
+      // not by dropping `history` here — persisting it keeps rehydration correct
+      // (historyIndex is a membership set, not recency-sorted) and preserves a
+      // second durable copy of a just-completed session.
       partialize: (state) => ({
         history: state.history,
         historyIndex: state.historyIndex,

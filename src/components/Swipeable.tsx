@@ -42,6 +42,15 @@ export const Swipeable = ({
   const wasOpenAtStart = useRef(false);
   const hapticTriggered = useRef(false);
 
+  // Latest-value refs so the PanResponder (created once below) always reads
+  // the current props instead of closing over whatever was passed on mount.
+  const onPinRef = useRef(onPin);
+  onPinRef.current = onPin;
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
+  const onToggleScrollRef = useRef(onToggleScroll);
+  onToggleScrollRef.current = onToggleScroll;
+
   useEffect(() => {
     const listenerId = translateX.addListener(({ value }) => {
       lastOffset.current = value;
@@ -58,13 +67,14 @@ export const Swipeable = ({
     return () => translateX.removeListener(listenerId);
   }, [translateX]);
 
-  const panResponder = useRef(
-    PanResponder.create({
+  const panResponderRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+  if (!panResponderRef.current) {
+    panResponderRef.current = PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         const { dx, dy } = gestureState;
         const isAlreadyOpen = Math.abs(lastOffset.current) > 5;
-        const isCorrectDirection = isAlreadyOpen ? true : (dx < -12 || (!!onPin && dx > 12));
+        const isCorrectDirection = isAlreadyOpen ? true : (dx < -12 || (!!onPinRef.current && dx > 12));
         const isHorizontal = Math.abs(dx) > Math.abs(dy) * 2;
         const reachedThreshold = Math.abs(dx) > 12;
         return isHorizontal && reachedThreshold && isCorrectDirection;
@@ -73,8 +83,8 @@ export const Swipeable = ({
       onPanResponderGrant: () => {
         translateX.stopAnimation();
         gestureStartOffset.current = lastOffset.current;
-        wasOpenAtStart.current = Math.abs(gestureStartOffset.current) > REVEAL_THRESHOLD; 
-        onToggleScroll?.(false); 
+        wasOpenAtStart.current = Math.abs(gestureStartOffset.current) > REVEAL_THRESHOLD;
+        onToggleScrollRef.current?.(false);
         translateX.setOffset(gestureStartOffset.current);
         translateX.setValue(0);
         hapticTriggered.current = Math.abs(gestureStartOffset.current) > REVEAL_THRESHOLD;
@@ -85,7 +95,7 @@ export const Swipeable = ({
         const rawTotal = gestureStartOffset.current + dx;
 
         if (rawTotal > 0) {
-          if (!onPin) {
+          if (!onPinRef.current) {
              const resistance = Math.pow(rawTotal, 0.4);
              translateX.setValue(resistance - gestureStartOffset.current);
              return;
@@ -109,11 +119,11 @@ export const Swipeable = ({
 
       onPanResponderRelease: (_, gestureState) => {
         const { vx } = gestureState;
-        onToggleScroll?.(true); 
+        onToggleScrollRef.current?.(true);
         translateX.flattenOffset();
         const finalValue = lastOffset.current;
 
-        if (finalValue > 5 && onPin) {
+        if (finalValue > 5 && onPinRef.current) {
            const isFlickRight = vx > 0.3;
            const isFlickLeft = vx < -0.3;
            const isPastReveal = finalValue > REVEAL_THRESHOLD;
@@ -129,7 +139,7 @@ export const Swipeable = ({
         if (finalValue < -threshold) {
           HapticFeedback.heavy();
           Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }).start(() => {
-            onDelete();
+            onDeleteRef.current();
             translateX.setValue(0);
             setIsOpen(false);
           });
@@ -147,7 +157,7 @@ export const Swipeable = ({
       },
 
       onPanResponderTerminate: () => {
-        onToggleScroll?.(true); 
+        onToggleScrollRef.current?.(true);
         translateX.flattenOffset();
         const finalValue = lastOffset.current;
         const shouldBeOpenLeft = finalValue < -REVEAL_THRESHOLD;
@@ -156,8 +166,9 @@ export const Swipeable = ({
         Animated.spring(translateX, { toValue, useNativeDriver: true, tension: 50, friction: 12 }).start(() => setIsOpen(shouldBeOpenLeft || shouldBeOpenRight));
       },
       onShouldBlockNativeResponder: () => true,
-    })
-  ).current;
+    });
+  }
+  const panResponder = panResponderRef.current;
 
   const handleDelete = () => {
     HapticFeedback.heavy();

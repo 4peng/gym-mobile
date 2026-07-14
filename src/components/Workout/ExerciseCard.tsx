@@ -6,7 +6,7 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import type { WorkoutExercise } from "@/types";
-import { resolveExercisePlaceholders } from "@/utils/placeholders";
+import { resolveExercisePlaceholders, type SetPlaceholder } from "@/utils/placeholders";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "@/components/RestTimerPicker";
 import { showConfirm } from "@/utils/alerts";
@@ -48,7 +48,19 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   const handleNotesChange = useCallback((text: string) => { updateExerciseField(exercise.id, "notes", text); }, [exercise.id, updateExerciseField]);
   const handleTrackingModeChange = useCallback((trackingMode: ExerciseTrackingMode) => { updateExerciseField(exercise.id, "trackingMode", trackingMode); }, [exercise.id, updateExerciseField]);
   const handleShowTrackingPicker = () => { trackingSegmentRef.current?.measureInWindow((x, y, width, height) => { setTrackingAnchor({ x, y, width, height }); setTrackingPickerVisible(true); }); };
-  const placeholders = useMemo(() => exercise.trackingMode === "strength" ? resolveExercisePlaceholders(getExerciseIdentityKey(exercise), exercise.sets, history, exercise.weightUnit || "kg") : [], [exercise, history]);
+  const exerciseIdentityKey = getExerciseIdentityKey(exercise);
+  const lastPlaceholdersRef = useRef<SetPlaceholder[]>([]);
+  const placeholders = useMemo(() => {
+    const next = exercise.trackingMode === "strength" ? resolveExercisePlaceholders(exerciseIdentityKey, exercise.sets, history, exercise.weightUnit || "kg") : [];
+    const prev = lastPlaceholdersRef.current;
+    // Keep positional identity stable so unaffected SetRows (React.memo) bail out of re-rendering.
+    const stabilized = next.map((p, i) => {
+      const prevP = prev[i];
+      return prevP && prevP.weight === p.weight && prevP.reps === p.reps ? prevP : p;
+    });
+    lastPlaceholdersRef.current = stabilized;
+    return stabilized;
+  }, [exercise.sets, exercise.trackingMode, exercise.weightUnit, exerciseIdentityKey, history]);
   const handleAddSet = useCallback(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); addSet(exercise.id); }, [exercise.id, addSet]);
   const handleRemoveExercise = useCallback(() => { showConfirm("Remove Exercise", `Remove "${exercise.name}"?`, () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); removeExercise(exercise.id); }); }, [exercise.id, exercise.name, removeExercise]);
   const handleUnitToggle = useCallback(() => { HapticFeedback.selection(); toggleExerciseUnit(exercise.id); }, [exercise.id, toggleExerciseUnit]);
