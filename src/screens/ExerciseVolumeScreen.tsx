@@ -347,6 +347,18 @@ const LogRow = React.memo(function LogRow({
   );
 });
 
+function StatTile({ label, value, unit }: { label: string; value: number; unit: string }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={TYPE.label}>{label}</Text>
+      <Text style={[TYPE.monoLarge, { fontSize: 24 }]}>
+        {Math.round(value)}
+        <Text style={[TYPE.monoSmall, { color: COLORS.TEXT_TERTIARY }]}> {unit}</Text>
+      </Text>
+    </View>
+  );
+}
+
 // ── Screen ──
 
 export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: string }) {
@@ -479,16 +491,6 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
   );
 
   const { unit, buckets, logs, stats } = data;
-  const StatTile = ({ label, value }: { label: string; value: number }) => (
-    <View style={{ flex: 1 }}>
-      <Text style={TYPE.label}>{label}</Text>
-      <Text style={[TYPE.monoLarge, { fontSize: 24 }]}>
-        {Math.round(value)}
-        <Text style={[TYPE.monoSmall, { color: COLORS.TEXT_TERTIARY }]}> {unit}</Text>
-      </Text>
-    </View>
-  );
-
   return (
     <KeyboardAvoidingView style={UI.screen} behavior="padding">
       <View style={styles.header}>
@@ -531,9 +533,9 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
             </Pressable>
 
             <View style={styles.statsRow}>
-              <StatTile label="Est. 1RM" value={stats.max1RM} />
-              <StatTile label="Max daily" value={stats.maxDaily} />
-              <StatTile label="Last log" value={stats.lastVolume} />
+              <StatTile label="Est. 1RM" value={stats.max1RM} unit={unit} />
+              <StatTile label="Max daily" value={stats.maxDaily} unit={unit} />
+              <StatTile label="Last log" value={stats.lastVolume} unit={unit} />
             </View>
 
             <VolumeChart key={range} buckets={buckets} unit={unit} range={range} />

@@ -53,6 +53,14 @@ describe("startNetworkSyncListener", () => {
     unsub();
   });
 
+  it("restores instead of pushing when a reconnect finds an empty install", async () => {
+    mockLocalEmpty = true;
+    await start(false);
+    handler()(netState(true));
+    expect(mockRestore).toHaveBeenCalledTimes(1);
+    expect(mockPushPending).not.toHaveBeenCalled();
+  });
+
   it("throttles a second reconnect inside 60s", async () => {
     await start(false);
     handler()(netState(true));

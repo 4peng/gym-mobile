@@ -33,9 +33,15 @@ function pushIfDue(): void {
 
 const isOnline = (state: NetInfoState) => !!state.isConnected && !!state.isInternetReachable;
 
+/** Fresh installs restore; everything else pushes whatever is pending (throttled). */
+function syncIfDue(): void {
+  if (isLocalEmpty()) void useSyncStore.getState().restoreFromCloud();
+  else pushIfDue();
+}
+
 function handleConnectivityChange(state: NetInfoState): void {
   const online = isOnline(state);
-  if (online && _wasOffline) pushIfDue();
+  if (online && _wasOffline) syncIfDue();
   _wasOffline = !online;
 }
 
@@ -49,10 +55,7 @@ export function startNetworkSyncListener(): () => void {
       return;
     }
     // Deferred so the first paint isn't competing with network work.
-    InteractionManager.runAfterInteractions(() => {
-      if (isLocalEmpty()) void useSyncStore.getState().restoreFromCloud();
-      else pushIfDue();
-    });
+    InteractionManager.runAfterInteractions(syncIfDue);
   });
 
   return unsubscribe;

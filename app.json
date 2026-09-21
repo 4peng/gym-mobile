@@ -9,7 +9,10 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.x4peng.gym-mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "plugins": [
       "expo-router",
