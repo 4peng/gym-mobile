@@ -5,7 +5,6 @@
 // The base URL can be swapped per environment.
 
 import { USER_ID } from "@/constants/user";
-import { Platform } from "react-native";
 import Constants from "expo-constants";
 
 /**
@@ -19,9 +18,6 @@ const LOCAL_PORT = "4000";
 
 const getBaseUrl = () => {
   if (ENV === "prod") return PROD_URL;
-
-  // Local logic
-  if (Platform.OS === 'web') return `http://localhost:${LOCAL_PORT}`;
 
   // If we are on a physical device, we must use the machine's local IP
   // instead of "localhost" (which would refer to the phone itself).

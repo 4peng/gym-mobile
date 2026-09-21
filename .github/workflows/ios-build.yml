@@ -24,9 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
-
       - name: Expo Prebuild
         run: npx expo prebuild --platform ios
 

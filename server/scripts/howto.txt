@@ -1,2 +1,0 @@
-  - npm run seed:year
-  - npm run seed:year:remove

@@ -1,12 +1,11 @@
 {
-  "name": "my-project",
+  "name": "gym-mobile",
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
     "ios": "expo start --ios",
-    "routine-web": "powershell -ExecutionPolicy Bypass -File ./Start-RoutineLab.ps1",
     "typecheck": "tsc --noEmit --pretty false --incremental false",
     "lint": "eslint .",
     "format": "prettier --write \"{src,app,shared}/**/*.{ts,tsx,js}\"",
@@ -37,7 +36,6 @@
     "immer": "^11.1.4",
     "lucide-react-native": "^0.575.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "~2.28.0",
