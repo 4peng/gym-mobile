@@ -21,17 +21,7 @@
         "expo-widgets",
         {
           "frequentUpdates": true,
-          "widgets": [
-            {
-              "name": "RestTimerLiveActivity",
-              "displayName": "Rest Timer",
-              "description": "Shows the active workout rest timer.",
-              "contentMarginsDisabled": true,
-              "supportedFamilies": [
-                "systemSmall"
-              ]
-            }
-          ]
+          "widgets": []
         }
       ],
       "expo-font"

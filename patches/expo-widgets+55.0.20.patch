@@ -1,0 +1,49 @@
+diff --git a/node_modules/expo-widgets/ios/WidgetsStorage.swift b/node_modules/expo-widgets/ios/WidgetsStorage.swift
+index 74c905a..2bc11f9 100644
+--- a/node_modules/expo-widgets/ios/WidgetsStorage.swift
++++ b/node_modules/expo-widgets/ios/WidgetsStorage.swift
+@@ -1,7 +1,43 @@
++import Foundation
++
+ enum WidgetsStorage {
+-  static var appGroupIdentifier: String? = Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String
++  /// The app group configured at build time (`ExpoWidgetsAppGroupIdentifier` in Info.plist).
++  static let configuredAppGroupIdentifier: String? =
++    Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String
++
++  /// The app group this bundle is actually entitled to. Sideloading tools re-sign apps with a
++  /// per-team group id (AltStore appends the team id and records the result under `ALTAppGroups`),
++  /// so the configured id is only a fallback; otherwise the app and the widget extension would
++  /// write to and read from two different containers and every widget would render empty.
++  static var appGroupIdentifier: String? = resolveAppGroupIdentifier()
+   static let defaults = UserDefaults(suiteName: appGroupIdentifier)
+ 
++  private static func resolveAppGroupIdentifier() -> String? {
++    let configured = configuredAppGroupIdentifier
++    let entitled =
++      (Bundle.main.object(forInfoDictionaryKey: "ALTAppGroups") as? [String])
++      ?? provisioningProfileAppGroups()
++    if let configured, let match = entitled.first(where: { $0.hasPrefix(configured) }) {
++      return match
++    }
++    return entitled.first ?? configured
++  }
++
++  /// App groups listed in the embedded provisioning profile's entitlements.
++  private static func provisioningProfileAppGroups() -> [String] {
++    guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
++          let data = try? Data(contentsOf: url),
++          let start = data.range(of: Data("<?xml".utf8)),
++          let end = data.range(of: Data("</plist>".utf8)),
++          start.lowerBound < end.upperBound,
++          let plist = try? PropertyListSerialization.propertyList(
++            from: data.subdata(in: start.lowerBound..<end.upperBound), format: nil) as? [String: Any],
++          let entitlements = plist["Entitlements"] as? [String: Any] else {
++      return []
++    }
++    return entitlements["com.apple.security.application-groups"] as? [String] ?? []
++  }
++
+   static func set(_ value: [String: Any], forKey key: String) {
+     guard let defaults else { return }
+ 

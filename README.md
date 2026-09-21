@@ -33,8 +33,21 @@ CI runs all of the above on every push. `ios-build.yml` produces an unsigned IPA
 The rest-timer Live Activity is a widget extension (`expo-widgets`). It ships inside the IPA as a
 second bundle id (`com.x4peng.gym-mobile.ExpoWidgetsTarget`). When signing the IPA with your
 sideloading tool, keep app extensions enabled so the extension is signed alongside the app;
-if the tool asks whether to strip extensions, say no. Nothing else is needed: the timer runs on
-`timerInterval`, so no push token or server is involved.
+if the tool asks whether to strip extensions, say no. The timer runs on `timerInterval`, so no
+push token or server is involved.
+
+The app hands the activity's layout to the extension through an App Group, so both bundles must
+end up entitled to the same group after re-signing:
+
+- CI ad-hoc signs the app and the extension with the `group.<bundle id>` entitlement (an unsigned
+  app has no entitlements and AltStore only re-signs the ones it finds).
+- AltStore renames the group per team (`group.<bundle id>.<TEAMID>`). `patches/expo-widgets+*.patch`
+  makes `expo-widgets` look up the entitled group at runtime (`ALTAppGroups` in Info.plist, then the
+  embedded provisioning profile) instead of trusting the build-time constant. `npm install` applies
+  the patch via `patch-package`.
+
+If the Live Activity appears but renders as an empty card, the two bundles are not sharing a
+group: check the tool kept App Groups when it signed.
 
 ## Layout
 

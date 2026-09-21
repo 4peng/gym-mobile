@@ -91,7 +91,34 @@ jobs:
           
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
-          zip -r GymMobile.ipa Payload
+
+      - name: Embed the App Group entitlement (ad-hoc signature)
+        # Sideloaders (AltStore) copy entitlements from the existing signature when they
+        # re-sign. An unsigned app has none, so the widget extension would never share an
+        # App Group with the app and the Live Activity would render as an empty card.
+        run: |
+          APP=$(find Payload -maxdepth 1 -name "*.app" -type d | head -n 1)
+          GROUP=$(node -p "'group.' + require('./app.json').expo.ios.bundleIdentifier")
+          cat > appgroup.entitlements <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.security.application-groups</key>
+            <array><string>$GROUP</string></array>
+          </dict>
+          </plist>
+          EOF
+          find "$APP/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) \
+            -exec codesign --force --sign - {} \; 2>/dev/null || true
+          for EXT in "$APP"/PlugIns/*.appex; do
+            [ -d "$EXT" ] && codesign --force --sign - --entitlements appgroup.entitlements "$EXT"
+          done
+          codesign --force --sign - --entitlements appgroup.entitlements "$APP"
+          codesign -d --entitlements :- "$APP" 2>/dev/null | head -n 20 || true
+
+      - name: Package IPA
+        run: zip -r GymMobile.ipa Payload
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
