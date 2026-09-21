@@ -14,7 +14,7 @@ const conn = (): SQLiteDatabase => {
 };
 
 /** expo-sqlite bound to the app database; opened lazily on first use. */
-export const appDriver: SqlDriver = {
+const appDriver: SqlDriver = {
   all: <T>(sql: string, params: SqlParam[] = []) => conn().getAllSync<T>(sql, params),
   first: <T>(sql: string, params: SqlParam[] = []) => conn().getFirstSync<T>(sql, params),
   run: (sql, params = []) => {

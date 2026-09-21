@@ -1,105 +1,97 @@
 # Repository Guidelines
 
 ## Purpose
-Expo Router workout tracker (iOS only) with an Express + Mongo backend. Core: routine creation, live workouts, history, offline sync.
+Personal, single-device workout tracker. Expo Router (iOS only, Expo SDK 55) with SQLite on the
+phone; an Express + Mongo mirror exists only so data survives reinstalling a sideloaded build.
 
 ## Project Structure
 - `app/`: Expo Router routes (thin: each renders one screen)
 - `src/screens/`: Screen implementations
-- `src/components/`: Reusable UI (`Workout/` live-workout pieces, `Workout/HUD/` session HUD, `Home/` dashboard chart)
-- `src/hooks/`: `useSheet` / `useDragToClose` (sheet mount + animation plumbing)
-- `src/stores/`: Zustand stores
-- `src/storage/`: AsyncStorage adapter + workout shards
-- `src/lib/api/`: API client, sync engine, converters
+- `src/components/`: Feature components (`Workout/` live-workout pieces, `Workout/HUD/` session HUD, `Home/` dashboard chart)
+- `src/components/ui/`: Primitives: `IconButton`, `ScreenHeader`, `SegmentedControl`, `Chip`, `Sheet`, `EmptyState`, `SectionLabel`
+- `src/constants/theme.ts`: every design token (`COLORS`, `SURFACE`, `SPACE`, `RADIUS`, `TYPE`, `UI`, fonts)
+- `src/hooks/useSheet.ts`: sheet mount/animation + drag-to-close (used by `Sheet`)
+- `src/db/`: SQLite layer (`driver.ts` schema + driver interface, `workoutRepo.ts`, `dbVersion.ts`, `migrateFromAsyncStorage.ts`, `index.ts` expo-sqlite binding)
+- `src/stores/`: Zustand stores (small, AsyncStorage-persisted)
+- `src/storage/asyncStorage.ts`: debounced AsyncStorage adapter for the stores
+- `src/lib/api/`: HTTP client, `backup.ts`, converters, `networkListener.ts`
 - `src/utils/`: Shared helpers
-- `src/widgets/`: iOS Live Activity
-- `src/constants/`, `src/data/`: Constants and exercise catalog
+- `src/widgets/`: iOS Live Activity (SwiftUI via `expo-widgets`; exempt from the colour-token lint rule)
 - `shared/`: JS helpers used by app and (contractually) server: `programs.js`, `muscles.js` with `.d.ts`
 - `server/`: Express + TypeScript backend
 
 ## Route Map
 - `app/index.tsx` → redirect (`/workout` if a session is active, else `/programs/`)
-- `app/programs/index.tsx` → programs list (home)
-- `app/programs/create.tsx` → `ProgramEditorScreen variant="create"`
-- `app/programs/[id].tsx` → `ProgramEditorScreen variant="edit"`
+- `app/programs/index.tsx` → home (`ProgramsListScreen`)
+- `app/programs/create.tsx`, `app/programs/[id].tsx` → `ProgramEditorScreen variant="create" | "edit"` (create may duplicate via `?sourceId=`)
 - `app/workout/index.tsx` → live workout
-- `app/history/index.tsx` → history
-- `app/stats/index.tsx` → exercise stats index
-- `app/exercises/[name]/volume.tsx` → exercise volume
-- `app/settings/index.tsx` → settings
-- `app/mock-data.tsx` → dev-only history injector (`__DEV__`, no in-app navigation to it)
-- `app/_layout.tsx` → root stack; `app/programs/_layout.tsx` → programs stack. Routes auto-register; only list a `Stack.Screen` when it needs options.
+- `app/history/index.tsx`, `app/stats/index.tsx`, `app/exercises/[name]/volume.tsx`, `app/settings/index.tsx`
+- `app/mock-data.tsx` → dev-only history injector (`__DEV__`, not linked from the UI)
+- `app/_layout.tsx` opens the database, runs the shard migration, then mounts the stack. Routes auto-register; only list a `Stack.Screen` when it needs options.
 
-## Screen / Component / State Ownership
-- `ProgramsListScreen`: dashboard + routine list (`ProgramTile`, `ActivityComboChart`)
-- `ProgramEditorScreen`: create/edit wrapper over `RoutineEditorScreen` (form UI) + `ExerciseEditor` rows
-- `WorkoutSessionScreen`: live session; `ExerciseCard` → `SetRow`, `ExerciseHistoryGraph`; HUD in `Workout/HUD/`; `ExerciseNavMenu`, `ExerciseReorderModal`
-- `WorkoutHistoryScreen`, `ExerciseListStatsScreen`, `ExerciseVolumeScreen`, `SettingsScreen`
-- Sheets/pickers: `ExercisePickerModal`, `MuscleSelector` (controlled: `visible`/`onClose`), `RestTimerPicker`, `ExerciseTrackingModeSelector`. All use `useSheet`.
-- Shared bits: `EditableSetTag` (tap-to-edit weight×reps chip), `SetTypeLegend`, `Swipeable`, timers (`FloatingRestTimer`, `LiveRestTimer`, `LiveWorkoutTimer`), `RestTimerLiveActivity` (iOS Live Activity)
-- `workoutSessionStore.ts`: active session, history cache/index, rest timer, sync metadata. `rewriteExerciseRefs()` is the single path for propagating exercise edits (muscles, renames, removals) across RAM history, active session and disk shards.
-- `programStore.ts`: programs, per-item dirty tracking (`dirtyProgramIds`), tombstones; `rewriteProgramExerciseRefs()` for exercise-definition propagation
-- `exerciseLibraryStore.ts`: custom exercises (local-only)
-- `uiPreferencesStore.ts`: UI preferences (detailed muscles, bodyweight, preferred unit)
-- `syncStore.ts` (sync actions, `forceResync`), `syncEffect.ts` (debounced background sync on dirty), `networkListener.ts` (sync on reconnect)
-- Screens read the store directly with `useShallow`; there are no selector-wrapper store files.
+## Ownership
+- `ProgramsListScreen`: activity summary (SQLite summaries), quick actions, routine list (`ProgramTile`)
+- `ProgramEditorScreen` → `RoutineEditorScreen` (form) → `ExerciseEditor` rows
+- `WorkoutSessionScreen`: live session; `ExerciseCard` → `SetRow`, `ExerciseHistoryGraph`; HUD in `Workout/HUD/`; `ExerciseNavMenu`, `RoutineNamePrompt`
+- `WorkoutHistoryScreen`, `ExerciseListStatsScreen`, `ExerciseVolumeScreen`, `SettingsScreen` read the repo through `useDbQuery`
+- Shared: `EditableSetTag` (tap-to-edit weight×reps), `SetTypeLegend`, `Swipeable`, `FloatingRestTimer`, `LiveRestTimer`, `LiveWorkoutTimer`, `RestTimerLiveActivity`
+- `workoutSessionStore.ts`: active session, rest timer, pins, `dirtyWorkoutIds` / `deletedWorkoutIds`. Completed sessions are written to `workoutRepo`, never kept in the store. `propagateExerciseEdit()` is the one path for muscle/rename/removal propagation (repo + active session).
+- `programStore.ts`: programs, `dirtyProgramIds` / `deletedProgramIds`, `importPrograms` for restore
+- `exerciseLibraryStore.ts` (custom exercises, local-only), `uiPreferencesStore.ts`
+- `syncStore.ts`: `pushPending`, `backupEverything`, `restoreFromCloud` with an in-flight guard; `syncEffect.ts` debounces a push whenever something becomes pending; `networkListener.ts` restores on an empty install or pushes on startup/reconnect
 
-## Persistence & Sync
-- `zustandAsyncStorage` (`src/storage/mmkv.ts`, historically named; it is AsyncStorage with per-key debounced writes flushed on background) backs every persisted store
-- Workouts are sharded one key per session in `workoutStorage.ts`; `normalizePersistedWorkoutSession` there is the one normalizer for shards and store rehydrate. Recent sessions are cached in `workoutSessionStore.history` (capped), all ids in `historyIndex`.
-- `src/lib/api/sync.ts`: offline-first (push tombstones via one `DELETE /batch` per collection → push dirty via `PUT /batch` → fetch deltas → merge by `updatedAt`). Programs push by `dirtyProgramIds`, workouts by `dirtyWorkoutIds` (per-item, never a timestamp watermark).
-- `forceResync()` clears server-backed keys (`program-store`, `workout-session-store`, `workout_*`, legacy `workout-stats-index-v1`) and reloads; custom exercises and pinned exercises survive.
+## Data & Persistence
+- SQLite `gym.db`: `workouts` (one row per completed session) + `workout_exercises` (one JSON row per exercise, indexed by `identity_key`). Stats read `recentExercises` (window function) or `exerciseHistory(key)`; nothing loads the whole history into memory.
+- `useDbQuery(fn, deps)` re-runs after any repo write (`bumpDbVersion`). Repo reads are synchronous.
+- Legacy `workout_*` AsyncStorage shards are imported once by `migrateFromAsyncStorage` and then deleted.
+- Stores persist with `zustandAsyncStorage` (per-key debounce, flushed on background). Store versions: workout-session 6, program 7.
+- Tests run the repository against Node's built-in `node:sqlite` (`src/db/__tests__/nodeDriver.ts`); CI needs Node ≥ 22.
+
+## Backup Model (single device)
+- Local is the source of truth. `updatedAt` is bumped on every local edit and used only for the push-clear guard (an edit landing during a push keeps its id dirty).
+- Push: `DELETE /batch` for pending deletes (hard delete), then `PUT /batch` in chunks of 50. Restore: `GET /programs`, `GET /workouts?limit&skip` paged by 200, replacing local. No tombstones, no watermarks, no merge.
+- Server (`server/src`): `makeSyncService(Model, sort)` (replaceOne upsert, deleteMany, findAll excluding legacy `deletedAt` docs) + `makeSyncRouter(service, schema, key)`; zod validation in `validation/schemas.ts`; models infer types from schemas.
 
 ## Data Invariants
-- `updatedAt` resolves conflicts; `deletedAt` is the tombstone flag
-- Normalize `ProgramExercise`/`WorkoutExercise` via `shared/programs.js` (`normalizeExercise`, `normalizeSets`, `normalizeTrackingMode`, `NEXT_SET_TYPE`); server schemas mirror it
-- Exercise identity: prefer `exerciseDefinitionId`, fall back to canonical name (`utils/exerciseIdentity.ts`)
-- Tracking modes: `strength`, `timed`, `cardio`. Set types: `working`, `warmup`, `dropset` (`SET_TYPE_COLORS` in `constants/colors.ts`)
-- Custom exercise ids: `custom-` prefix; renames/removals propagate through both stores' `*ExerciseDefinitionReferences` actions
-- Custom and pinned exercises are local-only; never wiped by sync or `forceResync`
-- `defaultSets` is a set-type template array; legacy numeric counts are backfilled to at least one working set
+- Normalize exercises via `shared/programs.js` (`normalizeExercise`, `normalizeSets`, `normalizeTrackingMode`, `NEXT_SET_TYPE`); `normalizePersistedWorkoutSession` (`src/utils/normalizeWorkout.ts`) for any raw session
+- Exercise identity: `exerciseDefinitionId`, else canonical name (`utils/exerciseIdentity.ts`); the repo recomputes `identity_key` on every write
+- Tracking modes `strength | timed | cardio`; set types `working | warmup | dropset` (`SET_TYPE_COLORS`)
+- Custom exercise ids use the `custom-` prefix; renames/removals go through both stores' `*ExerciseDefinitionReferences`
+- Custom and pinned exercises are local only; restore never touches them
+- `defaultSets` is a set-type template array; legacy numeric counts backfill to at least one working set
+- Finishing a workout stores only completed sets; a session with none is discarded
 
-## API & Backend
-- Mobile: `src/lib/api/programs.ts`, `workouts.ts` expose only `fetch*`, `batchUpsert*`, `batchDelete*`; `converters.ts` maps server ↔ client
-- Server: `server/src/index.ts` wires two collections through `makeSyncService(Model, sort)` (`services/syncService.ts`) and `makeSyncRouter(service, schema, key)` (`routes/syncRouter.ts`). Endpoints per collection: `GET /?userId&since&limit&skip`, `PUT /batch`, `DELETE /batch` (soft delete; `x-user-id` header). Validation: `validation/schemas.ts` (zod). Models infer types from their schemas.
-- Every write sets `updatedAt` explicitly; there are no Mongoose hooks. Stale incoming writes (older `updatedAt`) are ignored.
-- Seeds: `seed:year`, `seed:4day-split` (+ `:remove`); dev tools: `db:clear`, `db:diag`
-
-## Build Commands
-- `npm install`; `npm run dev` (Expo); `npm run ios`
-- `npm run typecheck`, `npm run lint`, `npm run format` / `format:check` (app, shared and server), `npm test` (Jest, `jest-expo`)
-- `cd server && npm install && npm run dev`; `npm run build && npm start`
+## Commands
+- `npm install`; `npm run dev`; `npm run ios`
+- `npm run typecheck`, `npm run lint`, `npm run format` / `format:check` (app, shared, server), `npm test`
+- `cd server && npm install && npm run dev`; `npm run build && npm start`; seeds `seed:year`, `seed:4day-split` (+ `:remove`); dev tools `db:clear`, `db:diag`
+- EAS: project `@4peng/gym-mobile`; `eas.json` has a `simulator` dev-client profile
 
 ## CI
-- `.github/workflows/ci.yml`: every push/PR runs `lint`, `format:check`, `typecheck`, server `tsc --noEmit`, `test`; steps use `if: !cancelled()` so one run reports every failure
-- `.github/workflows/ios-build.yml`: IPA build + release on `main` only. Not a gate.
-- Root `tsconfig.json` covers `app/` and `src/`; `server/` has its own tsconfig; `shared/` is typed by its `.d.ts` files
+- `.github/workflows/ci.yml` (Node 24): `lint`, `format:check`, `typecheck`, server `tsc --noEmit`, `test`; steps use `if: !cancelled()`
+- `.github/workflows/ios-build.yml`: unsigned IPA on `main`, released for sideloading. Not a gate.
 
 ## Coding Style
-- TypeScript strict, Prettier (100 cols, double quotes, trailing commas). Prettier is the formatting authority; do not hand-minify JSX.
-- PascalCase components/screens, camelCase stores/utils; prefer `@/` imports; thin routes
-- iOS only: no `Platform.OS` branches for Android or web, no `BackHandler`, no web fallbacks
-- Reuse before writing: check `src/utils/`, `src/hooks/`, `shared/` and `constants/` first
-
-## Engineering Standards
-- **Primitive Rule**: selectors return primitives or `useShallow`-wrapped arrays/objects; no inline object creation in a selector
-- **Wrap dynamic strings in `<Text>`**
-- **No native Modal**: overlays are absolute `View`s driven by `useSheet(visible)` (180ms `Animated.timing`, `useNativeDriver`); add `useDragToClose` for swipe-down dismissal
-- **Backend set types**: `enum: ['working', 'warmup', 'dropset']`
-- **Session continuity**: `activeExerciseId` is persisted with the session store
+- TypeScript strict; Prettier is the formatting authority (100 cols, double quotes, trailing commas). Never hand-minify JSX.
+- iOS only: no `Platform.OS` branches, no `BackHandler`, no web fallbacks
+- Colours, spacing, radii and text styles come from `@/constants/theme`; raw hex/rgba literals in components, screens or routes fail lint
+- Overlays use `Sheet` (or `useSheet` for the one anchored dropdown); never a native `Modal`
+- Selectors return primitives or `useShallow`-wrapped arrays/objects; screens read the store directly, no wrapper hooks
+- Reuse before writing: check `src/utils/`, `src/hooks/`, `src/components/ui/`, `shared/` first
+- One import alias: `@/` → `src/`, `@/shared/` → `shared/`
 
 ## Testing
-- Jest (`jest-expo`) suites live in `__tests__/` next to the code: stores, sync engine, network listener, storage, shared normalizers, utils. Run `npm test`.
-- Manual QA still covers UI: routine create/edit/save/delete, muscle picker, set/rest controls, quick-start, start-from-routine, finish, decimal weight, rest timer, history pagination, pull-to-refresh, stats, volume hydration
+- Jest (`jest-expo`) suites in `__tests__/` beside the code: repo SQL, migration, backup engine, stores, network listener, converters, utils. `npm test`.
+- Manual QA for UI: routine create/edit/duplicate/delete, muscle picker, set/rest controls, quick-start, start-from-routine, finish (incl. save-as-routine), decimal weight, rest timer + Live Activity, history editing, stats, volume screen, backup/restore
 
 ## Security
-- No auth; `x-user-id` header identifies the user. Secrets in `.env`; `MONGODB_URI` required; `PORT` defaults to `4000`. Helmet, CORS (`ALLOWED_ORIGIN`), rate limiting and zod validation are in `server/src/index.ts` / `validation/schemas.ts`.
+- No auth; `x-user-id` header identifies the user. Secrets in `.env`; `MONGODB_URI` required; `PORT` defaults to `4000`. Helmet, CORS (`ALLOWED_ORIGIN`), rate limiting and zod validation live in `server/src/index.ts` / `validation/schemas.ts`.
 
 ## When `AGENTS.md` Must Be Updated
 - Route structure or stack layout
 - Store ownership or source of truth
-- Persistence keys, shard strategy, force-resync
-- Sync flow, merge rules, tombstones, server endpoints
+- Database schema, persistence keys, migrations
+- Backup flow or server endpoints
 - Core commands, seed scripts, dev workflow
 - Update as part of the same change; no later cleanup
 

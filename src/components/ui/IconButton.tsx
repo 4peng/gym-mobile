@@ -12,7 +12,7 @@ const BORDER: Record<Tone, string> = {
 };
 
 /** Icon colour that matches a tone; use it for the child icon. */
-export const ICON_TONE: Record<Tone, string> = {
+const ICON_TONE: Record<Tone, string> = {
   neutral: COLORS.TEXT_PRIMARY,
   primary: COLORS.ACCENT_BLUE,
   success: COLORS.ACCENT_GREEN,
