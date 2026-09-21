@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { showAlert, showConfirm } from "@/utils/alerts";
+import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { copyExercises, normalizeExercises } from "@/shared/programs.js";
@@ -58,8 +58,6 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
     [normalizedSourceId, programs, variant]
   );
 
-  const editorMode = variant === "edit" ? "edit" : sourceProgram ? "duplicate" : "create";
-
   const initialName = useMemo(() => {
     if (variant === "edit") {
       return program?.name || "";
@@ -88,43 +86,26 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
   }, [id, program, updateProgram, variant]);
 
   const handleSave = useCallback((draft: RoutineDraft) => {
-    try {
-      if (variant === "edit") {
-        applyUpdate(draft);
-      } else {
-        addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
-      }
-
-      router.back();
-    } catch (err) {
-      console.error("Program save failed:", err);
-      showAlert("Error", "An unexpected error occurred while saving.");
+    if (variant === "edit") {
+      applyUpdate(draft);
+    } else {
+      addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
     }
+    router.back();
   }, [addProgram, applyUpdate, router, variant]);
 
   const handleSaveAndStart = useCallback((draft: RoutineDraft) => {
-    try {
-      const nextProgram = applyUpdate(draft);
+    const nextProgram = applyUpdate(draft);
+    if (!nextProgram) return;
 
-      if (!nextProgram) return;
-
-      if (activeSession) {
-        showConfirm(
-          "Active Workout",
-          "You already have a workout in progress. Discard it and start this one?",
-          () => {
-            startFromProgram(nextProgram!);
-            router.replace("/workout");
-          }
-        );
-        return;
-      }
-
+    const start = () => {
       startFromProgram(nextProgram);
       router.replace("/workout");
-    } catch (err) {
-      console.error("Program save and start failed:", err);
-      showAlert("Error", "An unexpected error occurred while saving.");
+    };
+    if (activeSession) {
+      showConfirm("Active Workout", "You already have a workout in progress. Discard it and start this one?", start);
+    } else {
+      start();
     }
   }, [activeSession, applyUpdate, router, startFromProgram]);
 
@@ -167,7 +148,7 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
 
   return (
     <RoutineEditorScreen
-      mode={editorMode}
+      mode={variant}
       initialName={initialName}
       initialExercises={initialExercises}
       onCancel={handleCancel}

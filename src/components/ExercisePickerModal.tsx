@@ -1,24 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
   Animated,
-  Easing,
-  PanResponder,
 } from "react-native";
+import { useDragToClose, useSheet } from "@/hooks/useSheet";
 import { Check, Pencil, Search, X } from "lucide-react-native";
 import { EXERCISE_CATALOG } from "@/data/exerciseCatalog";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import type { ExerciseDefinition } from "@/types";
-import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
+import { matchesCustomExerciseNameOrAlias, useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { MUSCLE_LABELS, type MuscleGroup } from "@/constants/muscles";
 import {
   matchesExerciseSearchQuery,
@@ -52,11 +50,9 @@ export default function ExercisePickerModal({
   const [renameTarget, setRenameTarget] = useState<ExerciseDefinition | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const renameInputRef = useRef<TextInput>(null);
-  const animValue = useRef(new Animated.Value(0)).current;
-const dragOffset = useRef(new Animated.Value(0)).current;
-  const [renderVisible, setRenderVisible] = useState(visible);
-  const renameAnimValue = useRef(new Animated.Value(0)).current;
-  const [renderRenameVisible, setRenderRenameVisible] = useState(false);
+  const { mounted, progress } = useSheet(visible);
+  const { mounted: renameMounted, progress: renameProgress } = useSheet(!!renameTarget);
+  const { dragOffset, panHandlers } = useDragToClose(onClose);
 
   const customExercises = useExerciseLibraryStore((state) => state.customExercises);
   const addCustomExercise = useExerciseLibraryStore((state) => state.addCustomExercise);
@@ -102,73 +98,6 @@ const dragOffset = useRef(new Animated.Value(0)).current;
     return () => clearTimeout(timeout);
   }, [renameTarget?.id]);
 
-  useEffect(() => {
-    if (visible) {
-      setRenderVisible(true);
-      Animated.timing(animValue, { 
-        toValue: 1, 
-        duration: 180, 
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true 
-      }).start();
-    } else {
-      Animated.timing(animValue, { 
-        toValue: 0, 
-        duration: 180, 
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true 
-      }).start(() => setRenderVisible(false));
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (renameTarget) {
-      setRenderRenameVisible(true);
-      Animated.timing(renameAnimValue, { 
-        toValue: 1, 
-        duration: 180, 
-        useNativeDriver: true 
-      }).start();
-    } else {
-      Animated.timing(renameAnimValue, { 
-        toValue: 0, 
-        duration: 180, 
-        useNativeDriver: true 
-      }).start(() => setRenderRenameVisible(false));
-    }
-  }, [renameTarget]);
-
-  // Latest-value ref so the PanResponder (created once below) always calls
-  // the current onClose prop instead of whatever was passed on first mount.
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  // Drag-to-close functionality (PanResponder.create runs exactly once via lazy ref init)
-  const panResponderRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
-  if (!panResponderRef.current) {
-    panResponderRef.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dy > 5 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          dragOffset.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150) {
-          onCloseRef.current();
-        }
-        Animated.spring(dragOffset, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-    });
-  }
-  const panResponder = panResponderRef.current;
-
   const allExercises = useMemo(
     () => [...customExercises, ...EXERCISE_CATALOG],
     [customExercises]
@@ -206,10 +135,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
         ? customExercises.find(
             (exercise) =>
               exercise.id !== renameTarget?.id &&
-              (exercise.name.trim().toLowerCase() === normalizedRenameDraft.toLowerCase() ||
-                (exercise.aliases || []).some(
-                  (alias) => alias.trim().toLowerCase() === normalizedRenameDraft.toLowerCase()
-                ))
+              matchesCustomExerciseNameOrAlias(exercise, normalizedRenameDraft)
           )
         : undefined,
     [customExercises, normalizedRenameDraft, renameTarget?.id]
@@ -296,8 +222,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
     }
   };
 
-  const renderExerciseItem = useCallback(
-    ({ item }: { item: ExerciseDefinition }) => {
+  const renderExerciseItem = ({ item }: { item: ExerciseDefinition }) => {
       const isSelected = item.id === selectedDefinitionId;
       const subtitleText =
         (item.muscles || []).length > 0
@@ -362,15 +287,13 @@ const dragOffset = useRef(new Animated.Value(0)).current;
           {content}
         </View>
       );
-    },
-    [selectedDefinitionId, handleSelect, startRenameCustomExercise, handleDeleteCustomExercise]
-  );
+  };
 
-  if (!renderVisible) return null;
+  if (!mounted) return null;
 
   return (
     <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: animValue }]}>
+      <Animated.View style={[styles.backdrop, { opacity: progress }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
       
@@ -380,7 +303,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
           {
             transform: [
               {
-                translateY: animValue.interpolate({
+                translateY: progress.interpolate({
                   inputRange: [0, 1],
                   outputRange: [600, 0]
                 })
@@ -389,7 +312,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
             ]
           }
         ]}
-        {...panResponder.panHandlers}
+        {...panHandlers}
       >
         <View style={styles.header}>
           <View>
@@ -443,8 +366,8 @@ const dragOffset = useRef(new Animated.Value(0)).current;
         />
 
         {/* Rename Modal */}
-        {renderRenameVisible ? (
-          <Animated.View style={[styles.renameOverlay, { opacity: renameAnimValue }]}>
+        {renameMounted ? (
+          <Animated.View style={[styles.renameOverlay, { opacity: renameProgress }]}>
             <KeyboardAvoidingView
               style={styles.renameSheetWrapper}
               behavior="padding"
@@ -454,7 +377,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
               
               <Animated.View style={[styles.renameSheet, {
                 transform: [{
-                  scale: renameAnimValue.interpolate({
+                  scale: renameProgress.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0.95, 1]
                   })

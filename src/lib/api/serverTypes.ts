@@ -13,7 +13,7 @@ interface ProgramExerciseServer {
   // Current docs store the full set-type template array so warmup/dropset
   // markers survive the sync round-trip. converters.ts tolerantly reads
   // both shapes.
-  defaultSets: number | Array<{ type: "working" | "warmup" | "dropset" }>;
+  defaultSets: number | { type: "working" | "warmup" | "dropset" }[];
   restSeconds: number;
   notes: string;
   weightUnit?: string;

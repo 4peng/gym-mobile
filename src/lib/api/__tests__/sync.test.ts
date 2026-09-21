@@ -6,6 +6,25 @@
 // const/let are in the temporal dead zone when the factories run because jest
 // hoists mock() calls above all imports. We inline mock creation instead.
 
+// ──────────────────────────────────────────────
+// Import module under test (imports resolve AFTER mocks are registered)
+// ──────────────────────────────────────────────
+
+import { syncPrograms, syncWorkouts, runFullSync } from "@/lib/api/sync";
+import type { Program, WorkoutSession } from "@/types";
+import { useProgramStore } from "@/stores/programStore";
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import {
+  batchDeletePrograms,
+  batchUpsertPrograms,
+  fetchPrograms,
+} from "@/lib/api/programs";
+import {
+  batchDeleteWorkouts,
+  batchUpsertWorkouts,
+  fetchWorkouts,
+} from "@/lib/api/workouts";
+
 jest.mock("@react-native-async-storage/async-storage", () => ({
   setItem: jest.fn(() => Promise.resolve()),
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -96,25 +115,6 @@ jest.mock("@/lib/api/workouts", () => ({
   batchUpsertWorkouts: jest.fn(),
   fetchWorkouts: jest.fn(),
 }));
-
-// ──────────────────────────────────────────────
-// Import module under test (imports resolve AFTER mocks are registered)
-// ──────────────────────────────────────────────
-
-import { syncPrograms, syncWorkouts, runFullSync } from "@/lib/api/sync";
-import type { Program, WorkoutSession } from "@/types";
-import { useProgramStore } from "@/stores/programStore";
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import {
-  batchDeletePrograms,
-  batchUpsertPrograms,
-  fetchPrograms,
-} from "@/lib/api/programs";
-import {
-  batchDeleteWorkouts,
-  batchUpsertWorkouts,
-  fetchWorkouts,
-} from "@/lib/api/workouts";
 
 function makeProgram(id: string, updatedAt: number, overrides: Partial<Program> = {}): Program {
   return {
@@ -273,7 +273,7 @@ describe("syncWorkouts", () => {
       dirtyWorkoutIds: ["w-shard"],
     });
 
-    const { workoutStorage } = require("@/storage/workoutStorage");
+    const { workoutStorage } = jest.requireMock("@/storage/workoutStorage");
     (workoutStorage.getBatch as jest.Mock).mockResolvedValue([shardWorkout]);
 
     await syncWorkouts();

@@ -2,6 +2,10 @@
 // TEST-008: Workout shard storage tests
 // ──────────────────────────────────────────────
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { workoutStorage } from "@/storage/workoutStorage";
+import type { WorkoutSession } from "@/types";
+
 jest.mock("@react-native-async-storage/async-storage", () => ({
   setItem: jest.fn(() => Promise.resolve()),
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -11,10 +15,6 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
   multiRemove: jest.fn(() => Promise.resolve()),
   getAllKeys: jest.fn(() => Promise.resolve([])),
 }));
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { workoutStorage } from "@/storage/workoutStorage";
-import type { WorkoutSession } from "@/types";
 
 const mockedAsyncStorage = jest.mocked(AsyncStorage);
 

@@ -10,7 +10,6 @@ import {
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   PanResponder,
 } from "react-native";
 import { Calendar, Check, X, ChevronDown, TrendingUp } from "lucide-react-native";
@@ -831,7 +830,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
   );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={UI.SHARED.iconBtn}>

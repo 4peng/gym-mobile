@@ -5,6 +5,9 @@
 // Debounce coalesces rapid writes to the same key into a single
 // trailing write ~400ms after the last change.
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { zustandAsyncStorage } from "@/storage/mmkv";
+
 jest.mock("@react-native-async-storage/async-storage", () => ({
   setItem: jest.fn(() => Promise.resolve()),
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -16,7 +19,7 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 jest.mock("react-native", () => {
-  const handlers: Array<(state: string) => void> = [];
+  const handlers: ((state: string) => void)[] = [];
   return {
     AppState: {
       addEventListener: jest.fn((_event: string, handler: (state: string) => void) => {
@@ -25,14 +28,10 @@ jest.mock("react-native", () => {
       }),
       currentState: "active",
     },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     _appStateHandlers: handlers,
   };
 });
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppState } from "react-native";
-import { zustandAsyncStorage } from "@/storage/mmkv";
 
 const mockedAsyncStorage = jest.mocked(AsyncStorage);
 

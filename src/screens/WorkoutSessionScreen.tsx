@@ -20,11 +20,10 @@ import { sessionExercisesToProgramExercises } from "@/utils/workoutToProgram";
 
 // Modular HUD Components
 import { HUDHeader } from "@/components/Workout/HUD/HUDHeader";
-import { ScrubberRail } from "@/components/Workout/HUD/ScrubberRail";
+import { ScrubberRail, SCRUB_STEP } from "@/components/Workout/HUD/ScrubberRail";
+import { useSheet } from "@/hooks/useSheet";
 import { HUDPillNav } from "@/components/Workout/HUD/HUDPillNav";
 
-const SCRUB_STEP = 76; // Match ScrubberRail logic: 64 + 12
-const CONDENSE_THRESHOLD = 80;
 const EMPTY_MUSCLES: MuscleGroup[] = [];
 
 export default function WorkoutSessionScreen() {
@@ -165,10 +164,10 @@ const [routineNameDefault, setRoutineNameDefault] = useState("");
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
-        <HUDHeader scrollY={scrollY} startedAt={startedAt} progressData={progressData} condenseThreshold={CONDENSE_THRESHOLD} />
+        <HUDHeader scrollY={scrollY} startedAt={startedAt} progressData={progressData} />
         
         <Animated.ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true} onScroll={scrollHandler} scrollEventThrottle={16}>
-          <View style={styles.mainFocus}>{currentExercise ? (<ExerciseCard exercise={currentExercise} key={currentExercise.id} onMusclePickerOpen={handleMusclePickerOpen} />) : (<View style={styles.noExercise}><Text style={styles.noExerciseText}>NO EXERCISES ADDED</Text><Pressable style={UI.SHARED.iconBtn} onPress={() => setExercisePickerVisible(true)}><Plus size={20} color={COLORS.ACCENT_BLUE} /></Pressable></View>)}</View>
+          <View>{currentExercise ? (<ExerciseCard exercise={currentExercise} key={currentExercise.id} onMusclePickerOpen={handleMusclePickerOpen} />) : (<View style={styles.noExercise}><Text style={styles.noExerciseText}>NO EXERCISES ADDED</Text><Pressable style={UI.SHARED.iconBtn} onPress={() => setExercisePickerVisible(true)}><Plus size={20} color={COLORS.ACCENT_BLUE} /></Pressable></View>)}</View>
           <View style={{ height: 120 }} />
         </Animated.ScrollView>
 
@@ -206,28 +205,20 @@ interface RoutineNamePromptProps {
 
 function RoutineNamePrompt({ visible, initialName, onCancel, onSave }: RoutineNamePromptProps) {
   const [name, setName] = useState(initialName);
-  const [renderVisible, setRenderVisible] = useState(false);
-  const animValue = useRef(new Animated.Value(0)).current;
-
+  const { mounted, progress } = useSheet(visible);
   useEffect(() => {
-    if (visible) {
-      setName(initialName);
-      setRenderVisible(true);
-      Animated.timing(animValue, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-    } else {
-      Animated.timing(animValue, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setRenderVisible(false));
-    }
-  }, [visible, initialName, animValue]);
+    if (visible) setName(initialName);
+  }, [visible, initialName]);
 
-  const backdropOpacity = animValue.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] });
-  const slideUp = animValue.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
+  const backdropOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] });
+  const slideUp = progress.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
 
   const handleSave = useCallback(() => {
     const trimmed = name.trim();
     onSave(trimmed.length > 0 ? trimmed : initialName);
   }, [name, initialName, onSave]);
 
-  if (!renderVisible) return null;
+  if (!mounted) return null;
 
   return (
     <View style={styles.promptOverlay} pointerEvents="box-none">
@@ -258,7 +249,6 @@ function RoutineNamePrompt({ visible, initialName, onCancel, onSave }: RoutineNa
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.BG },
   scrollContent: { flexGrow: 1, paddingTop: 10 },
-  mainFocus: { },
   noExercise: { flex: 1, justifyContent: "center", alignItems: "center", gap: 20, paddingTop: 100 },
   noExerciseText: { color: COLORS.TEXT_TERTIARY, fontSize: 14, fontFamily: UI.SHARED.sectionLabel.fontFamily, fontWeight: "800", letterSpacing: 2 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 40 },

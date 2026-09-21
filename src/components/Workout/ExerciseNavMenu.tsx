@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Pressable, StyleSheet, Text, View, Animated, Easing, Dimensions } from "react-native";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useSheet } from "@/hooks/useSheet";
+import { Pressable, StyleSheet, Text, View, Animated, Dimensions } from "react-native";
 import { X, Plus, Menu } from "lucide-react-native";
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from "react-native-draggable-flatlist";
 import { useShallow } from "zustand/react/shallow";
@@ -14,26 +15,25 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface ExerciseMeta { id: string; name: string; }
 
-const NavMenuItem = React.memo(({ item, index, drag, isActive, isFocused, onPress, onDelete }: { item: ExerciseMeta; index: number; drag: () => void; isActive: boolean; isFocused: boolean; onPress: (id: string) => void; onDelete: (id: string) => void; }) => {
+const NavMenuItem = React.memo(function NavMenuItem({ item, index, drag, isActive, isFocused, onPress, onDelete }: { item: ExerciseMeta; index: number; drag: () => void; isActive: boolean; isFocused: boolean; onPress: (id: string) => void; onDelete: (id: string) => void }) {
   return (<ScaleDecorator><Swipeable onDelete={() => onDelete(item.id)} borderRadius={UI.RADIUS_ITEM} marginBottom={0}><Pressable onPress={() => onPress(item.id)} onLongPress={drag} delayLongPress={200} disabled={isActive} style={[styles.navMenuItem, isFocused && styles.navMenuItemActive, isActive && styles.navMenuItemDragging]}><Text style={styles.navMenuIndex}>{(index + 1).toString().padStart(2, '0')}</Text><Text style={[styles.navMenuName, isFocused && { color: COLORS.ACCENT_BLUE }]}>{item.name.toUpperCase()}</Text><Menu size={14} color={COLORS.TEXT_TERTIARY} /></Pressable></Swipeable></ScaleDecorator>);
 });
 
 export default function ExerciseNavMenu({ visible, onClose, activeExerciseId, onSelect, onAddPress }: { visible: boolean; onClose: () => void; activeExerciseId: string | null; onSelect: (id: string) => void; onAddPress: () => void; }) {
-  const exerciseDataStrings = useWorkoutSessionStore(useShallow((s) => s.activeSession?.exercises.map(e => `${e.id}|${e.name}`) || []));
+  const exerciseIds = useWorkoutSessionStore(useShallow((s) => s.activeSession?.exercises.map((e) => e.id) ?? []));
+  const exerciseNames = useWorkoutSessionStore(useShallow((s) => s.activeSession?.exercises.map((e) => e.name) ?? []));
   const reorderExercises = useWorkoutSessionStore((s) => s.reorderExercises);
   const removeExercise = useWorkoutSessionStore((s) => s.removeExercise);
-  const localExercises = useMemo(() => exerciseDataStrings.map(str => { const [id, name] = str.split('|'); return { id, name }; }), [exerciseDataStrings]);
+  const localExercises = useMemo(() => exerciseIds.map((id, i) => ({ id, name: exerciseNames[i] })), [exerciseIds, exerciseNames]);
   const [dragList, setDragList] = useState<ExerciseMeta[]>(localExercises);
-  const animValue = useRef(new Animated.Value(0)).current;
-  const [renderVisible, setRenderVisible] = useState(visible);
-  useEffect(() => { if (visible) { setRenderVisible(true); Animated.timing(animValue, { toValue: 1, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(); } else { Animated.timing(animValue, { toValue: 0, duration: 150, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => setRenderVisible(false)); } }, [visible]);
+  const { mounted, progress } = useSheet(visible);
   useEffect(() => { if (visible) setDragList(localExercises); }, [visible, localExercises]);
   const handleDragEnd = useCallback(({ data }: { data: ExerciseMeta[] }) => { setDragList(data); setTimeout(() => { reorderExercises(data.map(ex => ex.id)); HapticFeedback.success(); }, 0); }, [reorderExercises]);
   const handleDelete = useCallback((id: string) => { removeExercise(id); HapticFeedback.heavy(); }, [removeExercise]);
   const renderItem = useCallback(({ item, drag, isActive, getIndex }: RenderItemParams<ExerciseMeta>) => { const index = getIndex(); return (<NavMenuItem item={item} index={index ?? 0} drag={drag} isActive={isActive} isFocused={item.id === activeExerciseId} onPress={(id) => { onSelect(id); onClose(); }} onDelete={handleDelete} />); }, [activeExerciseId, onSelect, onClose, handleDelete]);
-  if (!renderVisible) return null;
-  const backdropOpacity = animValue.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const sheetTranslateY = animValue.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_HEIGHT * 0.8, 0] });
+  if (!mounted) return null;
+  const backdropOpacity = progress;
+  const sheetTranslateY = progress.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_HEIGHT * 0.8, 0] });
   return (
     <View style={styles.absoluteContainer} pointerEvents="box-none">
       <Animated.View style={[styles.modalBackdrop, { opacity: backdropOpacity }]}><Pressable style={StyleSheet.absoluteFill} onPress={onClose} /></Animated.View>

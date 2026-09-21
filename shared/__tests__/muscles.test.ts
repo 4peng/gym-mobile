@@ -5,7 +5,7 @@ import {
   DETAILED_TO_PRIMARY_MAP,
   PRIMARY_MUSCLE_GROUPS,
   DETAILED_MODE_MUSCLE_GROUPS,
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
 } from "../muscles.js";
 
 // Pins down the primary<->detailed muscle expansion/collapse round-trip and

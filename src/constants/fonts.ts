@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 /**
  * Technical High-Performance Font Registry
  * 

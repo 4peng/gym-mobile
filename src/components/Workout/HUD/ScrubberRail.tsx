@@ -6,7 +6,7 @@ import { UI } from "@/constants/ui";
 
 const SCRUB_ITEM_WIDTH = 64; 
 const SCRUB_GAP = 12;
-const SCRUB_STEP = SCRUB_ITEM_WIDTH + SCRUB_GAP;
+export const SCRUB_STEP = SCRUB_ITEM_WIDTH + SCRUB_GAP;
 const POPUP_WIDTH = UI.WIDTH - 40;
 const SIDE_SPACER = (POPUP_WIDTH / 2) - (SCRUB_ITEM_WIDTH / 2);
 
@@ -20,13 +20,13 @@ interface ScrubberRailProps {
 
 const getShorthand = (name: string) => (name || "EXER").substring(0, 4).toUpperCase();
 
-export const ScrubberRail = React.memo(({ 
-  exerciseIds, 
-  exerciseNames, 
-  exerciseProgress, 
+export const ScrubberRail = React.memo(function ScrubberRail({
+  exerciseIds,
+  exerciseNames,
+  exerciseProgress,
   displayIndex,
-  scrubberScrollRef
-}: ScrubberRailProps) => {
+  scrubberScrollRef,
+}: ScrubberRailProps) {
   return (
     <View style={styles.scrubberPopup}>
       <ScrollView 

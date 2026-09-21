@@ -7,7 +7,6 @@ import {
   Pressable,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform,
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,8 +28,9 @@ import {
 import { generateId } from "@/utils/id";
 import type { ExerciseDefinition } from "@/types";
 import { inferTrackingModeFromExerciseDefinition } from "@/utils/exerciseTracking";
+import { useSheet } from "@/hooks/useSheet";
 
-type Mode = "create" | "edit" | "duplicate";
+type Mode = "create" | "edit";
 
 export interface RoutineDraft {
   name: string;
@@ -47,8 +47,6 @@ interface RoutineEditorScreenProps {
   onDelete?: (draft: RoutineDraft) => void;
 }
 
-const SHEET_ANIMATION_DURATION = 180;
-
 export default function RoutineEditorScreen({
   mode,
   initialName = "",
@@ -63,10 +61,9 @@ export default function RoutineEditorScreen({
   const [reorderVisible, setReorderVisible] = useState(false);
   const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const { mounted: optionsMounted, progress: optionsProgress } = useSheet(optionsVisible);
 
-  const optionsAnimation = useRef(new Animated.Value(0)).current;
-
-  const isCreateLike = mode === "create" || mode === "duplicate";
+  const isCreateLike = mode === "create";
 
   // Seed the form from props only once, on initial mount. `initialName`/
   // `initialExercises` are derived from the programs store and can change
@@ -94,26 +91,8 @@ export default function RoutineEditorScreen({
     [exercises]
   );
 
-  const animateSheet = useCallback((toValue: number, onComplete?: () => void) => {
-    Animated.timing(optionsAnimation, {
-      toValue,
-      duration: SHEET_ANIMATION_DURATION,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        onComplete?.();
-      }
-    });
-  }, [optionsAnimation]);
-
-  const openOptions = useCallback(() => {
-    setOptionsVisible(true);
-    animateSheet(1);
-  }, [animateSheet]);
-
-  const closeOptions = useCallback(() => {
-    animateSheet(0, () => setOptionsVisible(false));
-  }, [animateSheet]);
+  const openOptions = useCallback(() => setOptionsVisible(true), []);
+  const closeOptions = useCallback(() => setOptionsVisible(false), []);
 
   const handleUpdateExercise = useCallback(
     (id: string, updates: Partial<Omit<ExerciseFormData, "id">>) => {
@@ -190,12 +169,12 @@ export default function RoutineEditorScreen({
     onCancel(buildRoutineDraft(name, exercises) as RoutineDraft, hasChanges);
   }, [exercises, hasChanges, name, onCancel]);
 
-  const optionsTranslateY = optionsAnimation.interpolate({
+  const optionsTranslateY = optionsProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [28, 0],
   });
 
-  const optionsOpacity = optionsAnimation.interpolate({
+  const optionsOpacity = optionsProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
@@ -203,7 +182,7 @@ export default function RoutineEditorScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
     >
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View style={styles.topBar}>
@@ -295,7 +274,7 @@ export default function RoutineEditorScreen({
         </ScrollView>
       </SafeAreaView>
 
-      {optionsVisible ? (
+      {optionsMounted ? (
         <>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeOptions}>
             <Animated.View style={[styles.backdrop, { opacity: optionsOpacity }]} />

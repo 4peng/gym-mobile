@@ -42,28 +42,28 @@ export function normalizeExercise<TMuscle extends string = string>(
 ): RoutineExerciseDraft<TMuscle>;
 
 export function normalizeExercises<TMuscle extends string = string>(
-  exercises?: Array<Partial<RoutineExerciseDraft<TMuscle>> | null> | null,
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
   createId?: (() => string) | undefined
 ): RoutineExerciseDraft<TMuscle>[];
 
 export function copyExercises<TMuscle extends string = string>(
-  exercises?: Array<Partial<RoutineExerciseDraft<TMuscle>> | null> | null,
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
   createId?: (() => string) | undefined
 ): RoutineExerciseDraft<TMuscle>[];
 
 export function buildRoutineDraft<TMuscle extends string = string>(
   name: string,
-  exercises?: Array<Partial<RoutineExerciseDraft<TMuscle>> | null> | null,
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
   createId?: (() => string) | undefined
 ): RoutineDraft<TMuscle>;
 
 export function createRoutineSnapshot<TMuscle extends string = string>(
   name: string,
-  exercises?: Array<Partial<RoutineExerciseDraft<TMuscle>> | null> | null
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null
 ): string;
 
 export function validateRoutineDraft<TMuscle extends string = string>(
   name: string,
-  exercises?: Array<Partial<RoutineExerciseDraft<TMuscle>> | null> | null
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null
 ): string | null;
 

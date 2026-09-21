@@ -1,18 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useSheet } from "@/hooks/useSheet";
 import {
   Pressable,
   StyleSheet,
   Text,
   View,
   Animated,
-  Easing,
 } from "react-native";
 import { Check, GripVertical, X } from "lucide-react-native";
 import DraggableFlatList, {
   RenderItemParams,
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
-import { GestureHandlerRootView, Pressable as GesturePressable } from "react-native-gesture-handler";
+import { Pressable as GesturePressable } from "react-native-gesture-handler";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -20,7 +20,7 @@ import { HapticFeedback } from "@/utils/haptics";
 
 interface ReorderItem { id: string; name: string; }
 
-const ReorderRow = React.memo(({ item, index, drag, isActive }: { item: ReorderItem; index: number; drag: () => void; isActive: boolean; }) => {
+const ReorderRow = React.memo(function ReorderRow({ item, index, drag, isActive }: { item: ReorderItem; index: number; drag: () => void; isActive: boolean }) {
   return (
     <ScaleDecorator>
       <View style={[styles.row, isActive && styles.rowActive]}>
@@ -38,17 +38,9 @@ const ReorderRow = React.memo(({ item, index, drag, isActive }: { item: ReorderI
 
 export default function ExerciseReorderModal({ visible, exercises, onClose, onSave }: { visible: boolean; exercises: ReorderItem[]; onClose: () => void; onSave: (exerciseIds: string[]) => void; }) {
   const [draftOrder, setDraftOrder] = useState<ReorderItem[]>(exercises);
-  const animValue = useRef(new Animated.Value(0)).current;
-  const [renderVisible, setRenderVisible] = useState(visible);
-
+  const { mounted, progress } = useSheet(visible);
   useEffect(() => {
-    if (visible) {
-      setDraftOrder(exercises);
-      setRenderVisible(true);
-      Animated.timing(animValue, { toValue: 1, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-    } else {
-      Animated.timing(animValue, { toValue: 0, duration: 150, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => setRenderVisible(false));
-    }
+    if (visible) setDraftOrder(exercises);
   }, [visible, exercises]);
 
   const handleSave = useCallback(() => {
@@ -60,12 +52,12 @@ export default function ExerciseReorderModal({ visible, exercises, onClose, onSa
     <ReorderRow item={item} index={getIndex() ?? 0} drag={drag} isActive={isActive} />
   ), []);
 
-  if (!renderVisible) return null;
+  if (!mounted) return null;
 
   return (
     <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: animValue }]}><Pressable style={StyleSheet.absoluteFill} onPress={onClose} /></Animated.View>
-      <Animated.View style={[styles.container, { transform: [{ translateY: animValue.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) }] }]}>
+      <Animated.View style={[styles.backdrop, { opacity: progress }]}><Pressable style={StyleSheet.absoluteFill} onPress={onClose} /></Animated.View>
+      <Animated.View style={[styles.container, { transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) }] }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} style={UI.SHARED.dangerBtn}><X size={20} color={COLORS.DANGER} /></Pressable>
           <Text style={styles.title}>REORDER</Text>

@@ -6,15 +6,14 @@ import { useShallow } from "zustand/react/shallow";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
-import type { WorkoutExercise } from "@/types";
+import type { WorkoutExercise , ExerciseDefinition, ExerciseTrackingMode } from "@/types";
 import { resolveExercisePlaceholders, type SetPlaceholder } from "@/utils/placeholders";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "@/components/RestTimerPicker";
 import { showConfirm } from "@/utils/alerts";
 import { HapticFeedback } from "@/utils/haptics";
 import { SetRow } from "./SetRow";
-import ExercisePickerField from "@/components/ExercisePickerField";
-import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
+import ExercisePickerModal from "@/components/ExercisePickerModal";
 import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
 import { getTrackingModeLabel } from "@/utils/exerciseTracking";
 import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelector";
@@ -73,7 +72,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   return (
     <View style={styles.card}>
       <View style={styles.topRow}><View style={styles.topContent}><Pressable onPress={() => setExercisePickerVisible(true)}><Text style={styles.exerciseNameText}>{exercise.name}</Text></Pressable><Pressable onPress={() => onMusclePickerOpen?.(exercise.id)}><Text style={styles.muscleText} numberOfLines={1}>{(exercise.muscles && exercise.muscles.length > 0 ? exercise.muscles.map(m => MUSCLE_LABELS[m as MuscleGroup] || m).join(" • ") : "General").toUpperCase()}</Text></Pressable></View><Pressable onPress={handleRemoveExercise} hitSlop={12} style={styles.cardRemoveBtn}><Trash2 size={16} color={COLORS.DANGER} /></Pressable></View>
-<ExercisePickerField visible={exercisePickerVisible} onClose={() => setExercisePickerVisible(false)} onSelect={handleExerciseSelect} selectedDefinitionId={exercise.exerciseDefinitionId} />
+<ExercisePickerModal visible={exercisePickerVisible} onClose={() => setExercisePickerVisible(false)} onSelect={handleExerciseSelect} selectedDefinitionId={exercise.exerciseDefinitionId} />
        <View style={styles.instrumentBar}><View ref={trackingSegmentRef} style={{ flex: 1 }} collapsable={false}><Pressable style={styles.instrumentSegment} onPress={handleShowTrackingPicker}><TrackingIcon size={12} color={COLORS.ACCENT_BLUE} /><Text style={styles.instrumentText}>{getTrackingModeLabel(exercise.trackingMode).toUpperCase()}</Text></Pressable></View><View style={styles.instrumentDivider} />{exercise.trackingMode === "strength" && (<><Pressable style={styles.instrumentSegment} onPress={handleBodyweightToggle}>{exercise.isBodyweight ? (<User size={12} color={COLORS.ACCENT_GREEN} />) : (<Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />)}<Text style={[styles.instrumentText, exercise.isBodyweight && { color: COLORS.ACCENT_GREEN }]}>{exercise.isBodyweight ? "BODYWEIGHT" : "WEIGHTED"}</Text></Pressable>{!exercise.isBodyweight && (<><View style={styles.instrumentDivider} /><Pressable style={styles.instrumentSegment} onPress={handleUnitToggle}><Text style={[styles.instrumentText, { color: COLORS.ACCENT_BLUE }]}>{(exercise.weightUnit || "kg").toUpperCase()}</Text></Pressable></>)}<View style={styles.instrumentDivider} /></>)}<Pressable style={styles.instrumentSegment} onPress={() => setRestPickerVisible(true)}><Clock size={12} color={COLORS.TEXT_TERTIARY} /><Text style={styles.instrumentText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text></Pressable></View>
       <View style={styles.tabRow}><Pressable onPress={() => handleTabPress("SETS")} style={[styles.tabItem, activeTab === "SETS" && styles.activeTab]}><Text style={[styles.tabText, activeTab === "SETS" && styles.activeTabText]}>SETS</Text></Pressable><Pressable onPress={() => handleTabPress("HISTORY")} style={[styles.tabItem, activeTab === "HISTORY" && styles.activeTab]}><Text style={[styles.tabText, activeTab === "HISTORY" && styles.activeTabText]}>HISTORY</Text></Pressable></View>
       <ScrollView ref={pagerRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} scrollEnabled={!isEditingNotes} style={styles.pager}>

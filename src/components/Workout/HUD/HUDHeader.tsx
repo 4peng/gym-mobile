@@ -12,23 +12,20 @@ interface HUDHeaderProps {
   scrollY: Animated.Value;
   startedAt: string | null | undefined;
   progressData: { progress: number; completed: number; total: number };
-  condenseThreshold: number;
 }
 
-export const HUDHeader = React.memo(({ 
-  scrollY, 
-  startedAt, 
-  progressData,
-  condenseThreshold 
-}: HUDHeaderProps) => {
+/** Scroll offset (px) at which the sticky condensed HUD fades in. */
+const CONDENSE_THRESHOLD = 80;
+
+export const HUDHeader = React.memo(function HUDHeader({ scrollY, startedAt, progressData }: HUDHeaderProps) {
   const stickyHudOpacity = scrollY.interpolate({
-    inputRange: [condenseThreshold - 20, condenseThreshold],
+    inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
   const stickyHudTranslateY = scrollY.interpolate({
-    inputRange: [condenseThreshold - 20, condenseThreshold],
+    inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
     outputRange: [-20, 0],
     extrapolate: 'clamp',
   });

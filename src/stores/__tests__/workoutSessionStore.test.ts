@@ -1,14 +1,11 @@
-import { create } from "zustand";
-import { immer } from "zustand/middleware/immer";
-import { generateId } from "@/utils/id";
-import { nextLocalUpdatedAt } from "@/utils/timestamps";
-import type {
-  WorkoutSession,
-  WorkoutExercise,
-  WorkoutSet,
-  Program,
-  ProgramExercise,
-} from "@/types";
+import type { WorkoutSession, Program } from "@/types";
+
+// ──────────────────────────────────────────────
+// Import the store (after mocks are set up)
+// ──────────────────────────────────────────────
+
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { workoutStorage } from "@/storage/workoutStorage";
 
 // ──────────────────────────────────────────────
 // Mocks
@@ -85,13 +82,6 @@ jest.mock("@/constants/user", () => ({
   USER_ID: "test-user",
 }));
 
-// ──────────────────────────────────────────────
-// Import the store (after mocks are set up)
-// ──────────────────────────────────────────────
-
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { workoutStorage } from "@/storage/workoutStorage";
-
 const mockedWorkoutStorage = jest.mocked(workoutStorage);
 
 // ──────────────────────────────────────────────
@@ -121,46 +111,6 @@ function makeProgram(overrides: Partial<Program> = {}): Program {
     ],
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: 100,
-    ...overrides,
-  };
-}
-
-function makeEmptyWorkoutSession(): WorkoutSession {
-  return {
-    _id: "test-session-1",
-    userId: "test-user",
-    startedAt: "2026-06-01T10:00:00.000Z",
-    updatedAt: 100,
-    notes: "",
-    exercises: [],
-  };
-}
-
-function makeFullWorkoutSession(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
-  return {
-    _id: "test-session-2",
-    userId: "test-user",
-    programId: "prog-1",
-    startedAt: "2026-06-01T10:00:00.000Z",
-    completedAt: "2026-06-01T11:00:00.000Z",
-    updatedAt: 200,
-    notes: "felt good",
-    exercises: [
-      {
-        id: "ex-1",
-        exerciseDefinitionId: "barbell-bench-press",
-        trackingMode: "strength",
-        name: "Barbell Bench Press",
-        restSeconds: 90,
-        notes: "",
-        sets: [
-          { id: "s-1", weight: 100, reps: 10, type: "working", durationSeconds: null, distance: null, completedAt: "2026-06-01T10:05:00.000Z" },
-          { id: "s-2", weight: 110, reps: 8, type: "working", durationSeconds: null, distance: null, completedAt: "2026-06-01T10:10:00.000Z" },
-        ],
-        weightUnit: "kg",
-        muscles: ["chest"],
-      },
-    ],
     ...overrides,
   };
 }

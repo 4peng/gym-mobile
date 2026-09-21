@@ -10,7 +10,6 @@ import {
   LayoutAnimation,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
   RefreshControl,
 } from "react-native";
 import { 

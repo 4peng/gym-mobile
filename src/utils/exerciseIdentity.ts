@@ -6,7 +6,7 @@ export interface ExerciseIdentityLike {
   isBodyweight?: boolean;
 }
 
-const NORMALIZATION_RULES: Array<[RegExp, string]> = [
+const NORMALIZATION_RULES: [RegExp, string][] = [
   [/\bdumbells?\b/g, "dumbbell"],
   [/\bdumbel\b/g, "dumbbell"],
   [/\bpull[\s-]*ups?\b/g, "pull up"],

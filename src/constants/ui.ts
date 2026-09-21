@@ -1,4 +1,4 @@
-import { StyleSheet, Platform, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import { COLORS } from './colors';
 import { FONT_FAMILIES } from './fonts';
 

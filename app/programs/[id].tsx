@@ -1,5 +1,5 @@
-import EditProgramScreen from "@/src/screens/EditProgramScreen";
+import ProgramEditorScreen from "@/src/screens/ProgramEditorScreen";
 
 export default function EditProgramPage() {
-  return <EditProgramScreen />;
+  return <ProgramEditorScreen variant="edit" />;
 }

@@ -8,7 +8,7 @@ import {
   TextInput,
   LayoutAnimation,
 } from "react-native";
-import { ChevronLeft, ChevronRight, Search, BarChart2, Pin, Filter } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Search, BarChart2, Pin } from "lucide-react-native";
 import Svg, { Rect } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -327,7 +327,6 @@ export default function ExerciseListStatsScreen() {
   const renderExerciseItem = useCallback(
     ({ item }: { item: (typeof exerciseStats)[number] }) => (
       <Swipeable
-        onDelete={() => {}} // No delete on insights page
         onPin={() => handlePin(item.key)}
         onToggleScroll={setScrollEnabled}
       >

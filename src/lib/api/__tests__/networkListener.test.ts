@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- jest.resetModules() needs a synchronous re-require */
 // ──────────────────────────────────────────────
 // TEST-009: Network listener tests
 // ──────────────────────────────────────────────
+
+import NetInfo from "@react-native-community/netinfo";
 
 let mockRunFullSync = jest.fn(() => Promise.resolve(true));
 
@@ -30,13 +33,11 @@ jest.mock("react-native", () => ({
   InteractionManager: { runAfterInteractions: jest.fn((cb: () => void) => cb()) },
 }));
 
-import NetInfo from "@react-native-community/netinfo";
-
 const mockedNetInfo = jest.mocked(NetInfo);
 
 /** The connectivity handler registered by the most recently required listener module. */
 const getHandler = () =>
-  (require("@react-native-community/netinfo").addEventListener as jest.Mock).mock.calls[0][0];
+  (jest.requireMock("@react-native-community/netinfo").addEventListener as jest.Mock).mock.calls[0][0];
 
 /** Returns a minimal NetInfoState-like object. */
 function netState(connected: boolean): any {

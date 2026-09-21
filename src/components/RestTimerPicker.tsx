@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSheet } from "@/hooks/useSheet";
 import {
   View,
   Text,
@@ -7,8 +8,6 @@ import {
   FlatList,
   ListRenderItem,
   Pressable,
-  Dimensions,
-  Platform,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -17,7 +16,6 @@ import { COLORS } from '@/src/constants/colors';
 import { FONT_FAMILIES } from '@/src/constants/fonts';
 import { UI } from '@/constants/ui';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ITEM_HEIGHT = 60;
 const VISIBLE_ITEMS = 3;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
@@ -56,30 +54,11 @@ export default function RestTimerPicker({
   const initialSelection = getPickerSelection(initialSeconds);
   const [selectedMin, setSelectedMin] = useState(initialSelection.minuteValue);
   const [selectedSec, setSelectedSec] = useState(initialSelection.secondValue);
-  const [renderVisible, setRenderVisible] = useState(visible);
 
   const minListRef = useRef<FlatList<number>>(null);
   const secListRef = useRef<FlatList<number>>(null);
   const isInitializingScroll = useRef(false);
-  const animValue = useRef(new Animated.Value(visible ? 1 : 0)).current;
-
-  // Drive the backdrop/sheet animation on open/close.
-  useEffect(() => {
-    if (visible) {
-      setRenderVisible(true);
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(animValue, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }).start(() => setRenderVisible(false));
-    }
-  }, [visible]);
+  const { mounted, progress } = useSheet(visible);
 
   // Sync wheel position to the current value every time the modal opens.
   useEffect(() => {
@@ -136,12 +115,12 @@ export default function RestTimerPicker({
     }
   };
 
-  const backdropOpacity = animValue.interpolate({
+  const backdropOpacity = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.85],
   });
 
-  const slideUp = animValue.interpolate({
+  const slideUp = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [PICKER_HEIGHT + 200, 0],
   });
@@ -154,7 +133,7 @@ export default function RestTimerPicker({
     </View>
   );
 
-  if (!renderVisible) return null;
+  if (!mounted) return null;
 
   return (
     <View style={styles.overlay} pointerEvents="box-none">

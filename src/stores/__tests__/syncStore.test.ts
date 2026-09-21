@@ -2,6 +2,15 @@
 // Sync Store Tests (forceResync)
 // ──────────────────────────────────────────────
 
+// ──────────────────────────────────────────────
+// Import stores (after mocks)
+// ──────────────────────────────────────────────
+
+import { useSyncStore } from "@/stores/syncStore";
+import { useProgramStore } from "@/stores/programStore";
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
+
 const mockAsyncStorageMultiRemove = jest.fn();
 const mockAsyncStorageGetAllKeys = jest.fn();
 
@@ -81,15 +90,6 @@ const mockEngineRunFullSync = jest.fn();
 jest.mock("@/lib/api/sync", () => ({
   runFullSync: (...args: any[]) => mockEngineRunFullSync(...args),
 }));
-
-// ──────────────────────────────────────────────
-// Import stores (after mocks)
-// ──────────────────────────────────────────────
-
-import { useSyncStore } from "@/stores/syncStore";
-import { useProgramStore } from "@/stores/programStore";
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 
 // ──────────────────────────────────────────────
 // Tests

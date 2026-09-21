@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Animated,
   PanResponder,
@@ -20,7 +20,7 @@ const SECONDARY_DELETE_THRESHOLD = BUTTON_WIDTH + 80;
 
 interface SwipeableProps {
   children: React.ReactNode;
-  onDelete: () => void;
+  onDelete?: () => void;
   onPin?: () => void;
   onToggleScroll?: (enabled: boolean) => void;
   borderRadius?: number;
@@ -38,7 +38,6 @@ export const Swipeable = ({
   const translateX = useRef(new Animated.Value(0)).current;
   const lastOffset = useRef(0);
   const gestureStartOffset = useRef(0);
-  const [isOpen, setIsOpen] = useState(false);
   const wasOpenAtStart = useRef(false);
   const hapticTriggered = useRef(false);
 
@@ -74,7 +73,7 @@ export const Swipeable = ({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         const { dx, dy } = gestureState;
         const isAlreadyOpen = Math.abs(lastOffset.current) > 5;
-        const isCorrectDirection = isAlreadyOpen ? true : (dx < -12 || (!!onPinRef.current && dx > 12));
+        const isCorrectDirection = isAlreadyOpen ? true : ((!!onDeleteRef.current && dx < -12) || (!!onPinRef.current && dx > 12));
         const isHorizontal = Math.abs(dx) > Math.abs(dy) * 2;
         const reachedThreshold = Math.abs(dx) > 12;
         return isHorizontal && reachedThreshold && isCorrectDirection;
@@ -128,9 +127,9 @@ export const Swipeable = ({
            const isFlickLeft = vx < -0.3;
            const isPastReveal = finalValue > REVEAL_THRESHOLD;
            if (isFlickRight || (isPastReveal && !isFlickLeft)) {
-              Animated.spring(translateX, { toValue: BUTTON_WIDTH, useNativeDriver: true, velocity: vx, tension: 50, friction: 12 }).start(() => setIsOpen(true));
+              Animated.spring(translateX, { toValue: BUTTON_WIDTH, useNativeDriver: true, velocity: vx, tension: 50, friction: 12 }).start();
            } else {
-              Animated.spring(translateX, { toValue: 0, useNativeDriver: true, velocity: vx, tension: 50, friction: 12 }).start(() => setIsOpen(false));
+              Animated.spring(translateX, { toValue: 0, useNativeDriver: true, velocity: vx, tension: 50, friction: 12 }).start();
            }
            return;
         }
@@ -139,9 +138,8 @@ export const Swipeable = ({
         if (finalValue < -threshold) {
           HapticFeedback.heavy();
           Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }).start(() => {
-            onDeleteRef.current();
+            onDeleteRef.current?.();
             translateX.setValue(0);
-            setIsOpen(false);
           });
           return;
         }
@@ -150,9 +148,9 @@ export const Swipeable = ({
         const isFlickRight = vx > 0.3;
         const isPastReveal = finalValue < -REVEAL_THRESHOLD;
         if (isFlickLeft || (isPastReveal && !isFlickRight)) {
-          Animated.spring(translateX, { toValue: -BUTTON_WIDTH, useNativeDriver: true, velocity: vx, tension: 50, friction: 12, restSpeedThreshold: 0.1, restDisplacementThreshold: 0.1 }).start(() => setIsOpen(true));
+          Animated.spring(translateX, { toValue: -BUTTON_WIDTH, useNativeDriver: true, velocity: vx, tension: 50, friction: 12, restSpeedThreshold: 0.1, restDisplacementThreshold: 0.1 }).start();
         } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, velocity: vx, tension: 50, friction: 12, restSpeedThreshold: 0.1, restDisplacementThreshold: 0.1 }).start(() => setIsOpen(false));
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, velocity: vx, tension: 50, friction: 12, restSpeedThreshold: 0.1, restDisplacementThreshold: 0.1 }).start();
         }
       },
 
@@ -163,7 +161,7 @@ export const Swipeable = ({
         const shouldBeOpenLeft = finalValue < -REVEAL_THRESHOLD;
         const shouldBeOpenRight = finalValue > REVEAL_THRESHOLD;
         const toValue = shouldBeOpenLeft ? -BUTTON_WIDTH : (shouldBeOpenRight ? BUTTON_WIDTH : 0);
-        Animated.spring(translateX, { toValue, useNativeDriver: true, tension: 50, friction: 12 }).start(() => setIsOpen(shouldBeOpenLeft || shouldBeOpenRight));
+        Animated.spring(translateX, { toValue, useNativeDriver: true, tension: 50, friction: 12 }).start();
       },
       onShouldBlockNativeResponder: () => true,
     });
@@ -173,15 +171,13 @@ export const Swipeable = ({
   const handleDelete = () => {
     HapticFeedback.heavy();
     Animated.timing(translateX, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-      setIsOpen(false);
-      onDelete();
+      onDelete?.();
     });
   };
 
   const handlePinAction = () => {
     HapticFeedback.medium();
     Animated.timing(translateX, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-      setIsOpen(false);
       onPin?.();
     });
   };

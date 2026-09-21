@@ -1,9 +1,8 @@
-import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { View, ActivityIndicator, AppState } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { COLORS } from '@/constants/colors';
 import { FONT_ASSETS } from '@/constants/fonts';
 import { startNetworkSyncListener } from '@/lib/api/networkListener';

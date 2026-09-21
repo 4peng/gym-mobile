@@ -3,6 +3,9 @@
 // ──────────────────────────────────────────────
 
 // Mock native / side-effect modules before importing the store
+import { useProgramStore } from "@/stores/programStore";
+import type { Program } from "@/types";
+
 jest.mock("@react-native-async-storage/async-storage", () => ({
   setItem: jest.fn(() => Promise.resolve()),
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -24,9 +27,6 @@ jest.mock("@/storage/mmkv", () => ({
 jest.mock("@/constants/user", () => ({
   USER_ID: "test-user",
 }));
-
-import { useProgramStore } from "@/stores/programStore";
-import type { Program } from "@/types";
 
 // ──────────────────────────────────────────────
 // Helpers

@@ -1,28 +1,26 @@
-import React, { useRef, useState, useEffect } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  Animated,
-  BackHandler,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View, Animated } from "react-native";
 import { Check } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import type { ExerciseTrackingMode } from "@/types";
-import {
-  EXERCISE_TRACKING_OPTIONS,
-  getTrackingModeLabel,
-} from "@/utils/exerciseTracking";
+import { EXERCISE_TRACKING_OPTIONS, getTrackingModeLabel } from "@/utils/exerciseTracking";
+import { useSheet } from "@/hooks/useSheet";
+
+interface AnchorLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface ExerciseTrackingModeSelectorProps {
   value: ExerciseTrackingMode;
   onChange: (trackingMode: ExerciseTrackingMode) => void;
-  visible?: boolean;
-  onClose?: () => void;
-  anchorLayout?: { x: number; y: number; width: number; height: number };
+  visible: boolean;
+  onClose: () => void;
+  /** Window-space layout of the trigger; the menu drops down below it. */
+  anchorLayout?: AnchorLayout;
 }
 
 export default function ExerciseTrackingModeSelector({
@@ -32,60 +30,22 @@ export default function ExerciseTrackingModeSelector({
   onClose,
   anchorLayout,
 }: ExerciseTrackingModeSelectorProps) {
-  const animValue = useRef(new Animated.Value(0)).current;
-  const [renderVisible, setRenderVisible] = useState(false);
+  const { mounted, progress } = useSheet(visible && !!anchorLayout);
+  if (!mounted || !anchorLayout) return null;
 
-  // Handle visibility and animation
-  useEffect(() => {
-    if (visible && anchorLayout) {
-      setRenderVisible(true);
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(animValue, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }).start(() => {
-        setRenderVisible(false);
-      });
-    }
-  }, [visible, anchorLayout]);
-
-  // Handle Android back button (replaces Modal's onRequestClose)
-  useEffect(() => {
-    if (!visible) return;
-
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose?.();
-      return true;
-    });
-
-    return () => subscription.remove();
-  }, [visible, onClose]);
-
-  // Don't render if not visible
-  if (!renderVisible) return null;
-
-  // Calculate menu position based on anchor
   const menuStyle = {
-    top: anchorLayout!.y + anchorLayout!.height + 4,
-    left: anchorLayout!.x,
-    width: Math.max(140, anchorLayout!.width * 1.5),
+    top: anchorLayout.y + anchorLayout.height + 4,
+    left: anchorLayout.x,
+    width: Math.max(140, anchorLayout.width * 1.5),
   };
 
   return (
     <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      {/* Backdrop to catch outside clicks */}
-      <Animated.View style={[styles.backdrop, { opacity: animValue }]}>
+      <Animated.View style={[styles.backdrop, { opacity: progress }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Dropdown menu with fade-in animation */}
-      <Animated.View style={[styles.menu, menuStyle, { opacity: animValue }]}>
+      <Animated.View style={[styles.menu, menuStyle, { opacity: progress }]}>
         {EXERCISE_TRACKING_OPTIONS.map((option) => {
           const isSelected = option === value;
           return (
@@ -93,7 +53,7 @@ export default function ExerciseTrackingModeSelector({
               key={option}
               onPress={() => {
                 onChange(option);
-                onClose?.();
+                onClose();
               }}
               style={({ pressed }) => [
                 styles.option,
@@ -101,10 +61,7 @@ export default function ExerciseTrackingModeSelector({
                 pressed && styles.optionPressed,
               ]}
             >
-              <Text style={[
-                styles.optionText,
-                isSelected && styles.optionTextSelected
-              ]}>
+              <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
                 {getTrackingModeLabel(option).toUpperCase()}
               </Text>
               {isSelected && <Check size={12} color={COLORS.ACCENT_BLUE} strokeWidth={3} />}
@@ -117,14 +74,8 @@ export default function ExerciseTrackingModeSelector({
 }
 
 const styles = StyleSheet.create({
-  absoluteOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1000,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
+  absoluteOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   menu: {
     position: "absolute",
     backgroundColor: COLORS.BG,
@@ -145,22 +96,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 6, // Keep - small element
+    borderRadius: 6,
     gap: 8,
   },
-  optionSelected: {
-    backgroundColor: "rgba(0, 122, 255, 0.08)",
-  },
-  optionPressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-  },
+  optionSelected: { backgroundColor: "rgba(0, 122, 255, 0.08)" },
+  optionPressed: { backgroundColor: "rgba(255, 255, 255, 0.05)" },
   optionText: {
     color: COLORS.TEXT_SECONDARY,
     fontSize: 11,
     fontWeight: "800",
     fontFamily: FONT_FAMILIES.MONO,
   },
-  optionTextSelected: {
-    color: COLORS.ACCENT_BLUE,
-  },
+  optionTextSelected: { color: COLORS.ACCENT_BLUE },
 });

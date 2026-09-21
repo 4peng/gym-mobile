@@ -15,7 +15,7 @@ interface HUDPillNavProps {
   onNextPress: () => void;
 }
 
-export const HUDPillNav = React.memo(({
+export const HUDPillNav = React.memo(function HUDPillNav({
   activeIndex,
   totalExercises,
   onMenuPress,
@@ -23,7 +23,7 @@ export const HUDPillNav = React.memo(({
   onFinishPress,
   onPrevPress,
   onNextPress,
-}: HUDPillNavProps) => {
+}: HUDPillNavProps) {
   return (
     <View style={[UI.SHARED.hudPill, styles.pillNav]}>
       <Pressable style={UI.SHARED.iconBtn} onPress={onMenuPress}>

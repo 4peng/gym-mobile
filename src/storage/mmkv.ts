@@ -26,7 +26,7 @@ const DEBOUNCE_MS = 400;
 interface PendingWrite {
   value: string;
   timeout: ReturnType<typeof setTimeout>;
-  resolvers: Array<() => void>;
+  resolvers: (() => void)[];
 }
 
 const pendingWrites = new Map<string, PendingWrite>();
