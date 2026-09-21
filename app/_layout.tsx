@@ -63,17 +63,10 @@ export default function RootLayout() {
           animation: 'fade_from_bottom',
         }}
       >
-        <Stack.Screen name="index" />
-        <Stack.Screen name="programs" />
-        <Stack.Screen name="workout/index" />
         <Stack.Screen
           name="exercises/[name]/volume"
-          options={{
-            animation: 'slide_from_bottom',
-            gestureEnabled: true,
-          }}
+          options={{ animation: 'slide_from_bottom', gestureEnabled: true }}
         />
-        <Stack.Screen name="stats/index" />
       </Stack>
     </GestureHandlerRootView>
   );

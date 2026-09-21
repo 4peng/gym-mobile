@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { ChevronLeft, ChevronRight, Search, BarChart2, Pin, Filter } from "lucide-react-native";
 import Svg, { Rect } from "react-native-svg";
-import { useAppRouter } from "@/utils/navigation";
+import { useRouter } from "expo-router";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { workoutStorage } from "@/storage/workoutStorage";
@@ -24,7 +24,7 @@ import { WorkoutSession } from "@/src/types";
 import {
   DETAILED_MODE_MUSCLE_GROUPS,
   expandPrimaryMusclesForDetailedMode,
-  MUSCLE_GROUPS,
+  PRIMARY_MUSCLE_GROUPS,
   MUSCLE_LABELS,
   MuscleGroup,
 } from "@/constants/muscles";
@@ -108,7 +108,7 @@ const MiniChart = ({ data }: { data: number[] }) => {
 // ──────────────────────────────────────────────
 
 export default function ExerciseListStatsScreen() {
-  const router = useAppRouter();
+  const router = useRouter();
   const rawHistory = useWorkoutSessionStore(useShallow((s) => s.history));
   const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
   const pinnedExerciseNamesRaw = useWorkoutSessionStore(useShallow((s) => s.pinnedExerciseNames));
@@ -127,7 +127,7 @@ export default function ExerciseListStatsScreen() {
   const [scrollEnabled, setScrollEnabled] = React.useState(true);
   const selectableMuscles: readonly MuscleGroup[] = showDetailedMuscleGroups
     ? (DETAILED_MODE_MUSCLE_GROUPS as readonly MuscleGroup[])
-    : (MUSCLE_GROUPS as readonly MuscleGroup[]);
+    : (PRIMARY_MUSCLE_GROUPS as readonly MuscleGroup[]);
   // Shards already fetched from disk, keyed by session _id, so repeated
   // hydration passes never re-request a shard we already have in memory.
   const hydratedShardsRef = useRef<Map<string, WorkoutSession>>(new Map());

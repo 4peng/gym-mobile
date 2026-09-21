@@ -59,7 +59,7 @@ export function formatDurationMinutes(totalMinutes: number) {
   return `${hours}h ${minutes}m`;
 }
 
-export function formatActivityRangeLabel(mode: ActivityPeriodMode, now: Date) {
+function formatActivityRangeLabel(mode: ActivityPeriodMode, now: Date) {
   if (mode === "week") {
     const end = endOfDay(now);
     const start = startOfDay(shiftDays(end, -6));
@@ -77,7 +77,7 @@ export function formatActivityRangeLabel(mode: ActivityPeriodMode, now: Date) {
   return `${startMonth.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase()} - ${endMonth.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase()}`;
 }
 
-export function toDurationMinutes(startedAt?: string, completedAt?: string) {
+function toDurationMinutes(startedAt?: string, completedAt?: string) {
   if (!startedAt || !completedAt) return 0;
 
   const start = new Date(startedAt).getTime();

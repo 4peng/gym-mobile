@@ -33,7 +33,10 @@ jest.mock("react-native", () => ({
 import NetInfo from "@react-native-community/netinfo";
 
 const mockedNetInfo = jest.mocked(NetInfo);
-const addEventListenerMock = mockedNetInfo.addEventListener as jest.Mock;
+
+/** The connectivity handler registered by the most recently required listener module. */
+const getHandler = () =>
+  (require("@react-native-community/netinfo").addEventListener as jest.Mock).mock.calls[0][0];
 
 /** Returns a minimal NetInfoState-like object. */
 function netState(connected: boolean): any {
@@ -42,7 +45,6 @@ function netState(connected: boolean): any {
 
 beforeEach(() => {
   // Reset mock call history and set default fetch to offline
-  addEventListenerMock.mockClear();
   (mockedNetInfo.fetch as jest.Mock).mockClear();
   (mockedNetInfo.fetch as jest.Mock).mockResolvedValue(netState(false));
   mockRunFullSync = jest.fn(() => Promise.resolve(true));
@@ -62,7 +64,7 @@ describe("startNetworkSyncListener", () => {
     // Flush startup NetInfo.fetch().then() which sets _wasOffline = true
     await Promise.resolve();
 
-    const handler = addEventListenerMock.mock.calls[0][0];
+    const handler = getHandler();
 
     // Switch to online
     handler(netState(true));
@@ -77,7 +79,7 @@ describe("startNetworkSyncListener", () => {
     const unsub = startNetworkSyncListener();
     await Promise.resolve();
 
-    const handler = addEventListenerMock.mock.calls[0][0];
+    const handler = getHandler();
 
     handler(netState(true));
     expect(mockRunFullSync).toHaveBeenCalledTimes(1);
@@ -98,7 +100,7 @@ describe("startNetworkSyncListener", () => {
     const unsub = startNetworkSyncListener();
     await Promise.resolve();
 
-    const handler = addEventListenerMock.mock.calls[0][0];
+    const handler = getHandler();
 
     // First reconnect triggers sync (fails)
     handler(netState(true));
@@ -121,7 +123,7 @@ describe("startNetworkSyncListener", () => {
     const unsub = startNetworkSyncListener();
     await Promise.resolve();
 
-    const handler = addEventListenerMock.mock.calls[0][0];
+    const handler = getHandler();
 
     // No sync on startup because offline
     expect(mockRunFullSync).not.toHaveBeenCalled();

@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { Calendar, Check, X, ChevronDown, TrendingUp } from "lucide-react-native";
 import Svg, { Path, Line, Text as SvgText, Rect, G } from "react-native-svg";
-import { useAppRouter } from "@/utils/navigation";
+import { useRouter } from "expo-router";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { workoutStorage } from "@/storage/workoutStorage";
 import { useShallow } from "zustand/react/shallow";
@@ -377,7 +377,7 @@ const LogRow = React.memo(function LogRow({ log, unit, onDeleteSession, onEditDa
 });
 
 export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScreenProps) {
-  const router = useAppRouter();
+  const router = useRouter();
   const historyCache = useWorkoutSessionStore(useShallow((s) => s.history));
   const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
   const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);

@@ -2,10 +2,11 @@
 // All ObjectId <-> string conversions live here.
 // No other file should import or mention ObjectId.
 
-import type { Program, WorkoutSession, ProgramSetTemplate } from "@/types";
+import type { Program, WorkoutSession } from "@/types";
 import type { ProgramServer, WorkoutServer } from "./serverTypes";
 import type { MuscleGroup } from "@/constants/muscles";
 import { normalizeTrackingMode } from "@/utils/exerciseTracking";
+import { normalizeSets } from "@/shared/programs.js";
 
 // Program: Client -> Server
 
@@ -44,24 +45,12 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
     userId: server.userId,
     name: server.name,
     exercises: server.exercises.map((e) => {
-      // Handle server returning either a number or (future) array
-      let defaultSets: ProgramSetTemplate[] = [];
-      if (typeof e.defaultSets === "number") {
-        defaultSets = Array.from({ length: e.defaultSets }, () => ({ type: "working" }));
-      } else if (Array.isArray(e.defaultSets)) {
-        defaultSets = e.defaultSets.map((s) => ({
-          type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working",
-        }));
-      } else {
-        defaultSets = [{ type: "working" }, { type: "working" }, { type: "working" }];
-      }
-
       return {
         id: e.id,
         exerciseDefinitionId: e.exerciseDefinitionId,
         trackingMode: normalizeTrackingMode(e.trackingMode),
         name: e.name,
-        defaultSets,
+        defaultSets: normalizeSets(e.defaultSets),
         restSeconds: e.restSeconds,
         notes: e.notes,
         weightUnit: e.weightUnit as "kg" | "lbs" | undefined,

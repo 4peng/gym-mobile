@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+import { current } from "immer";
 import { zustandAsyncStorage } from "@/storage/mmkv";
-import { workoutStorage } from "@/storage/workoutStorage";
+import { workoutStorage, normalizePersistedWorkoutSession } from "@/storage/workoutStorage";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import { MuscleGroup } from "@/constants/muscles";
@@ -167,9 +168,6 @@ interface WorkoutSessionActions {
    */
   applySyncMerge: (remote: WorkoutSession[], syncStartTime: number) => void;
 
-  /** Runs a merge diagnostic: injects test sessions, merges, returns exercise count, cleans up. */
-  runMergeDiagnostic: () => number;
-
   /**
    * Append workouts fetched from backend that are not present locally.
    */
@@ -296,8 +294,52 @@ function markShardRewriteDirty(
   state.history = [...state.history];
 }
 
-function hasCompletedSets(exercise: WorkoutExercise): boolean {
-  return exercise.sets.some((set) => !!set.completedAt);
+type StoreSet = (recipe: (state: WorkoutSessionState) => void) => void;
+type StoreGet = () => WorkoutSessionState;
+
+/**
+ * Applies `mutate` to every exercise across RAM history, the active session
+ * and shard-only sessions on disk. Changed history sessions get a fresh
+ * updatedAt, are marked dirty and re-persisted. Resolves once shards are done.
+ * `mutate` returns true when it changed the exercise.
+ */
+function rewriteExerciseRefs(
+  set: StoreSet,
+  get: StoreGet,
+  mutate: (exercise: WorkoutExercise) => boolean,
+): Promise<void> {
+  const loadedIds = new Set(get().history.map((s) => s._id));
+  const shardOnlyIds = get().historyIndex.filter((id) => !loadedIds.has(id));
+  const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
+  const changedSessions: WorkoutSession[] = [];
+
+  set((state) => {
+    state.history.forEach((session) => {
+      let changed = false;
+      session.exercises.forEach((ex) => {
+        if (mutate(ex)) changed = true;
+      });
+      if (!changed) return;
+      session.updatedAt = updatedAt;
+      changedSessions.push(current(session));
+      if (!state.dirtyWorkoutIds.includes(session._id)) state.dirtyWorkoutIds.push(session._id);
+      state.isDirty = true;
+    });
+    if (state.activeSession) {
+      let changed = false;
+      state.activeSession.exercises.forEach((ex) => {
+        if (mutate(ex)) changed = true;
+      });
+      if (changed) state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+    }
+  });
+
+  if (changedSessions.length > 0) void workoutStorage.saveBatch(changedSessions);
+  if (shardOnlyIds.length === 0) return Promise.resolve();
+
+  return rewriteShardOnlySessions(shardOnlyIds, updatedAt, mutate).then((changed) => {
+    if (changed.length > 0) set((state) => markShardRewriteDirty(state, changed));
+  });
 }
 
 function inferTrackingMode(
@@ -353,87 +395,6 @@ function buildCompletedSession(session: WorkoutSession): WorkoutSession {
         sets: exercise.sets.filter((set) => !!set.completedAt),
       }))
       .filter((exercise) => exercise.sets.length > 0),
-  };
-}
-
-function normalizePersistedWorkoutSession(raw: any): WorkoutSession | null {
-  if (!raw || typeof raw !== "object") return null;
-  const id = raw._id ? String(raw._id) : null;
-  if (!id) return null;
-
-  const exercises = Array.isArray(raw.exercises)
-    ? raw.exercises.map((ex: any) => ({
-        id: ex?.id ? String(ex.id) : generateId(),
-        programExerciseId:
-          typeof ex?.programExerciseId === "string" ? ex.programExerciseId : undefined,
-        exerciseDefinitionId:
-          typeof ex?.exerciseDefinitionId === "string" ? ex.exerciseDefinitionId : undefined,
-        trackingMode: normalizeTrackingMode(ex?.trackingMode),
-        name: typeof ex?.name === "string" ? ex.name : "",
-        restSeconds:
-          typeof ex?.restSeconds === "number" && Number.isFinite(ex.restSeconds)
-            ? ex.restSeconds
-            : 90,
-        notes: typeof ex?.notes === "string" ? ex.notes : "",
-        sets: Array.isArray(ex?.sets)
-          ? ex.sets.map((s: any) => ({
-              id: s?.id ? String(s.id) : generateId(),
-              weight:
-                typeof s?.weight === "number" && Number.isFinite(s.weight)
-                  ? s.weight
-                  : s?.weight == null
-                    ? null
-                    : null,
-              reps:
-                typeof s?.reps === "number" && Number.isFinite(s.reps)
-                  ? s.reps
-                  : s?.reps == null
-                    ? null
-                    : null,
-              durationSeconds:
-                typeof s?.durationSeconds === "number" && Number.isFinite(s.durationSeconds)
-                  ? s.durationSeconds
-                  : s?.durationSeconds == null
-                    ? null
-                    : null,
-              distance:
-                typeof s?.distance === "number" && Number.isFinite(s.distance)
-                  ? s.distance
-                  : s?.distance == null
-                    ? null
-                    : null,
-              completedAt: typeof s?.completedAt === "string" ? s.completedAt : undefined,
-            })).map((set: WorkoutSet) => normalizeSetForTrackingMode(set, normalizeTrackingMode(ex?.trackingMode)))
-          : [],
-        weightUnit: ex?.weightUnit === "lbs" ? "lbs" : "kg",
-        muscles: Array.isArray(ex?.muscles) ? ex.muscles : [],
-        isBodyweight: typeof ex?.isBodyweight === "boolean" ? ex.isBodyweight : false,
-        timerStartedAt:
-          typeof ex?.timerStartedAt === "string" ? ex.timerStartedAt : undefined,
-      }))
-    : [];
-
-  return {
-    _id: id,
-    userId: typeof raw.userId === "string" ? raw.userId : USER_ID,
-    programId: raw.programId ? String(raw.programId) : undefined,
-    startedAt:
-      typeof raw.startedAt === "string" ? raw.startedAt : new Date().toISOString(),
-    completedAt: typeof raw.completedAt === "string" ? raw.completedAt : undefined,
-    updatedAt:
-      typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt)
-        ? raw.updatedAt
-        : Date.now(),
-    deletedAt:
-      typeof raw.deletedAt === "number" || raw.deletedAt === null
-        ? raw.deletedAt
-        : undefined,
-    notes: typeof raw.notes === "string" ? raw.notes : "",
-    exercises,
-    cumulativeRestSeconds:
-      typeof raw.cumulativeRestSeconds === "number" && Number.isFinite(raw.cumulativeRestSeconds)
-        ? raw.cumulativeRestSeconds
-        : 0,
   };
 }
 
@@ -1218,252 +1179,49 @@ export const useWorkoutSessionStore = create<
       },
 
       updateMusclesInHistory: (exerciseIdentityKey, muscles) => {
-        const normalizedKey = normalizeExerciseIdentityKey(exerciseIdentityKey);
-        if (!normalizedKey) return;
-        const normalizedMuscles = [...muscles];
-        const loadedHistoryIds = new Set(get().history.map((session) => session._id));
-        const shardOnlyIds = get().historyIndex.filter((id) => !loadedHistoryIds.has(id));
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-
-        // Custom exercises (ids like "custom-<uuid>") are detected from the raw,
-        // un-normalized exerciseDefinitionId of matched exercises — normalizeExerciseIdentityKey
-        // strips the hyphen, so "custom-abc" would never match a "custom-" prefix check.
-        const matchedCustomExerciseIds = new Set<string>();
-
-        const updatedSessions: WorkoutSession[] = [];
-        set((state) => {
-          let count = 0;
-
-          state.history.forEach(session => {
-            let sessionChanged = false;
-            session.exercises.forEach(ex => {
-              if (getExerciseIdentityKey(ex) === normalizedKey) {
-                ex.muscles = [...normalizedMuscles];
-                session.updatedAt = updatedAt;
-                count++;
-                sessionChanged = true;
-                if (typeof ex.exerciseDefinitionId === "string" && ex.exerciseDefinitionId.startsWith("custom-")) {
-                  matchedCustomExerciseIds.add(ex.exerciseDefinitionId);
-                }
-              }
-            });
-            if (sessionChanged) {
-              updatedSessions.push(safeClone(session));
-              if (!state.dirtyWorkoutIds.includes(session._id)) {
-                state.dirtyWorkoutIds.push(session._id);
-              }
-            }
-          });
-
-          // Also update active session if it contains the exercise
-          if (state.activeSession) {
-            state.activeSession.exercises.forEach(ex => {
-              if (getExerciseIdentityKey(ex) === normalizedKey) {
-                ex.muscles = [...normalizedMuscles];
-                if (typeof ex.exerciseDefinitionId === "string" && ex.exerciseDefinitionId.startsWith("custom-")) {
-                  matchedCustomExerciseIds.add(ex.exerciseDefinitionId);
-                }
-              }
-            });
-          }
-
-          if (count > 0) state.isDirty = true;
+        const key = normalizeExerciseIdentityKey(exerciseIdentityKey);
+        if (!key) return;
+        // Custom exercises ("custom-<id>") are detected from the raw exerciseDefinitionId:
+        // normalizeExerciseIdentityKey strips the hyphen, so the key itself never matches.
+        const customIds = new Set<string>();
+        const syncLibrary = () =>
+          customIds.forEach((id) =>
+            useExerciseLibraryStore.getState().updateCustomExerciseMuscles(id, muscles),
+          );
+        const done = rewriteExerciseRefs(set, get, (ex) => {
+          if (getExerciseIdentityKey(ex) !== key) return false;
+          ex.muscles = [...muscles];
+          if (ex.exerciseDefinitionId?.startsWith("custom-")) customIds.add(ex.exerciseDefinitionId);
+          return true;
         });
-
-        if (updatedSessions.length > 0) {
-          workoutStorage.saveBatch(updatedSessions);
-        }
-
-        matchedCustomExerciseIds.forEach((rawId) => {
-          useExerciseLibraryStore.getState().updateCustomExerciseMuscles(rawId, normalizedMuscles);
-        });
-
-        if (shardOnlyIds.length > 0) {
-          void (async () => {
-            const shardCustomExerciseIds = new Set<string>();
-            const changedShardSessions = await rewriteShardOnlySessions(
-              shardOnlyIds,
-              updatedAt,
-              (exercise) => {
-                if (getExerciseIdentityKey(exercise) !== normalizedKey) return false;
-                exercise.muscles = [...normalizedMuscles];
-                if (typeof exercise.exerciseDefinitionId === "string" && exercise.exerciseDefinitionId.startsWith("custom-")) {
-                  shardCustomExerciseIds.add(exercise.exerciseDefinitionId);
-                }
-                return true;
-              }
-            );
-
-            if (changedShardSessions.length === 0) return;
-
-            set((state) => {
-              markShardRewriteDirty(state, changedShardSessions);
-            });
-
-            shardCustomExerciseIds.forEach((rawId) => {
-              useExerciseLibraryStore.getState().updateCustomExerciseMuscles(rawId, normalizedMuscles);
-            });
-          })();
-        }
+        syncLibrary();
+        void done.then(syncLibrary);
       },
 
       renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
-        const normalizedExerciseDefinitionId = String(exerciseDefinitionId).trim();
-        const normalizedName = String(nextName).trim();
-        if (!normalizedExerciseDefinitionId || !normalizedName) return;
-
-        const loadedHistoryIds = new Set(get().history.map((session) => session._id));
-        const shardOnlyIds = get().historyIndex.filter((id) => !loadedHistoryIds.has(id));
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        const updatedSessions: WorkoutSession[] = [];
-
-        set((state) => {
-          let changed = false;
-
-          state.history.forEach((session) => {
-            let sessionChanged = false;
-            session.exercises.forEach((exercise) => {
-              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
-              if (exercise.name === normalizedName) return;
-              exercise.name = normalizedName;
-              session.updatedAt = updatedAt;
-              sessionChanged = true;
-              changed = true;
-            });
-
-            if (sessionChanged) {
-              updatedSessions.push(safeClone(session));
-              if (!state.dirtyWorkoutIds.includes(session._id)) {
-                state.dirtyWorkoutIds.push(session._id);
-              }
-            }
-          });
-
-          if (state.activeSession) {
-            state.activeSession.exercises.forEach((exercise) => {
-              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
-              if (exercise.name === normalizedName) return;
-              exercise.name = normalizedName;
-              changed = true;
-            });
-
-            if (changed) {
-              state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-            }
-
-            if (
-              state.activeRestTimer &&
-              state.activeSession.exercises.some(
-                (exercise) =>
-                  exercise.id === state.activeRestTimer?.exerciseId &&
-                  exercise.exerciseDefinitionId === normalizedExerciseDefinitionId
-              )
-            ) {
-              state.activeRestTimer.exerciseName = normalizedName;
-            }
-          }
-
-          if (changed) {
-            state.isDirty = true;
-          }
+        const defId = String(exerciseDefinitionId).trim();
+        const name = String(nextName).trim();
+        if (!defId || !name) return;
+        void rewriteExerciseRefs(set, get, (ex) => {
+          if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
+          ex.name = name;
+          return true;
         });
-
-        if (updatedSessions.length > 0) {
-          workoutStorage.saveBatch(updatedSessions);
-        }
-
-        if (shardOnlyIds.length > 0) {
-          void (async () => {
-            const changedShardSessions = await rewriteShardOnlySessions(
-              shardOnlyIds,
-              updatedAt,
-              (exercise) => {
-                if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return false;
-                if (exercise.name === normalizedName) return false;
-                exercise.name = normalizedName;
-                return true;
-              }
-            );
-
-            if (changedShardSessions.length === 0) return;
-
-            set((state) => {
-              markShardRewriteDirty(state, changedShardSessions);
-            });
-          })();
-        }
+        set((state) => {
+          const timer = state.activeRestTimer;
+          const timerEx = timer && state.activeSession?.exercises.find((ex) => ex.id === timer.exerciseId);
+          if (timer && timerEx?.exerciseDefinitionId === defId) timer.exerciseName = name;
+        });
       },
 
       removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
-        const normalizedExerciseDefinitionId = String(exerciseDefinitionId).trim();
-        if (!normalizedExerciseDefinitionId) return;
-
-        const loadedHistoryIds = new Set(get().history.map((session) => session._id));
-        const shardOnlyIds = get().historyIndex.filter((id) => !loadedHistoryIds.has(id));
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        const updatedSessions: WorkoutSession[] = [];
-
-        set((state) => {
-          let changed = false;
-
-          state.history.forEach((session) => {
-            let sessionChanged = false;
-            session.exercises.forEach((exercise) => {
-              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
-              exercise.exerciseDefinitionId = "";
-              session.updatedAt = updatedAt;
-              sessionChanged = true;
-              changed = true;
-            });
-
-            if (sessionChanged) {
-              updatedSessions.push(safeClone(session));
-              if (!state.dirtyWorkoutIds.includes(session._id)) {
-                state.dirtyWorkoutIds.push(session._id);
-              }
-            }
-          });
-
-          if (state.activeSession) {
-            state.activeSession.exercises.forEach((exercise) => {
-              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
-              exercise.exerciseDefinitionId = "";
-              changed = true;
-            });
-
-            if (changed) {
-              state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-            }
-          }
-
-          if (changed) {
-            state.isDirty = true;
-          }
+        const defId = String(exerciseDefinitionId).trim();
+        if (!defId) return;
+        void rewriteExerciseRefs(set, get, (ex) => {
+          if (ex.exerciseDefinitionId !== defId) return false;
+          ex.exerciseDefinitionId = "";
+          return true;
         });
-
-        if (updatedSessions.length > 0) {
-          workoutStorage.saveBatch(updatedSessions);
-        }
-
-        if (shardOnlyIds.length > 0) {
-          void (async () => {
-            const changedShardSessions = await rewriteShardOnlySessions(
-              shardOnlyIds,
-              updatedAt,
-              (exercise) => {
-                if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return false;
-                exercise.exerciseDefinitionId = "";
-                return true;
-              }
-            );
-
-            if (changedShardSessions.length === 0) return;
-
-            set((state) => {
-              markShardRewriteDirty(state, changedShardSessions);
-            });
-          })();
-        }
       },
 
       applySyncMerge: (remote, syncStartTime) => {
@@ -1597,63 +1355,6 @@ export const useWorkoutSessionStore = create<
         });
       },
 
-      runMergeDiagnostic: () => {
-        const workoutId = "diag-merge-" + Date.now();
-        const base: WorkoutSession = {
-          _id: workoutId,
-          userId: "test",
-          startedAt: "2026-01-01T10:00:00Z",
-          updatedAt: 1000,
-          notes: "",
-          exercises: [],
-        };
-
-        const local: WorkoutSession = {
-          ...base,
-          exercises: [{
-            id: "ex-1",
-            name: "Local Exercise",
-            trackingMode: "strength",
-            sets: [],
-            restSeconds: 60,
-            notes: "",
-            muscles: [],
-          }],
-        };
-
-        const remote: WorkoutSession = {
-          ...base,
-          updatedAt: 2000,
-          exercises: [{
-            id: "ex-2",
-            name: "Remote Exercise",
-            trackingMode: "strength",
-            sets: [],
-            restSeconds: 60,
-            notes: "",
-            muscles: [],
-          }],
-        };
-
-        // Inject local diagnostic session
-        set((state) => {
-          state.history = [local, ...state.history];
-        });
-
-        // Apply merge — remote has higher updatedAt so it should win/last-write-wins
-        get().applySyncMerge([remote], Date.now());
-
-        // Check merged result
-        const merged = get().history.find((w) => w._id === workoutId);
-        const exCount = merged?.exercises.length || 0;
-
-        // Clean up diagnostic session
-        set((state) => {
-          state.history = state.history.filter((w) => w._id !== workoutId);
-        });
-
-        return exCount;
-      },
     })),
     {
       name: "workout-session-store",

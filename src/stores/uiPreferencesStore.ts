@@ -12,7 +12,6 @@ interface UiPreferencesState {
 
 interface UiPreferencesActions {
   toggleDetailedMuscleGroups: () => void;
-  setDetailedMuscleGroups: (enabled: boolean) => void;
   setAnalyticsBodyweight: (bodyweight: number | null) => void;
   toggleAnalyticsBodyweightUnit: () => void;
   setPreferredWeightUnit: (unit: "kg" | "lbs") => void;
@@ -31,8 +30,6 @@ export const useUiPreferencesStore = create<
         set((state) => ({
           showDetailedMuscleGroups: !state.showDetailedMuscleGroups,
         })),
-      setDetailedMuscleGroups: (enabled) =>
-        set({ showDetailedMuscleGroups: enabled }),
       setAnalyticsBodyweight: (analyticsBodyweight) =>
         set({ analyticsBodyweight }),
       toggleAnalyticsBodyweightUnit: () => {

@@ -20,7 +20,7 @@ import {
   DETAILED_MODE_MUSCLE_GROUPS,
   DETAILED_MUSCLE_GROUPS,
   MUSCLE_LABELS,
-  MUSCLE_GROUPS,
+  PRIMARY_MUSCLE_GROUPS,
   MuscleGroup,
 } from '@/constants/muscles';
 import { useUiPreferencesStore } from '@/stores/uiPreferencesStore';
@@ -73,7 +73,7 @@ const dragOffset = useRef(new Animated.Value(0)).current;
     ? DETAILED_MODE_MUSCLE_GROUPS
     : Array.from(
         new Set([
-          ...MUSCLE_GROUPS,
+          ...PRIMARY_MUSCLE_GROUPS,
           ...selectedMuscles.filter((m) => detailedSet.has(m)),
         ])
       );

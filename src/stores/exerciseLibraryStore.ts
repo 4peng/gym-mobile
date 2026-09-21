@@ -4,6 +4,7 @@ import { zustandAsyncStorage } from "@/storage/mmkv";
 import { generateId } from "@/utils/id";
 import type { ExerciseDefinition } from "@/types";
 import type { MuscleGroup } from "@/constants/muscles";
+import { normalizeExerciseDisplayName as normalizeName } from "@/utils/exerciseIdentity";
 
 interface ExerciseLibraryState {
   customExercises: ExerciseDefinition[];
@@ -31,11 +32,7 @@ function normalizeCustomExercise(raw: unknown): ExerciseDefinition | null {
   };
 }
 
-function normalizeName(value: string) {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-function matchesCustomExerciseNameOrAlias(
+export function matchesCustomExerciseNameOrAlias(
   exercise: ExerciseDefinition,
   normalizedName: string
 ) {

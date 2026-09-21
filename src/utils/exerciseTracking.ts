@@ -1,4 +1,5 @@
 import type { ExerciseDefinition, ExerciseTrackingMode, WorkoutSet } from "@/types";
+import { normalizeTrackingMode } from "@/shared/programs.js";
 
 export const EXERCISE_TRACKING_OPTIONS: ExerciseTrackingMode[] = [
   "strength",
@@ -37,9 +38,7 @@ const CARDIO_EXERCISE_IDS = new Set([
   "farmer-carry",
 ]);
 
-export function normalizeTrackingMode(value: unknown): ExerciseTrackingMode {
-  return value === "timed" || value === "cardio" ? value : "strength";
-}
+export { normalizeTrackingMode };
 
 export function getTrackingModeLabel(mode: ExerciseTrackingMode): string {
   return TRACKING_MODE_LABELS[mode];

@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useState, useRef, useMemo } from "react"
 import { LayoutAnimation, StyleSheet, Text, TextInput, View, InteractionManager, Animated, ScrollView, Alert, Pressable } from "react-native";
 import { Dumbbell, Plus, Check, X } from "lucide-react-native";
 import { GestureHandlerRootView, GestureDetector, Gesture, Directions } from "react-native-gesture-handler";
-import { useAppRouter } from "@/utils/navigation";
+import { useRouter } from "expo-router";
 import { showConfirm } from "@/utils/alerts";
-import { useAddExercise, useClearExpiredTimer, useCompleteSession, useDiscardSession, useSessionExerciseIds, useSessionExerciseNames, useSessionExerciseProgress, useSessionProgress } from "@/stores/activeSessionStore";
+import { useShallow } from "zustand/react/shallow";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
 import { COLORS } from "@/constants/colors";
@@ -28,22 +28,33 @@ const CONDENSE_THRESHOLD = 80;
 const EMPTY_MUSCLES: MuscleGroup[] = [];
 
 export default function WorkoutSessionScreen() {
-  const router = useAppRouter();
+  const router = useRouter();
   const activeSessionId = useWorkoutSessionStore((s) => s.activeSession?._id);
   const startedAt = useWorkoutSessionStore((s) => s.activeSession?.startedAt);
   const activeExerciseId = useWorkoutSessionStore((s) => s.activeExerciseId);
   const setActiveExerciseId = useWorkoutSessionStore((s) => s.setActiveExerciseId);
   const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
   
-  const exerciseIds = useSessionExerciseIds();
-  const exerciseNames = useSessionExerciseNames();
-  const exerciseProgress = useSessionExerciseProgress();
-  const progressData = useSessionProgress();
+  const exerciseIds = useWorkoutSessionStore(useShallow((s) => s.activeSession?.exercises.map((e) => e.id) ?? []));
+  const exerciseNames = useWorkoutSessionStore(useShallow((s) => s.activeSession?.exercises.map((e) => e.name) ?? []));
+  const exerciseProgress = useWorkoutSessionStore(useShallow((s) =>
+    (s.activeSession?.exercises ?? []).map((e) =>
+      e.sets.length > 0 ? e.sets.filter((st) => !!st.completedAt).length / e.sets.length : 0,
+    ),
+  ));
+  const progressData = useWorkoutSessionStore(useShallow((s) => {
+    let total = 0, completed = 0;
+    for (const ex of s.activeSession?.exercises ?? []) {
+      total += ex.sets.length;
+      for (const st of ex.sets) if (st.completedAt) completed++;
+    }
+    return { progress: total > 0 ? completed / total : 0, completed, total };
+  }));
 
-  const addExercise = useAddExercise();
-  const completeSession = useCompleteSession();
-  const discardSession = useDiscardSession();
-  const clearExpiredTimer = useClearExpiredTimer();
+  const addExercise = useWorkoutSessionStore((s) => s.addExercise);
+  const completeSession = useWorkoutSessionStore((s) => s.completeSession);
+  const discardSession = useWorkoutSessionStore((s) => s.discardSession);
+  const clearExpiredTimer = useWorkoutSessionStore((s) => s.clearExpiredTimer);
   const addProgram = useProgramStore((s) => s.addProgram);
 
 const [exercisePickerVisible, setExercisePickerVisible] = useState(false);

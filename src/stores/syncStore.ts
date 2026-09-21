@@ -6,9 +6,7 @@
 // `runFullSync` action the UI can call directly.
 
 import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WORKOUT_STATS_KEY } from "@/storage/workoutStatsStorage";
 import { runFullSync as engineRunFullSync } from "@/lib/api/sync";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -16,7 +14,7 @@ import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 const APP_STORAGE_KEYS = [
   "program-store",
   "workout-session-store",
-  WORKOUT_STATS_KEY,
+  "workout-stats-index-v1", // legacy stats index left on disk by older builds
 ] as const;
 const APP_STORAGE_PREFIXES = ["workout_"] as const;
 

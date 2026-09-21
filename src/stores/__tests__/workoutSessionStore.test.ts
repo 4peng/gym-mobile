@@ -776,10 +776,8 @@ describe("workoutSessionStore", () => {
 
       useWorkoutSessionStore.getState().updateMusclesInHistory("pull-up", ["back", "arms"]);
 
-      // Flush microtasks so the async shard-rewrite completes
-      // (getBatch then saveBatch are each one await)
-      await Promise.resolve();
-      await Promise.resolve();
+      // Flush the async shard rewrite (getBatch -> saveBatch -> mark dirty)
+      await new Promise((resolve) => setImmediate(resolve));
 
       // saveBatch should have been called with the rewritten shard
       expect(mockedWorkoutStorage.saveBatch).toHaveBeenCalled();

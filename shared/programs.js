@@ -49,7 +49,7 @@ function normalizeMuscles(muscles) {
   );
 }
 
-function normalizeTrackingMode(value) {
+export function normalizeTrackingMode(value) {
   return value === "timed" || value === "cardio" ? value : DEFAULT_TRACKING_MODE;
 }
 
@@ -165,11 +165,4 @@ export function validateRoutineDraft(name, exercises) {
   }
 
   return null;
-}
-
-export function createEmptyRoutine(createId) {
-  return {
-    name: "",
-    exercises: [createEmptyExercise(createId)],
-  };
 }

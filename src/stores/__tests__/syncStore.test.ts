@@ -50,7 +50,7 @@ jest.mock("@/utils/restTimerLiveActivity", () => ({
 jest.mock("@/stores/exerciseLibraryStore", () => ({
   useExerciseLibraryStore: {
     getState: jest.fn(() => ({
-      exercises: [
+      customExercises: [
         { id: "custom-ex-1", name: "My Custom Exercise", muscles: ["chest"] },
       ],
       updateCustomExerciseMuscles: jest.fn(),
@@ -250,7 +250,7 @@ describe("forceResync", () => {
       lastSyncedAt: null,
     });
     // pinnedExerciseNames preserved
-    expect(setStateCall![0].pinnedExerciseNames).toEqual(["push-up", "pull-up"]);
+    expect((setStateCall![0] as { pinnedExerciseNames?: string[] }).pinnedExerciseNames).toEqual(["push-up", "pull-up"]);
   });
 
   it("triggers full sync after reset", async () => {
@@ -269,8 +269,8 @@ describe("forceResync", () => {
     // (it only clears program-store and workout-session-store keys)
     // So custom exercises should be untouched
     const postState = useExerciseLibraryStore.getState();
-    expect(postState.exercises).toEqual(preState.exercises);
-    expect(postState.exercises).toEqual([
+    expect(postState.customExercises).toEqual(preState.customExercises);
+    expect(postState.customExercises).toEqual([
       { id: "custom-ex-1", name: "My Custom Exercise", muscles: ["chest"] },
     ]);
   });

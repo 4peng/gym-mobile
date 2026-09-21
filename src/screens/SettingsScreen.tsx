@@ -13,7 +13,7 @@ import {
   Easing,
 } from "react-native";
 import { ChevronLeft, Database, Download, ShieldAlert, Share2, RefreshCw, Tags } from "lucide-react-native";
-import { useAppRouter } from "@/utils/navigation";
+import { useRouter } from "expo-router";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
@@ -26,7 +26,7 @@ import { showConfirm, showAlert } from "@/utils/alerts";
 import { workoutStorage } from "@/storage/workoutStorage";
 
 export default function SettingsScreen() {
-  const router = useAppRouter();
+  const router = useRouter();
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const runFullSync = useSyncStore((s) => s.runFullSync);
   const forceResync = useSyncStore((s) => s.forceResync);
@@ -125,16 +125,6 @@ export default function SettingsScreen() {
     } catch (err) {
       console.error("Failed to export backup:", err);
       showAlert("Export Failed", "Could not gather your full backup. Please try again.");
-    }
-  };
-
-  const runMergeDiagnostic = () => {
-    const exCount = useWorkoutSessionStore.getState().runMergeDiagnostic();
-    
-    if (exCount === 2) {
-      showAlert("Merge Diagnostic", "SUCCESS: Deep merge preserved both local and remote exercises (2 total). Your data is safe.");
-    } else {
-      showAlert("Merge Diagnostic", `FAILED: Found ${exCount} exercises. Expected 2. Data loss occurred.`);
     }
   };
 
@@ -281,8 +271,6 @@ export default function SettingsScreen() {
           <Pressable 
             style={({ pressed }) => [styles.option, pressed && styles.pressed]}
             onPress={handleExport}
-            onLongPress={runMergeDiagnostic}
-            delayLongPress={2000}
           >
             <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
               <Download size={20} color={COLORS.ACCENT_BLUE} />

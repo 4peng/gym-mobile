@@ -26,6 +26,7 @@ function makeWorkout(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
     completedAt: "2026-06-01T11:00:00.000Z",
     updatedAt: 200,
     notes: "test workout",
+    cumulativeRestSeconds: 0,
     exercises: [
       {
         id: "ex-1",
@@ -40,6 +41,7 @@ function makeWorkout(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
         ],
         weightUnit: "kg",
         muscles: ["chest"],
+        isBodyweight: false,
       },
     ],
     ...overrides,
@@ -54,6 +56,7 @@ function makeTimedWorkout(overrides: Partial<WorkoutSession> = {}): WorkoutSessi
     completedAt: "2026-06-01T10:30:00.000Z",
     updatedAt: 300,
     notes: "timed workout",
+    cumulativeRestSeconds: 0,
     exercises: [
       {
         id: "ex-t1",
@@ -63,11 +66,12 @@ function makeTimedWorkout(overrides: Partial<WorkoutSession> = {}): WorkoutSessi
         restSeconds: 30,
         notes: "",
         sets: [
-          { id: "st-1", weight: null, reps: null, durationSeconds: 60, distance: null },
-          { id: "st-2", weight: null, reps: null, durationSeconds: 45, distance: null },
+          { id: "st-1", weight: null, reps: null, type: "working", durationSeconds: 60, distance: null },
+          { id: "st-2", weight: null, reps: null, type: "working", durationSeconds: 45, distance: null },
         ],
         weightUnit: "kg",
         muscles: ["core"],
+        isBodyweight: false,
       },
     ],
     ...overrides,

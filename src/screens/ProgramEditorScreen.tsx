@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { useAppParams, useAppRouter } from "@/utils/navigation";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { showAlert, showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -31,10 +31,10 @@ const getProgramName = (program: Program | undefined) => {
 };
 
 export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProps) {
-  const { id, sourceId } = useAppParams<{ id?: string; sourceId?: string | string[] }>();
+  const { id, sourceId } = useLocalSearchParams<{ id?: string; sourceId?: string | string[] }>();
   const normalizedSourceId = Array.isArray(sourceId) ? sourceId[0] : sourceId;
 
-  const router = useAppRouter();
+  const router = useRouter();
 
   const addProgram = useProgramStore((s) => s.addProgram);
   const updateProgram = useProgramStore((s) => s.updateProgram);

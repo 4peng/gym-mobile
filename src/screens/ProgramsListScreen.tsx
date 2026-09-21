@@ -19,7 +19,7 @@ import {
 } from "lucide-react-native";
 import ActivityComboChart from "@/components/Home/ActivityComboChart";
 import { ProgramTile } from "@/components/ProgramTile";
-import { useAppRouter } from "@/utils/navigation";
+import { useRouter } from "expo-router";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -36,7 +36,7 @@ import {
 import type { Program } from "@/types";
 
 export default function ProgramsListScreen() {
-  const router = useAppRouter();
+  const router = useRouter();
 
   const isManualSync = useSyncStore((s) => s.isManualSync);
   const runFullSync = useSyncStore((s) => s.runFullSync);

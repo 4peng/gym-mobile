@@ -149,7 +149,7 @@ describe("mapProgramFromBackend", () => {
     ]);
   });
 
-  it("backfills defaultSets: 0 into an empty array (Array.from length 0)", () => {
+  it("normalizes defaultSets: 0 to the shared one-working-set minimum", () => {
     const server: ProgramServer = {
       _id: "prog1",
       userId: "user1",
@@ -170,7 +170,7 @@ describe("mapProgramFromBackend", () => {
     };
 
     const program = mapProgramFromBackend(server);
-    expect(program.exercises[0].defaultSets).toEqual([]);
+    expect(program.exercises[0].defaultSets).toEqual([{ type: "working" }]);
   });
 
   it("collapses unrecognized set-type values in an array to 'working'", () => {

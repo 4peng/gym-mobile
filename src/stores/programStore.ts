@@ -52,6 +52,26 @@ function normalizeProgram(raw: unknown): Program {
   };
 }
 
+/** Applies `mutate` to every exercise of every live program; dirties the ones that changed. */
+function rewriteProgramExerciseRefs(
+  state: ProgramState,
+  updatedAt: number,
+  mutate: (exercise: ProgramExercise) => boolean,
+) {
+  state.programs.forEach((program) => {
+    if (program.deletedAt) return; // don't re-dirty tombstoned programs
+    let changed = false;
+    program.exercises.forEach((ex) => {
+      if (mutate(ex)) changed = true;
+    });
+    if (!changed) return;
+    program.updatedAt = updatedAt;
+    // syncPrograms pushes strictly by dirtyProgramIds; an updatedAt bump alone never syncs.
+    if (!state.dirtyProgramIds.includes(program._id)) state.dirtyProgramIds.push(program._id);
+    state.isDirty = true;
+  });
+}
+
 export const useProgramStore = create<ProgramState & ProgramActions>()(
   persist(
     immer((set, get) => ({
@@ -130,77 +150,30 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
       },
 
       renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
-        const normalizedExerciseDefinitionId = String(exerciseDefinitionId).trim();
-        const normalizedName = String(nextName).trim();
-        if (!normalizedExerciseDefinitionId || !normalizedName) return;
-
+        const defId = String(exerciseDefinitionId).trim();
+        const name = String(nextName).trim();
+        if (!defId || !name) return;
         const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        set((state) => {
-          let changed = false;
-
-          state.programs.forEach((program) => {
-            if (program.deletedAt) return; // don't re-dirty tombstoned programs
-            let programChanged = false;
-
-            program.exercises.forEach((exercise) => {
-              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
-              if (exercise.name === normalizedName) return;
-
-              exercise.name = normalizedName;
-              programChanged = true;
-            });
-
-            if (programChanged) {
-              program.updatedAt = updatedAt;
-              // Must mark the program dirty by id: syncPrograms pushes strictly
-              // by dirtyProgramIds, so an updatedAt bump alone would never sync.
-              if (!state.dirtyProgramIds.includes(program._id)) {
-                state.dirtyProgramIds.push(program._id);
-              }
-              changed = true;
-            }
-          });
-
-          if (changed) {
-            state.isDirty = true;
-          }
-        });
+        set((state) =>
+          rewriteProgramExerciseRefs(state, updatedAt, (ex) => {
+            if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
+            ex.name = name;
+            return true;
+          }),
+        );
       },
 
       removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
-        const normalizedExerciseDefinitionId = String(exerciseDefinitionId).trim();
-        if (!normalizedExerciseDefinitionId) return;
-
+        const defId = String(exerciseDefinitionId).trim();
+        if (!defId) return;
         const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        set((state) => {
-          let changed = false;
-
-          state.programs.forEach((program) => {
-            if (program.deletedAt) return; // don't re-dirty tombstoned programs
-            let programChanged = false;
-
-            program.exercises.forEach((exercise) => {
-              if (exercise.exerciseDefinitionId !== normalizedExerciseDefinitionId) return;
-
-              exercise.exerciseDefinitionId = "";
-              programChanged = true;
-            });
-
-            if (programChanged) {
-              program.updatedAt = updatedAt;
-              // Must mark the program dirty by id: syncPrograms pushes strictly
-              // by dirtyProgramIds, so an updatedAt bump alone would never sync.
-              if (!state.dirtyProgramIds.includes(program._id)) {
-                state.dirtyProgramIds.push(program._id);
-              }
-              changed = true;
-            }
-          });
-
-          if (changed) {
-            state.isDirty = true;
-          }
-        });
+        set((state) =>
+          rewriteProgramExerciseRefs(state, updatedAt, (ex) => {
+            if (ex.exerciseDefinitionId !== defId) return false;
+            ex.exerciseDefinitionId = "";
+            return true;
+          }),
+        );
       },
 
       getProgramById: (id) => {

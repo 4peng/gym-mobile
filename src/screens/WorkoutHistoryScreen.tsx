@@ -23,15 +23,8 @@ import {
   Check,
   X 
 } from "lucide-react-native";
-import { useAppRouter } from "@/utils/navigation";
-import {
-  useDeleteHistorySession,
-  useFetchMoreWorkoutHistory,
-  useHasMoreWorkoutHistory,
-  useUpdateHistorySet,
-  useUpdateSessionDate,
-  useWorkoutHistory,
-} from "@/stores/workoutHistoryStore";
+import { useRouter } from "expo-router";
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { useShallow } from "zustand/react/shallow";
@@ -78,8 +71,8 @@ interface WorkoutSessionCardProps {
 
 const WorkoutSessionCard = React.memo(function WorkoutSessionCard({ session, programName, onDelete, onToggleScroll }: WorkoutSessionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const updateHistorySet = useUpdateHistorySet();
-  const updateSessionDate = useUpdateSessionDate();
+  const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
+  const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
   const decimalKeyboardType = "decimal-pad";
   
   const [editingSet, setEditingSet] = useState<{
@@ -255,8 +248,8 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({ session, pro
 // ──────────────────────────────────────────────
 
 export default function WorkoutHistoryScreen() {
-  const router = useAppRouter();
-  const allHistory = useWorkoutHistory();
+  const router = useRouter();
+  const allHistory = useWorkoutSessionStore(useShallow((s) => s.history));
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const runFullSync = useSyncStore((s) => s.runFullSync);
   
@@ -267,9 +260,9 @@ export default function WorkoutHistoryScreen() {
     [allHistory]
   );
 
-  const hasMoreHistoryOnServer = useHasMoreWorkoutHistory();
-  const deleteHistorySession = useDeleteHistorySession();
-  const fetchMoreHistory = useFetchMoreWorkoutHistory();
+  const hasMoreHistoryOnServer = useWorkoutSessionStore((s) => s.hasMoreHistory);
+  const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);
+  const fetchMoreHistory = useWorkoutSessionStore((s) => s.fetchMoreHistory);
   const programs = useProgramStore(useShallow((s) => s.programs));
   const programsById = useMemo(() => {
     const map = new Map<string, (typeof programs)[number]>();
