@@ -1,199 +1,119 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from "react-native";
+import React, { useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import Svg, { Path, Rect, G, Text as SvgText } from "react-native-svg";
-import { useShallow } from "zustand/react/shallow";
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { workoutStorage } from "@/storage/workoutStorage";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { normalizeExerciseIdentityKey, getExerciseIdentityKey } from "@/utils/exerciseIdentity";
+import { workoutRepo } from "@/db";
+import { useDbQuery } from "@/db/dbVersion";
+import { COLORS, FONT_FAMILIES, LAYOUT, SPACE, SURFACE, TYPE } from "@/constants/theme";
+import { normalizeExerciseIdentityKey } from "@/utils/exerciseIdentity";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { makeLoadResolver } from "@/utils/bodyweightAnalytics";
 import { buildSmoothPath, calendarDayIndex } from "@/utils/chart";
-import { byCompletedAtDesc } from "@/utils/timestamps";
-import type { WorkoutSession } from "@/types";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHART_HEIGHT = 160;
+const DAYS = 20;
 
-interface ExerciseHistoryGraphProps {
-  exerciseKey: string;
-}
-
-function ExerciseHistoryGraph({ exerciseKey }: ExerciseHistoryGraphProps) {
-  const historyCache = useWorkoutSessionStore(useShallow((s) => s.history));
-  const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
+/** Volume per day for the last 20 days of one exercise. Lives inside ExerciseCard's HISTORY tab. */
+function ExerciseHistoryGraph({ exerciseKey }: { exerciseKey: string }) {
+  const key = normalizeExerciseIdentityKey(exerciseKey);
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
 
-  const [loading, setLoading] = useState(true);
-  const [localFullHistory, setLocalFullHistory] = useState<WorkoutSession[]>([]);
-  const normalizedExerciseKey = normalizeExerciseIdentityKey(exerciseKey);
+  const sinceIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - (DAYS - 1));
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, []);
+  const rows = useDbQuery(() => workoutRepo.exerciseHistory(key, sinceIso), [key, sinceIso]);
+  const latest = useDbQuery(() => workoutRepo.latestExercise(key), [key]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadShards = async () => {
-      setLoading(true);
-      try {
-        const cachedIds = new Set(historyCache.map((s) => s._id));
-        const missingIds = historyIndex.filter((id) => !cachedIds.has(id));
-        const shards = await workoutStorage.getBatch(missingIds);
-
-        const combined = [...historyCache, ...shards]
-          .filter(
-            (s) =>
-              !s.deletedAt &&
-              s.exercises.some((e) => getExerciseIdentityKey(e) === normalizedExerciseKey),
-          )
-          .sort(byCompletedAtDesc);
-
-        if (isMounted) {
-          setLocalFullHistory(combined);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Failed to hydrate shards for history graph:", err);
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadShards();
-    return () => {
-      isMounted = false;
-    };
-  }, [normalizedExerciseKey, historyIndex, historyCache]);
-
-  const processedData = useMemo(() => {
+  const chart = useMemo(() => {
+    const unit = latest?.weightUnit || "kg";
     const now = new Date();
-    const data: { label: string; value: number; timestamp: number; endTimestamp: number }[] = [];
-
-    // Fixed 30 day view for the card
-    const bucketCount = 20;
-    const todayDayIndex = calendarDayIndex(now);
-
-    for (let i = bucketCount - 1; i >= 0; i--) {
-      const end = new Date(now);
-      end.setDate(end.getDate() - i);
-      end.setHours(23, 59, 59, 999);
-
-      const start = new Date(end);
-      start.setHours(0, 0, 0, 0);
-
-      data.push({
+    const todayIndex = calendarDayIndex(now);
+    const buckets = Array.from({ length: DAYS }, (_, i) => {
+      const day = new Date(now);
+      day.setDate(day.getDate() - (DAYS - 1 - i));
+      return {
         label:
-          i % 5 === 0 ? end.toLocaleDateString("default", { month: "short", day: "numeric" }) : "",
+          i % 5 === 0 ? day.toLocaleDateString("default", { month: "short", day: "numeric" }) : "",
         value: 0,
-        timestamp: start.getTime(),
-        endTimestamp: end.getTime(),
-      });
-    }
-
-    const lastSessionWithEx = [...localFullHistory]
-      .reverse()
-      .find((s) => s.exercises.find((e) => getExerciseIdentityKey(e) === normalizedExerciseKey));
-    const targetUnit =
-      lastSessionWithEx?.exercises.find((e) => getExerciseIdentityKey(e) === normalizedExerciseKey)
-        ?.weightUnit || "kg";
-
-    localFullHistory.forEach((session) => {
-      const sessionDate = new Date(session.completedAt || session.startedAt);
-      const exercise = session.exercises.find(
-        (e) => getExerciseIdentityKey(e) === normalizedExerciseKey,
-      );
-
-      if (exercise) {
-        const resolveLoad = makeLoadResolver(
-          exercise,
-          targetUnit,
-          analyticsBodyweight,
-          analyticsBodyweightUnit,
-        );
-
-        let totalVolume = 0;
-        exercise.sets.forEach((s) => {
-          if (s.completedAt && s.reps !== null && Number.isFinite(s.reps)) {
-            const effectiveLoad = resolveLoad(s.weight);
-            if (effectiveLoad !== null) totalVolume += effectiveLoad * s.reps;
-          }
-        });
-
-        // Buckets are evenly spaced, single-day windows, so the target bucket can be
-        // computed directly instead of linearly scanning every bucket per session.
-        const daysAgo = todayDayIndex - calendarDayIndex(sessionDate);
-        const bucketIndex = bucketCount - 1 - daysAgo;
-        if (bucketIndex >= 0 && bucketIndex < bucketCount) {
-          data[bucketIndex].value += totalVolume;
-        }
-      }
+      };
     });
 
-    return { buckets: data, unit: targetUnit };
-  }, [localFullHistory, normalizedExerciseKey, analyticsBodyweight, analyticsBodyweightUnit]);
+    for (const row of rows) {
+      const resolveLoad = makeLoadResolver(
+        row.exercise,
+        unit,
+        analyticsBodyweight,
+        analyticsBodyweightUnit,
+      );
+      let volume = 0;
+      for (const s of row.exercise.sets) {
+        if (!s.completedAt || s.reps === null) continue;
+        const load = resolveLoad(s.weight);
+        if (load !== null) volume += load * s.reps;
+      }
+      const index = DAYS - 1 - (todayIndex - calendarDayIndex(new Date(row.completedAt)));
+      if (index >= 0 && index < DAYS) buckets[index].value += volume;
+    }
 
-  // Chart geometry only depends on processedData, so it's derived once per data
-  // change instead of being recomputed (and re-allocated) on every render.
-  const chartGeometry = useMemo(() => {
-    const { buckets, unit } = processedData;
-    const maxVolume = Math.max(100, ...buckets.map((d) => d.value));
-    const chartWidth = SCREEN_WIDTH - 64; // Card padding + margin
-    const barWidth = (chartWidth / buckets.length) * 0.7;
-    const gap = (chartWidth - buckets.length * barWidth) / (buckets.length - 1);
+    const maxVolume = Math.max(100, ...buckets.map((b) => b.value));
+    const chartWidth = LAYOUT.screenWidth - 64;
+    const barWidth = (chartWidth / DAYS) * 0.7;
+    const gap = (chartWidth - DAYS * barWidth) / (DAYS - 1);
+    const points = buckets.flatMap((b, i) =>
+      b.value === 0
+        ? []
+        : [
+            {
+              x: i * (barWidth + gap) + barWidth / 2,
+              y: CHART_HEIGHT - (b.value / maxVolume) * (CHART_HEIGHT - 40) - 20,
+            },
+          ],
+    );
+    return {
+      unit,
+      buckets,
+      maxVolume,
+      chartWidth,
+      barWidth,
+      gap,
+      linePath: buildSmoothPath(points),
+    };
+  }, [rows, latest, analyticsBodyweight, analyticsBodyweightUnit]);
 
-    const activePoints = buckets
-      .map((d, i) => {
-        if (d.value === 0) return null;
-        const x = i * (barWidth + gap) + barWidth / 2;
-        const normalized = d.value / maxVolume;
-        const y = CHART_HEIGHT - normalized * (CHART_HEIGHT - 40) - 20;
-        return { x, y };
-      })
-      .filter((p): p is { x: number; y: number } => p !== null);
-
-    const linePath = buildSmoothPath(activePoints);
-
-    return { buckets, unit, maxVolume, chartWidth, barWidth, gap, activePoints, linePath };
-  }, [processedData]);
-
-  if (loading) {
+  if (!latest) {
     return (
-      <View style={styles.emptyContainer}>
-        <ActivityIndicator color={COLORS.ACCENT_BLUE} />
+      <View style={styles.empty}>
+        <Text style={TYPE.caption}>No history for this exercise yet</Text>
       </View>
     );
   }
 
-  if (localFullHistory.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No history found for this exercise</Text>
-      </View>
-    );
-  }
-
-  const { buckets, unit, maxVolume, chartWidth, barWidth, gap, linePath } = chartGeometry;
+  const { unit, buckets, maxVolume, chartWidth, barWidth, gap, linePath } = chart;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>VOLUME TREND ({unit.toUpperCase()})</Text>
-        <Text style={styles.headerValue}>{Math.round(maxVolume)} MAX</Text>
+        <Text style={TYPE.label}>Volume trend ({unit})</Text>
+        <Text style={[TYPE.label, { color: COLORS.ACCENT_BLUE }]}>{Math.round(maxVolume)} max</Text>
       </View>
       <Svg width={chartWidth} height={CHART_HEIGHT}>
-        {buckets.map((d, i) => {
-          const barHeight = (d.value / maxVolume) * (CHART_HEIGHT - 40);
+        {buckets.map((b, i) => {
+          const barHeight = (b.value / maxVolume) * (CHART_HEIGHT - 40);
           const x = i * (barWidth + gap);
-          const y = CHART_HEIGHT - barHeight - 20;
           return (
             <G key={i}>
               <Rect
                 x={x}
-                y={y}
+                y={CHART_HEIGHT - barHeight - 20}
                 width={barWidth}
                 height={Math.max(2, barHeight)}
-                fill={d.value === 0 ? "rgba(255,255,255,0.03)" : "rgba(11, 130, 255, 0.4)"}
+                fill={b.value === 0 ? SURFACE.raised : SURFACE.blueBorder}
                 rx={barWidth / 2}
               />
-              {d.label ? (
+              {b.label ? (
                 <SvgText
                   x={x + barWidth / 2}
                   y={CHART_HEIGHT - 5}
@@ -203,7 +123,7 @@ function ExerciseHistoryGraph({ exerciseKey }: ExerciseHistoryGraphProps) {
                   textAnchor="middle"
                   fontFamily={FONT_FAMILIES.MONO}
                 >
-                  {d.label.toUpperCase()}
+                  {b.label.toUpperCase()}
                 </SvgText>
               ) : null}
             </G>
@@ -225,40 +145,11 @@ function ExerciseHistoryGraph({ exerciseKey }: ExerciseHistoryGraphProps) {
   );
 }
 
-// Mounted permanently as a pager page inside ExerciseCard, so without memo it
-// re-renders on every ExerciseCard render (e.g. every keystroke) even while hidden.
+// Mounted permanently as a pager page inside ExerciseCard; memo keeps it from re-rendering per keystroke.
 export default React.memo(ExerciseHistoryGraph);
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: 10,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  headerText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 10,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
-    letterSpacing: 1,
-  },
-  headerValue: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 10,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  emptyContainer: {
-    height: CHART_HEIGHT,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
+  container: { paddingTop: SPACE.sm },
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: SPACE.lg },
+  empty: { height: CHART_HEIGHT, justifyContent: "center", alignItems: "center" },
 });

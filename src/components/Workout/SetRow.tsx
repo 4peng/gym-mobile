@@ -1,23 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
+  Keyboard,
+  LayoutAnimation,
   Pressable,
   StyleSheet,
-  LayoutAnimation,
-  Keyboard,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { Check, X } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { COLORS, SET_TYPE_COLORS } from "@/constants/colors";
-import { SetTypeLegend } from "./SetTypeLegend";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SET_TYPE_COLORS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { toTitleCase } from "@/utils/string";
 import type { ExerciseTrackingMode, WorkoutSet } from "@/types";
 import { resolveSetOnComplete, type SetPlaceholder } from "@/utils/placeholders";
 import { HapticFeedback } from "@/utils/haptics";
+import { SetTypeLegend } from "./SetTypeLegend";
 
 interface SetRowProps {
   set: WorkoutSet;
@@ -27,44 +25,51 @@ interface SetRowProps {
   exerciseName: string;
   restSeconds: number;
   trackingMode: ExerciseTrackingMode;
-  weightUnit: "kg" | "lbs";
 }
 
-function InputBlock({
+/** Numeric cell. Decimal fields keep a local draft so "12." survives typing. */
+function NumberCell({
   value,
   placeholder,
-  keyboardType,
-  onChangeText,
-  onBlur,
-  onFocus,
+  decimal,
   completed,
-  style,
+  onCommit,
 }: {
-  value: string;
+  value: number | null | undefined;
   placeholder: string;
-  keyboardType: "decimal-pad" | "number-pad" | "numeric";
-  onChangeText: (text: string) => void;
-  onBlur?: () => void;
-  onFocus?: () => void;
+  decimal?: boolean;
   completed: boolean;
-  style?: any;
+  onCommit: (value: number | null) => void;
 }) {
+  const [draft, setDraft] = useState(value == null ? "" : String(value));
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const handlePress = useCallback(() => {
-    inputRef.current?.focus();
-  }, []);
+
+  useEffect(() => {
+    if (!focused) setDraft(value == null ? "" : String(value));
+  }, [focused, value]);
+
+  const handleChange = (text: string) => {
+    const normalized = decimal ? text.replace(",", ".") : text;
+    setDraft(normalized);
+    if (normalized === "") return onCommit(null);
+    if (decimal && normalized.endsWith(".")) return;
+    const parsed = decimal ? Number(normalized) : parseInt(normalized, 10);
+    if (Number.isFinite(parsed)) onCommit(parsed);
+  };
+
   return (
-    <Pressable onPress={handlePress} style={[styles.inputCell, style]}>
+    <Pressable onPress={() => inputRef.current?.focus()} style={styles.inputCell}>
       <TextInput
         ref={inputRef}
         style={[styles.inputText, completed && styles.inputTextCompleted]}
-        keyboardType={keyboardType}
-        value={value}
+        keyboardType={decimal ? "decimal-pad" : "number-pad"}
+        value={draft}
         placeholder={placeholder}
         placeholderTextColor={COLORS.TEXT_TERTIARY}
-        onChangeText={onChangeText}
-        onBlur={onBlur}
-        onFocus={onFocus}
+        onChangeText={handleChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       />
     </Pressable>
   );
@@ -78,111 +83,21 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
   exerciseName,
   restSeconds,
   trackingMode,
-  weightUnit,
 }) {
   const updateSet = useWorkoutSessionStore((s) => s.updateSet);
   const toggleSetCompletion = useWorkoutSessionStore((s) => s.toggleSetCompletion);
   const toggleSetType = useWorkoutSessionStore((s) => s.toggleSetType);
   const removeSet = useWorkoutSessionStore((s) => s.removeSet);
   const startRestTimer = useWorkoutSessionStore((s) => s.startRestTimer);
-  const [weightDraft, setWeightDraft] = useState(set.weight !== null ? String(set.weight) : "");
-  const [distanceDraft, setDistanceDraft] = useState(
-    set.distance !== null && set.distance !== undefined ? String(set.distance) : "",
-  );
-  const [isWeightFocused, setIsWeightFocused] = useState(false);
-  const [isDistanceFocused, setIsDistanceFocused] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
   const isCompleted = !!set.completedAt;
-  useEffect(() => {
-    if (isWeightFocused) return;
-    setWeightDraft(set.weight !== null ? String(set.weight) : "");
-  }, [isWeightFocused, set.weight]);
-  useEffect(() => {
-    if (isDistanceFocused) return;
-    setDistanceDraft(
-      set.distance !== null && set.distance !== undefined ? String(set.distance) : "",
-    );
-  }, [isDistanceFocused, set.distance]);
-  const handleWeightChange = useCallback(
-    (text: string) => {
-      const normalizedText = text.replace(",", ".");
-      setWeightDraft(normalizedText);
-      if (normalizedText === "") {
-        updateSet(exerciseId, set.id, "weight", null);
-        return;
-      }
-      if (normalizedText === ".") return;
-      const val = Number(normalizedText);
-      if (!Number.isFinite(val)) return;
-      updateSet(exerciseId, set.id, "weight", val);
-    },
+
+  const commit = useCallback(
+    (field: "weight" | "reps" | "durationSeconds" | "distance") => (value: number | null) =>
+      updateSet(exerciseId, set.id, field, value),
     [exerciseId, set.id, updateSet],
   );
-  const handleWeightBlur = useCallback(() => {
-    setIsWeightFocused(false);
-    const normalizedText = weightDraft.trim().replace(",", ".");
-    if (normalizedText === "") {
-      setWeightDraft("");
-      updateSet(exerciseId, set.id, "weight", null);
-      return;
-    }
-    const val = Number(normalizedText);
-    if (!Number.isFinite(val)) {
-      setWeightDraft(set.weight !== null ? String(set.weight) : "");
-      return;
-    }
-    setWeightDraft(String(val));
-    updateSet(exerciseId, set.id, "weight", val);
-  }, [exerciseId, set.id, set.weight, updateSet, weightDraft]);
-  const handleRepsChange = useCallback(
-    (text: string) => {
-      const val = text === "" ? null : parseInt(text, 10);
-      if (val !== null && isNaN(val)) return;
-      updateSet(exerciseId, set.id, "reps", val);
-    },
-    [exerciseId, set.id, updateSet],
-  );
-  const handleDurationChange = useCallback(
-    (text: string) => {
-      const val = text === "" ? null : parseInt(text, 10);
-      if (val !== null && isNaN(val)) return;
-      updateSet(exerciseId, set.id, "durationSeconds", val);
-    },
-    [exerciseId, set.id, updateSet],
-  );
-  const handleDistanceChange = useCallback(
-    (text: string) => {
-      const normalizedText = text.replace(",", ".");
-      setDistanceDraft(normalizedText);
-      if (normalizedText === "") {
-        updateSet(exerciseId, set.id, "distance", null);
-        return;
-      }
-      if (normalizedText === ".") return;
-      const val = Number(normalizedText);
-      if (!Number.isFinite(val)) return;
-      updateSet(exerciseId, set.id, "distance", val);
-    },
-    [exerciseId, set.id, updateSet],
-  );
-  const handleDistanceBlur = useCallback(() => {
-    setIsDistanceFocused(false);
-    const normalizedText = distanceDraft.trim().replace(",", ".");
-    if (normalizedText === "") {
-      setDistanceDraft("");
-      updateSet(exerciseId, set.id, "distance", null);
-      return;
-    }
-    const val = Number(normalizedText);
-    if (!Number.isFinite(val)) {
-      setDistanceDraft(
-        set.distance !== null && set.distance !== undefined ? String(set.distance) : "",
-      );
-      return;
-    }
-    setDistanceDraft(String(val));
-    updateSet(exerciseId, set.id, "distance", val);
-  }, [distanceDraft, exerciseId, set.distance, set.id, updateSet]);
+
   const handleToggleComplete = useCallback(() => {
     if (!isCompleted) {
       Keyboard.dismiss();
@@ -190,11 +105,10 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
         const resolved = resolveSetOnComplete(set, placeholder);
         if (set.weight === null) updateSet(exerciseId, set.id, "weight", resolved.weight);
         if (set.reps === null) updateSet(exerciseId, set.id, "reps", resolved.reps);
-      } else if (trackingMode === "timed") {
-        if (set.durationSeconds == null) updateSet(exerciseId, set.id, "durationSeconds", 0);
       } else {
         if (set.durationSeconds == null) updateSet(exerciseId, set.id, "durationSeconds", 0);
-        if (set.distance == null) updateSet(exerciseId, set.id, "distance", 0);
+        if (trackingMode === "cardio" && set.distance == null)
+          updateSet(exerciseId, set.id, "distance", 0);
       }
       HapticFeedback.medium();
     } else {
@@ -202,9 +116,8 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     toggleSetCompletion(exerciseId, set.id);
-    if (!isCompleted && restSeconds > 0) {
-      startRestTimer(exerciseId, restSeconds, toTitleCase(exerciseName));
-    }
+    if (!isCompleted && restSeconds > 0)
+      void startRestTimer(exerciseId, restSeconds, toTitleCase(exerciseName));
   }, [
     exerciseId,
     exerciseName,
@@ -217,116 +130,84 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
     trackingMode,
     updateSet,
   ]);
-  const handleToggleType = useCallback(() => {
-    HapticFeedback.selection();
-    toggleSetType(exerciseId, set.id);
-  }, [exerciseId, set.id, toggleSetType]);
-  const handleLongPress = useCallback(() => {
-    HapticFeedback.selection();
-    setShowLegend(true);
-  }, []);
-  const handlePressOut = useCallback(() => {
-    setShowLegend(false);
-  }, []);
-  const handleRemove = useCallback(() => {
-    removeSet(exerciseId, set.id);
-  }, [exerciseId, set.id, removeSet]);
-  const setNumberColor = SET_TYPE_COLORS[set.type ?? "working"];
-  const renderInputs = () => {
-    if (trackingMode === "timed") {
-      return (
-        <InputBlock
-          value={
-            set.durationSeconds !== null && set.durationSeconds !== undefined
-              ? String(set.durationSeconds)
-              : ""
-          }
-          placeholder="0"
-          keyboardType="number-pad"
-          onChangeText={handleDurationChange}
-          completed={isCompleted}
-          style={{ flex: 2 }}
-        />
-      );
-    }
-    if (trackingMode === "cardio") {
-      return (
-        <>
-          <InputBlock
-            value={
-              set.durationSeconds !== null && set.durationSeconds !== undefined
-                ? String(set.durationSeconds)
-                : ""
-            }
-            placeholder="0"
-            keyboardType="number-pad"
-            onChangeText={handleDurationChange}
-            completed={isCompleted}
-          />
-          <InputBlock
-            value={distanceDraft}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-            onChangeText={handleDistanceChange}
-            onFocus={() => setIsDistanceFocused(true)}
-            onBlur={handleDistanceBlur}
-            completed={isCompleted}
-          />
-        </>
-      );
-    }
-    return (
-      <>
-        <InputBlock
-          value={weightDraft}
-          placeholder={placeholder.weight !== null ? String(placeholder.weight) : "-"}
-          keyboardType="decimal-pad"
-          onChangeText={handleWeightChange}
-          onFocus={() => setIsWeightFocused(true)}
-          onBlur={handleWeightBlur}
-          completed={isCompleted}
-        />
-        <InputBlock
-          value={set.reps !== null ? String(set.reps) : ""}
-          placeholder={placeholder.reps !== null ? String(placeholder.reps) : "-"}
-          keyboardType="number-pad"
-          onChangeText={handleRepsChange}
-          completed={isCompleted}
-        />
-      </>
-    );
-  };
+
+  const setTypeColor = SET_TYPE_COLORS[set.type ?? "working"];
+
   return (
     <View style={[styles.row, isCompleted && styles.rowCompleted]}>
       <Pressable
         style={styles.indexCell}
-        onPress={handleToggleType}
-        onLongPress={handleLongPress}
-        onPressOut={handlePressOut}
+        onPress={() => {
+          HapticFeedback.selection();
+          toggleSetType(exerciseId, set.id);
+        }}
+        onLongPress={() => {
+          HapticFeedback.selection();
+          setShowLegend(true);
+        }}
+        onPressOut={() => setShowLegend(false)}
         delayLongPress={300}
         hitSlop={8}
       >
-        <Text style={[styles.indexText, { color: setNumberColor }]}>{index + 1}</Text>
+        <Text style={[TYPE.monoSmall, { color: setTypeColor }]}>{index + 1}</Text>
       </Pressable>
-      {showLegend && <SetTypeLegend style={styles.legendPopup} />}
-      <View style={styles.inputsWrapper}>{renderInputs()}</View>
-      <View style={styles.actionCell}>
+      {showLegend && <SetTypeLegend style={styles.legend} />}
+
+      <View style={styles.inputs}>
+        {trackingMode === "strength" ? (
+          <>
+            <NumberCell
+              value={set.weight}
+              placeholder={placeholder.weight !== null ? String(placeholder.weight) : "-"}
+              decimal
+              completed={isCompleted}
+              onCommit={commit("weight")}
+            />
+            <NumberCell
+              value={set.reps}
+              placeholder={placeholder.reps !== null ? String(placeholder.reps) : "-"}
+              completed={isCompleted}
+              onCommit={commit("reps")}
+            />
+          </>
+        ) : (
+          <>
+            <NumberCell
+              value={set.durationSeconds}
+              placeholder="0"
+              completed={isCompleted}
+              onCommit={commit("durationSeconds")}
+            />
+            {trackingMode === "cardio" ? (
+              <NumberCell
+                value={set.distance}
+                placeholder="0.00"
+                decimal
+                completed={isCompleted}
+                onCommit={commit("distance")}
+              />
+            ) : null}
+          </>
+        )}
+      </View>
+
+      <View style={styles.actions}>
         <Pressable
           onPress={handleToggleComplete}
           style={({ pressed }) => [
-            styles.checkButton,
-            isCompleted && styles.checkButtonCompleted,
-            pressed && styles.actionPressed,
+            styles.check,
+            isCompleted && styles.checkCompleted,
+            pressed && UI.pressed,
           ]}
         >
-          {isCompleted ? (
-            <Check size={14} color={COLORS.ACCENT_GREEN} strokeWidth={3} />
-          ) : (
-            <View style={styles.checkPlaceholder} />
-          )}
+          {isCompleted ? <Check size={14} color={COLORS.ACCENT_GREEN} strokeWidth={3} /> : null}
         </Pressable>
         {!isCompleted ? (
-          <Pressable onPress={handleRemove} hitSlop={10} style={styles.removeButton}>
+          <Pressable
+            onPress={() => removeSet(exerciseId, set.id)}
+            hitSlop={10}
+            style={styles.remove}
+          >
             <X size={12} color={COLORS.DANGER} />
           </Pressable>
         ) : null}
@@ -335,61 +216,47 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
   );
 });
 
+export const SET_ROW_LAYOUT = {
+  indexWidth: 32,
+  inputWidth: 72,
+  gap: SPACE.md,
+  actionsWidth: 60,
+} as const;
+
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 44,
-    backgroundColor: COLORS.BG,
-    paddingHorizontal: 4,
-  },
-  rowCompleted: { backgroundColor: COLORS.ACCENT_GREEN_DEEP, borderRadius: UI.RADIUS_ITEM },
-  indexCell: { width: 32, alignItems: "center", justifyContent: "center" },
-  indexText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "800",
-  },
-  inputsWrapper: { flex: 1, flexDirection: "row", justifyContent: "center", gap: 12 },
+  row: { flexDirection: "row", alignItems: "center", minHeight: 44, paddingHorizontal: SPACE.xs },
+  rowCompleted: { backgroundColor: COLORS.ACCENT_GREEN_DEEP, borderRadius: RADIUS.item },
+  indexCell: { width: SET_ROW_LAYOUT.indexWidth, alignItems: "center", justifyContent: "center" },
+  legend: { position: "absolute", left: 40, top: -40 },
+  inputs: { flex: 1, flexDirection: "row", justifyContent: "center", gap: SET_ROW_LAYOUT.gap },
   inputCell: {
-    width: 72,
+    width: SET_ROW_LAYOUT.inputWidth,
     height: 32,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
-    borderRadius: 6,
+    backgroundColor: SURFACE.raised,
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     justifyContent: "center",
   },
-  inputText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-    textAlign: "center",
-    padding: 0,
-  },
+  inputText: { ...TYPE.mono, fontSize: 15, textAlign: "center", padding: 0 },
   inputTextCompleted: { color: COLORS.ACCENT_GREEN },
-  actionCell: {
-    width: 60,
+  actions: {
+    width: SET_ROW_LAYOUT.actionsWidth,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 8,
-    paddingRight: 4,
+    gap: SPACE.sm,
+    paddingRight: SPACE.xs,
   },
-  checkButton: {
+  check: {
     width: 28,
     height: 28,
-    borderRadius: 6,
+    borderRadius: RADIUS.sm,
     borderWidth: 1.5,
     borderColor: COLORS.BORDER_LIGHT,
     alignItems: "center",
     justifyContent: "center",
   },
-  checkButtonCompleted: { borderColor: COLORS.ACCENT_GREEN, backgroundColor: "transparent" },
-  checkPlaceholder: { width: 14, height: 14 },
-  removeButton: { padding: 4 },
-  actionPressed: { opacity: 0.7 },
-  legendPopup: { position: "absolute", left: 40, top: -40 },
+  checkCompleted: { borderColor: COLORS.ACCENT_GREEN },
+  remove: { padding: SPACE.xs },
 });

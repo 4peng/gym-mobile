@@ -1,13 +1,11 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import { current } from "immer";
-import { zustandAsyncStorage } from "@/storage/mmkv";
-import { workoutStorage, normalizePersistedWorkoutSession } from "@/storage/workoutStorage";
+import { zustandAsyncStorage } from "@/storage/asyncStorage";
+import { workoutRepo } from "@/db";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
 import { MuscleGroup } from "@/constants/muscles";
-import { safeClone } from "@/utils/clone";
 import type {
   ExerciseDefinition,
   Program,
@@ -34,78 +32,51 @@ import {
 } from "@/utils/restTimerLiveActivity";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
-import { nextLocalUpdatedAt, byCompletedAtDesc } from "@/utils/timestamps";
+import { normalizePersistedWorkoutSession } from "@/utils/normalizeWorkout";
 import { NEXT_SET_TYPE } from "@/shared/programs.js";
 
-// ──────────────────────────────────────────────
-// Constants for Optimization
-// ──────────────────────────────────────────────
-const MAX_MEMORY_HISTORY = 15; // Limit in-memory history cache size
-const WORKOUT_SESSION_STORE_VERSION = 5;
-
-// ──────────────────────────────────────────────
-// Rest timer type
-// ──────────────────────────────────────────────
+const STORE_VERSION = 6;
 
 export interface ActiveRestTimer {
   /** Absolute epoch-ms when the rest period ends. */
   endTime: number;
   /** Absolute epoch-ms when the rest period started. */
   startTime: number;
-  /** The exercise that triggered this rest. */
   exerciseId: string;
-  /** Human-readable name, shown in the floating UI. */
   exerciseName: string;
-  /** Notification identifier returned by expo-notifications. */
+  /** Identifier returned by expo-notifications. */
   notificationId: string;
 }
 
-// ──────────────────────────────────────────────
-// State shape
-// ──────────────────────────────────────────────
-
+/**
+ * Live-session state plus backup bookkeeping. Completed sessions live in SQLite
+ * (`workoutRepo`); this store only tracks which of them still need pushing.
+ */
 interface WorkoutSessionState {
-  /** Currently active (in-progress) session, if any. */
   activeSession: WorkoutSession | null;
-  /**
-   * Recent cached sessions for immediate UI.
-   * Stored in persistent main store but limited in size.
-   */
-  history: WorkoutSession[];
-  /**
-   * Full index of all workout IDs available locally.
-   * Essential for lazy loading sharded workouts.
-   */
-  historyIndex: string[];
-  /** IDs of sessions deleted locally but not yet synced to the server. */
-  deletedWorkoutIds: string[];
-  /** IDs of completed sessions changed locally and pending upload. */
-  dirtyWorkoutIds: string[];
-  /** Whether there are more sessions to fetch from the server. */
-  hasMoreHistory: boolean;
-  /** Background-safe rest timer (persisted via MMKV). */
   activeRestTimer: ActiveRestTimer | null;
-  /** List of exercise names pinned on the insights page. */
+  /** Identity keys pinned to the top of the stats list. */
   pinnedExerciseNames: string[];
-  /** Currently focused exercise ID for the single-exercise view. */
+  /** Focused exercise in the single-exercise workout view. */
   activeExerciseId: string | null;
-  /** True when completed workouts have un-synced changes. */
-  isDirty: boolean;
-  /** Epoch-ms of the last successful sync. */
-  lastSyncedAt: number | null;
+  /** Completed sessions changed locally and not yet backed up. */
+  dirtyWorkoutIds: string[];
+  /** Sessions deleted locally and not yet deleted in the cloud. */
+  deletedWorkoutIds: string[];
 }
 
+type EditableSetField = keyof Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">;
+
 interface WorkoutSessionActions {
-  // ── Session lifecycle ──────────────────────
   startQuickSession: () => void;
   startFromProgram: (program: Program) => void;
   updateWorkoutNotes: (notes: string) => void;
-  completeSession: () => void;
+  /** Stores the session (completed sets only). Returns false when nothing was completed. */
+  completeSession: () => boolean;
   discardSession: () => void;
   deleteHistorySession: (sessionId: string) => void;
-  updateSessionDate: (sessionId: string, newDate: string) => void;
+  updateSessionDate: (sessionId: string, completedAtIso: string) => void;
 
-  // ── Exercise mutations ─────────────────────
   setActiveExerciseId: (id: string | null) => void;
   addExercise: (exerciseDefinition?: ExerciseDefinition | null) => void;
   reorderExercises: (exerciseIds: string[]) => void;
@@ -119,58 +90,42 @@ interface WorkoutSessionActions {
   toggleExerciseUnit: (exerciseId: string) => void;
   toggleExerciseBodyweight: (exerciseId: string) => void;
 
-  // ── Set mutations ──────────────────────────
   addSet: (exerciseId: string) => void;
   removeSet: (exerciseId: string, setId: string) => void;
   updateSet: (
     exerciseId: string,
     setId: string,
-    field: keyof Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">,
+    field: EditableSetField,
     value: number | null,
   ) => void;
   updateHistorySet: (
     sessionId: string,
     exerciseId: string,
     setId: string,
-    field: keyof Pick<WorkoutSet, "weight" | "reps" | "durationSeconds" | "distance">,
+    field: EditableSetField,
     value: number | null,
   ) => void;
   toggleSetCompletion: (exerciseId: string, setId: string) => void;
   toggleSetType: (exerciseId: string, setId: string) => void;
 
-  // ── Queries ────────────────────────────────
-  fetchMoreHistory: () => Promise<void>;
-
-  // ── Rest timer ─────────────────────────────
   startRestTimer: (exerciseId: string, restSeconds: number, exerciseName: string) => Promise<void>;
   cancelRestTimer: () => Promise<void>;
   clearExpiredTimer: () => void;
 
-  // ── Stats ──────────────────────────────────
   togglePinExercise: (identityKey: string) => void;
 
-  // ── Sync metadata ─────────────────────────
-  clearDeletedWorkouts: (ids: string[]) => void;
-  clearDirtyWorkouts: (ids: string[]) => void;
   updateMusclesInHistory: (exerciseIdentityKey: string, muscles: MuscleGroup[]) => void;
   renameExerciseDefinitionReferences: (exerciseDefinitionId: string, nextName: string) => void;
   removeExerciseDefinitionReferences: (exerciseDefinitionId: string) => void;
 
-  /**
-   * Applies remote data using last-write-wins against the current state.
-   * Resolves race conditions by merging inside the state lock.
-   */
-  applySyncMerge: (remote: WorkoutSession[], syncStartTime: number) => void;
-
-  /**
-   * Append workouts fetched from backend that are not present locally.
-   */
-  mergeRemoteWorkouts: (remote: WorkoutSession[]) => void;
+  /** Stores completed sessions (restore / import). `markDirty` queues them for backup. */
+  importWorkouts: (sessions: WorkoutSession[], markDirty: boolean) => void;
+  clearDeletedWorkouts: (ids: string[]) => void;
+  /** Clears push bookkeeping, keeping any id edited after `pushedAt`. */
+  clearDirtyWorkouts: (ids: string[], pushedAt: number) => void;
 }
 
-// ──────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────
 
 function createEmptySet(
   trackingMode: WorkoutExercise["trackingMode"] = "strength",
@@ -199,10 +154,6 @@ function createEmptySetsFromTemplates(
   return templates.map((t) => createEmptySet(trackingMode, initialWeight, t.type));
 }
 
-// ──────────────────────────────────────────────
-// updateExerciseField value typing
-// ──────────────────────────────────────────────
-
 type UpdatableExerciseField = keyof Pick<
   WorkoutExercise,
   | "name"
@@ -225,462 +176,257 @@ type ExerciseFieldValue<F extends UpdatableExerciseField> = F extends "restSecon
         ? MuscleGroup[]
         : F extends "trackingMode"
           ? WorkoutExercise["trackingMode"]
-          : string; // "name" | "exerciseDefinitionId" | "notes"
+          : string;
 
-// ──────────────────────────────────────────────
-// Shared history-sort / shard-rewrite helpers
-// ──────────────────────────────────────────────
-
-/**
- * Loads sessions that only exist as on-disk shards (not in the in-RAM cache),
- * applies `mutateExercise` to every exercise, and persists the ones that changed.
- * Returns the sessions that were actually rewritten.
- */
-async function rewriteShardOnlySessions(
-  shardOnlyIds: string[],
-  updatedAt: number,
-  mutateExercise: (exercise: WorkoutExercise) => boolean,
-): Promise<WorkoutSession[]> {
-  if (shardOnlyIds.length === 0) return [];
-
-  const shardSessions = await workoutStorage.getBatch(shardOnlyIds);
-  const changedShardSessions = shardSessions
-    .map((session) => {
-      let sessionChanged = false;
-      const nextSession = safeClone(session);
-
-      nextSession.exercises.forEach((exercise) => {
-        if (mutateExercise(exercise)) sessionChanged = true;
-      });
-
-      if (!sessionChanged) return null;
-
-      nextSession.updatedAt = updatedAt;
-      return nextSession;
-    })
-    .filter((session): session is WorkoutSession => session !== null);
-
-  if (changedShardSessions.length > 0) {
-    await workoutStorage.saveBatch(changedShardSessions);
-  }
-
-  return changedShardSessions;
-}
-
-/** Marks freshly-rewritten shard sessions dirty and nudges the history reference. */
-function markShardRewriteDirty(
-  state: Pick<WorkoutSessionState, "dirtyWorkoutIds" | "isDirty" | "history">,
-  sessions: WorkoutSession[],
-): void {
-  sessions.forEach((session) => {
-    if (!state.dirtyWorkoutIds.includes(session._id)) {
-      state.dirtyWorkoutIds.push(session._id);
-    }
-  });
-  state.isDirty = true;
-  state.history = [...state.history];
-}
-
-type StoreSet = (recipe: (state: WorkoutSessionState) => void) => void;
-type StoreGet = () => WorkoutSessionState;
-
-/**
- * Applies `mutate` to every exercise across RAM history, the active session
- * and shard-only sessions on disk. Changed history sessions get a fresh
- * updatedAt, are marked dirty and re-persisted. Resolves once shards are done.
- * `mutate` returns true when it changed the exercise.
- */
-function rewriteExerciseRefs(
-  set: StoreSet,
-  get: StoreGet,
-  mutate: (exercise: WorkoutExercise) => boolean,
-): Promise<void> {
-  const loadedIds = new Set(get().history.map((s) => s._id));
-  const shardOnlyIds = get().historyIndex.filter((id) => !loadedIds.has(id));
-  const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-  const changedSessions: WorkoutSession[] = [];
-
-  set((state) => {
-    state.history.forEach((session) => {
-      let changed = false;
-      session.exercises.forEach((ex) => {
-        if (mutate(ex)) changed = true;
-      });
-      if (!changed) return;
-      session.updatedAt = updatedAt;
-      changedSessions.push(current(session));
-      if (!state.dirtyWorkoutIds.includes(session._id)) state.dirtyWorkoutIds.push(session._id);
-      state.isDirty = true;
-    });
-    if (state.activeSession) {
-      let changed = false;
-      state.activeSession.exercises.forEach((ex) => {
-        if (mutate(ex)) changed = true;
-      });
-      if (changed) state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-    }
-  });
-
-  if (changedSessions.length > 0) void workoutStorage.saveBatch(changedSessions);
-  if (shardOnlyIds.length === 0) return Promise.resolve();
-
-  return rewriteShardOnlySessions(shardOnlyIds, updatedAt, mutate).then((changed) => {
-    if (changed.length > 0) set((state) => markShardRewriteDirty(state, changed));
-  });
+/** Most recent stored occurrence of an exercise, used to seed new exercises. */
+function latestOccurrence(
+  exercise: ExerciseDefinition | WorkoutExercise | null,
+): WorkoutExercise | null {
+  if (!exercise) return null;
+  const key = getExerciseIdentityKey(exercise);
+  return key ? workoutRepo.latestExercise(key) : null;
 }
 
 function inferTrackingMode(
   exercise: ExerciseDefinition | WorkoutExercise | null,
-  history: WorkoutSession[],
 ): WorkoutExercise["trackingMode"] {
-  const defaultMode = inferTrackingModeFromExerciseDefinition(exercise);
-  if (!exercise) return defaultMode;
-
-  const identityKey = getExerciseIdentityKey(exercise);
-  if (!identityKey) return defaultMode;
-
-  // Search history for the most recent occurrence of this exercise
-  for (const session of history) {
-    if (!session.completedAt) continue;
-    const match = session.exercises.find((ex) => getExerciseIdentityKey(ex) === identityKey);
-    if (match?.trackingMode) {
-      return match.trackingMode;
-    }
-  }
-
-  return defaultMode;
+  return (
+    latestOccurrence(exercise)?.trackingMode ?? inferTrackingModeFromExerciseDefinition(exercise)
+  );
 }
 
-function inferWeightUnit(
-  exercise: ExerciseDefinition | WorkoutExercise | null,
-  history: WorkoutSession[],
-): "kg" | "lbs" {
-  const globalPreferred = useUiPreferencesStore.getState().preferredWeightUnit || "kg";
-  if (!exercise) return globalPreferred;
-
-  const identityKey = getExerciseIdentityKey(exercise);
-  if (!identityKey) return globalPreferred;
-
-  // Search history for the most recent occurrence of this exercise
-  for (const session of history) {
-    if (!session.completedAt) continue;
-    const match = session.exercises.find((ex) => getExerciseIdentityKey(ex) === identityKey);
-    if (match?.weightUnit) {
-      return match.weightUnit;
-    }
-  }
-
-  return globalPreferred;
+function inferWeightUnit(exercise: ExerciseDefinition | WorkoutExercise | null): "kg" | "lbs" {
+  return (
+    latestOccurrence(exercise)?.weightUnit ??
+    useUiPreferencesStore.getState().preferredWeightUnit ??
+    "kg"
+  );
 }
 
+/** Keeps only completed sets, and only exercises that still have one. */
 function buildCompletedSession(session: WorkoutSession): WorkoutSession {
   return {
     ...session,
     exercises: session.exercises
-      .map((exercise) => ({
-        ...exercise,
-        sets: exercise.sets.filter((set) => !!set.completedAt),
-      }))
+      .map((exercise) => ({ ...exercise, sets: exercise.sets.filter((set) => !!set.completedAt) }))
       .filter((exercise) => exercise.sets.length > 0),
   };
 }
 
-function normalizePersistedWorkoutState(
+const addUnique = (list: string[], id: string) => {
+  if (!list.includes(id)) list.push(id);
+};
+
+type StoreSet = (recipe: (state: WorkoutSessionState) => void) => void;
+
+/**
+ * Applies `mutate` to every stored exercise (via the repo) and to the active
+ * session; marks changed stored sessions dirty. `mutate` returns true on change.
+ */
+function propagateExerciseEdit(
+  set: StoreSet,
+  mutate: (exercise: WorkoutExercise) => boolean,
+): void {
+  const changed = workoutRepo.rewriteExercises(mutate);
+  set((state) => {
+    changed.forEach((id) => addUnique(state.dirtyWorkoutIds, id));
+    if (!state.activeSession) return;
+    let touched = false;
+    state.activeSession.exercises.forEach((ex) => {
+      if (mutate(ex)) touched = true;
+    });
+    if (touched) state.activeSession.updatedAt = Date.now();
+  });
+}
+
+function normalizePersistedState(
   state: Partial<WorkoutSessionState> | undefined,
-): Omit<WorkoutSessionState, "activeSession"> & { activeSession: WorkoutSession | null } {
-  const history = Array.isArray(state?.history)
-    ? state!.history
-        .map(normalizePersistedWorkoutSession)
-        .filter((s): s is WorkoutSession => s !== null)
-    : [];
-
+): WorkoutSessionState {
   const activeSession = normalizePersistedWorkoutSession(state?.activeSession);
-  const historyIndex = Array.isArray(state?.historyIndex)
-    ? state!.historyIndex.map((id) => String(id))
-    : history.map((h) => h._id);
-
-  const dedupedHistoryIndex = Array.from(new Set(historyIndex));
-
-  let activeExerciseId =
-    typeof state?.activeExerciseId === "string" ? state.activeExerciseId : null;
-
-  // Fallback: If there's an active session but no focused exercise ID, default to the first exercise
-  if (!activeExerciseId && activeSession && activeSession.exercises.length > 0) {
-    activeExerciseId = activeSession.exercises[0].id;
-  }
-
+  const ids = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+  const timer = state?.activeRestTimer;
   return {
     activeSession,
-    history,
-    historyIndex: dedupedHistoryIndex,
-    deletedWorkoutIds: Array.isArray(state?.deletedWorkoutIds)
-      ? state!.deletedWorkoutIds.map((id) => String(id))
-      : [],
-    dirtyWorkoutIds: Array.isArray(state?.dirtyWorkoutIds)
-      ? state!.dirtyWorkoutIds.map((id) => String(id))
-      : [],
-    hasMoreHistory: typeof state?.hasMoreHistory === "boolean" ? state.hasMoreHistory : true,
     activeRestTimer:
-      state?.activeRestTimer &&
-      typeof state.activeRestTimer.endTime === "number" &&
-      typeof state.activeRestTimer.startTime === "number" &&
-      typeof state.activeRestTimer.exerciseId === "string" &&
-      typeof state.activeRestTimer.exerciseName === "string" &&
-      typeof state.activeRestTimer.notificationId === "string"
-        ? state.activeRestTimer
+      timer &&
+      typeof timer.endTime === "number" &&
+      typeof timer.startTime === "number" &&
+      typeof timer.exerciseId === "string" &&
+      typeof timer.exerciseName === "string" &&
+      typeof timer.notificationId === "string"
+        ? timer
         : null,
-    pinnedExerciseNames: Array.isArray(state?.pinnedExerciseNames)
-      ? state!.pinnedExerciseNames.map((name) => String(name).toLowerCase())
-      : [],
-    activeExerciseId,
-    isDirty: !!state?.isDirty,
-    lastSyncedAt:
-      typeof state?.lastSyncedAt === "number" && Number.isFinite(state.lastSyncedAt)
-        ? state.lastSyncedAt
-        : null,
+    pinnedExerciseNames: ids(state?.pinnedExerciseNames).map((n) => n.toLowerCase()),
+    activeExerciseId:
+      typeof state?.activeExerciseId === "string"
+        ? state.activeExerciseId
+        : (activeSession?.exercises[0]?.id ?? null),
+    dirtyWorkoutIds: ids(state?.dirtyWorkoutIds),
+    deletedWorkoutIds: ids(state?.deletedWorkoutIds),
   };
 }
 
-// ──────────────────────────────────────────────
-// Store
-// ──────────────────────────────────────────────
+// ── Store ──────────────────────────────────────
 
 export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessionActions>()(
   persist(
-    immer((set, get) => ({
-      activeSession: null,
-      history: [],
-      historyIndex: [],
-      deletedWorkoutIds: [],
-      dirtyWorkoutIds: [],
-      hasMoreHistory: true,
-      activeRestTimer: null,
-      pinnedExerciseNames: [],
-      activeExerciseId: null,
-      isDirty: false,
-      lastSyncedAt: null,
-
-      // ── Session lifecycle ────────────────────
-
-      startQuickSession: () => {
-        const session: WorkoutSession = {
-          _id: generateId(),
-          userId: USER_ID,
-          startedAt: new Date().toISOString(),
-          updatedAt: Date.now(),
-          notes: "",
-          exercises: [],
-          cumulativeRestSeconds: 0,
-        };
-        set((state) => {
-          state.activeSession = session;
-          state.activeExerciseId = null;
-        });
-      },
-
-      startFromProgram: (program) => {
-        // Deep-copy program exercises into an independent session.
-        const exercises: WorkoutExercise[] = (program.exercises || []).map((pe) => ({
-          id: generateId(),
-          programExerciseId: pe.id,
-          exerciseDefinitionId: pe.exerciseDefinitionId,
-          trackingMode: normalizeTrackingMode(pe.trackingMode),
-          name: pe.name,
-          restSeconds: pe.restSeconds,
-          notes: pe.notes,
-          sets: createEmptySetsFromTemplates(
-            pe.defaultSets,
-            normalizeTrackingMode(pe.trackingMode),
-            pe.initialWeight ?? null,
-          ),
-          weightUnit: pe.weightUnit || "kg",
-          muscles: pe.muscles || [],
-        }));
-
-        const session: WorkoutSession = {
-          _id: generateId(),
-          userId: USER_ID,
-          programId: program._id,
-          startedAt: new Date().toISOString(),
-          updatedAt: Date.now(),
-          notes: "",
-          exercises,
-          cumulativeRestSeconds: 0,
-        };
-        set((state) => {
-          state.activeSession = session;
-          state.activeExerciseId = exercises.length > 0 ? exercises[0].id : null;
-        });
-      },
-
-      updateWorkoutNotes: (notes) => {
+    immer((set, get) => {
+      const withActive = (recipe: (session: WorkoutSession, state: WorkoutSessionState) => void) =>
         set((state) => {
           if (!state.activeSession) return;
-          state.activeSession.notes = notes;
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
+          recipe(state.activeSession, state);
+          state.activeSession.updatedAt = Date.now();
         });
-      },
 
-      completeSession: () => {
-        // Cancel any active rest timer when session ends.
-        const timer = get().activeRestTimer;
-        if (timer) {
-          cancelScheduledNotification(timer.notificationId);
-          void endRestTimerLiveActivity(
-            buildActiveRestTimerLiveActivityProps(get().activeSession, timer),
-          );
-        }
+      const withExercise = (
+        exerciseId: string,
+        recipe: (ex: WorkoutExercise, state: WorkoutSessionState) => void,
+      ) =>
+        withActive((session, state) => {
+          const ex = session.exercises.find((e) => e.id === exerciseId);
+          if (ex) recipe(ex, state);
+        });
 
-        const session = get().activeSession;
-        if (!session) return;
+      const endTimerSideEffects = (timer: ActiveRestTimer) => {
+        void cancelScheduledNotification(timer.notificationId);
+        void endRestTimerLiveActivity(
+          buildActiveRestTimerLiveActivityProps(get().activeSession, timer),
+        );
+      };
 
-        const completedAt = new Date().toISOString();
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        const finalSession = {
-          ...buildCompletedSession(session),
-          completedAt,
-          updatedAt,
-        };
-
-        // Shard the full session to dedicated storage (Async, performance win)
-        workoutStorage.save(finalSession);
-
+      /** Adds the time the timer has run (until `until`) to the session's rest total and clears it. */
+      const bankRestTime = (timer: ActiveRestTimer, until: number) => {
+        const elapsed = Math.max(0, Math.floor((until - timer.startTime) / 1000));
         set((state) => {
-          // Add to index and recent history cache
-          if (!state.historyIndex.includes(finalSession._id)) {
-            state.historyIndex.unshift(finalSession._id);
+          if (state.activeSession) {
+            state.activeSession.cumulativeRestSeconds =
+              (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
           }
-
-          state.history.unshift(safeClone(finalSession));
-
-          // Partial Persistence: Truncate in-memory history cache
-          if (state.history.length > MAX_MEMORY_HISTORY) {
-            state.history = state.history.slice(0, MAX_MEMORY_HISTORY);
-          }
-
-          state.activeSession = null;
           state.activeRestTimer = null;
-          state.activeExerciseId = null;
-          if (!state.dirtyWorkoutIds.includes(finalSession._id)) {
-            state.dirtyWorkoutIds.push(finalSession._id);
-          }
-          state.isDirty = true;
         });
-      },
+      };
 
-      discardSession: () => {
-        // Cancel any active rest timer when session is discarded.
-        const timer = get().activeRestTimer;
-        if (timer) {
-          cancelScheduledNotification(timer.notificationId);
-          void endRestTimerLiveActivity(
-            buildActiveRestTimerLiveActivityProps(get().activeSession, timer),
-          );
-        }
+      return {
+        activeSession: null,
+        activeRestTimer: null,
+        pinnedExerciseNames: [],
+        activeExerciseId: null,
+        dirtyWorkoutIds: [],
+        deletedWorkoutIds: [],
 
-        set((state) => {
-          state.activeSession = null;
-          state.activeRestTimer = null;
-          state.activeExerciseId = null;
-        });
-      },
+        // ── Session lifecycle ──
 
-      deleteHistorySession: (sessionId) => {
-        // Remove from sharded storage
-        workoutStorage.remove(sessionId);
-
-        set((state) => {
-          const workout = state.history.find((s) => s._id === sessionId);
-          if (workout) {
-            workout.deletedAt = Date.now();
-            workout.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-          }
-
-          state.historyIndex = state.historyIndex.filter((id) => id !== sessionId);
-
-          if (!state.deletedWorkoutIds.includes(sessionId)) {
-            state.deletedWorkoutIds.push(sessionId);
-          }
-          state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => id !== sessionId);
-          state.isDirty = true;
-        });
-      },
-
-      updateSessionDate: (sessionId, newDate) => {
-        const isLoaded = get().history.some((s) => s._id === sessionId);
-
-        if (isLoaded) {
-          let updatedSession: WorkoutSession | null = null;
+        startQuickSession: () => {
           set((state) => {
-            const session = state.history.find((s) => s._id === sessionId);
-            if (session) {
-              session.completedAt = newDate;
-              session.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-              state.isDirty = true;
-
-              // Re-sort history by completedAt date
-              state.history.sort(byCompletedAtDesc);
-
-              updatedSession = safeClone(session);
-              if (!state.dirtyWorkoutIds.includes(sessionId)) {
-                state.dirtyWorkoutIds.push(sessionId);
-              }
-            }
+            state.activeSession = {
+              _id: generateId(),
+              userId: USER_ID,
+              startedAt: new Date().toISOString(),
+              updatedAt: Date.now(),
+              notes: "",
+              exercises: [],
+              cumulativeRestSeconds: 0,
+            };
+            state.activeExerciseId = null;
           });
+        },
 
-          if (updatedSession) {
-            workoutStorage.save(updatedSession);
-          }
-          return;
-        }
+        startFromProgram: (program) => {
+          const exercises: WorkoutExercise[] = (program.exercises || []).map((pe) => {
+            const trackingMode = normalizeTrackingMode(pe.trackingMode);
+            return {
+              id: generateId(),
+              programExerciseId: pe.id,
+              exerciseDefinitionId: pe.exerciseDefinitionId,
+              trackingMode,
+              name: pe.name,
+              restSeconds: pe.restSeconds,
+              notes: pe.notes,
+              sets: createEmptySetsFromTemplates(
+                pe.defaultSets,
+                trackingMode,
+                pe.initialWeight ?? null,
+              ),
+              weightUnit: pe.weightUnit || "kg",
+              muscles: pe.muscles || [],
+              isBodyweight: pe.isBodyweight,
+            };
+          });
+          set((state) => {
+            state.activeSession = {
+              _id: generateId(),
+              userId: USER_ID,
+              programId: program._id,
+              startedAt: new Date().toISOString(),
+              updatedAt: Date.now(),
+              notes: "",
+              exercises,
+              cumulativeRestSeconds: 0,
+            };
+            state.activeExerciseId = exercises[0]?.id ?? null;
+          });
+        },
 
-        // Not paged into RAM — the session only exists as an on-disk shard.
-        void (async () => {
-          const session = await workoutStorage.get(sessionId);
-          if (!session) return;
+        updateWorkoutNotes: (notes) =>
+          withActive((session) => {
+            session.notes = notes;
+          }),
 
-          session.completedAt = newDate;
-          session.updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
+        completeSession: () => {
+          const { activeSession, activeRestTimer } = get();
+          if (!activeSession) return false;
+          if (activeRestTimer) endTimerSideEffects(activeRestTimer);
 
-          await workoutStorage.save(session);
+          const finalSession = {
+            ...buildCompletedSession(activeSession),
+            completedAt: new Date().toISOString(),
+            updatedAt: Date.now(),
+          };
+          const stored = finalSession.exercises.length > 0;
+          if (stored) workoutRepo.upsertMany([finalSession]);
 
           set((state) => {
-            if (!state.dirtyWorkoutIds.includes(sessionId)) {
-              state.dirtyWorkoutIds.push(sessionId);
-            }
-            state.isDirty = true;
-
-            // Keep the RAM copy in sync if it got paged in while we awaited —
-            // but never clobber a newer edit that landed in the meantime.
-            const cached = state.history.find((s) => s._id === sessionId);
-            if (cached && cached.updatedAt <= session.updatedAt) {
-              cached.completedAt = newDate;
-              cached.updatedAt = session.updatedAt;
-              state.history.sort(byCompletedAtDesc);
-            }
+            state.activeSession = null;
+            state.activeRestTimer = null;
+            state.activeExerciseId = null;
+            if (stored) addUnique(state.dirtyWorkoutIds, finalSession._id);
           });
-        })();
-      },
+          return stored;
+        },
 
-      setActiveExerciseId: (id) => {
-        set((state) => {
-          state.activeExerciseId = id;
-        });
-      },
+        discardSession: () => {
+          const timer = get().activeRestTimer;
+          if (timer) endTimerSideEffects(timer);
+          set((state) => {
+            state.activeSession = null;
+            state.activeRestTimer = null;
+            state.activeExerciseId = null;
+          });
+        },
 
-      addExercise: (exerciseDefinition = null) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const trackingMode = inferTrackingMode(exerciseDefinition, state.history);
-          const weightUnit = inferWeightUnit(exerciseDefinition, state.history);
+        deleteHistorySession: (sessionId) => {
+          workoutRepo.deleteMany([sessionId]);
+          set((state) => {
+            addUnique(state.deletedWorkoutIds, sessionId);
+            state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => id !== sessionId);
+          });
+        },
 
-          // Use shared default sets structure
-          const defaultSetsTemplates: { type: WorkoutSet["type"] }[] = [
-            { type: "working" },
-            { type: "working" },
-            { type: "working" },
-          ];
+        updateSessionDate: (sessionId, completedAtIso) => {
+          if (!workoutRepo.updateDate(sessionId, completedAtIso)) return;
+          set((state) => addUnique(state.dirtyWorkoutIds, sessionId));
+        },
 
+        // ── Exercise mutations ──
+
+        setActiveExerciseId: (id) =>
+          set((state) => {
+            state.activeExerciseId = id;
+          }),
+
+        addExercise: (exerciseDefinition = null) => {
+          const trackingMode = inferTrackingMode(exerciseDefinition);
+          const weightUnit = inferWeightUnit(exerciseDefinition);
           const exercise: WorkoutExercise = {
             id: generateId(),
             exerciseDefinitionId: exerciseDefinition?.id,
@@ -688,671 +434,303 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
             name: exerciseDefinition?.name || "",
             restSeconds: 90,
             notes: "",
-            sets: createEmptySetsFromTemplates(defaultSetsTemplates, trackingMode),
+            sets: createEmptySetsFromTemplates(
+              [{ type: "working" }, { type: "working" }, { type: "working" }],
+              trackingMode,
+            ),
             weightUnit,
             muscles: exerciseDefinition?.muscles || [],
           };
-          state.activeSession.exercises.push(exercise);
-          state.activeExerciseId = exercise.id; // Auto-focus new exercise
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+          withActive((session, state) => {
+            session.exercises.push(exercise);
+            state.activeExerciseId = exercise.id;
+          });
+        },
 
-      reorderExercises: (exerciseIds) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const byId = new Map(
-            state.activeSession.exercises.map((exercise) => [exercise.id, exercise]),
-          );
-          const reordered = exerciseIds
-            .map((id) => byId.get(id))
-            .filter((exercise): exercise is WorkoutExercise => !!exercise);
-          if (reordered.length !== state.activeSession.exercises.length) return;
-          state.activeSession.exercises = reordered;
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        reorderExercises: (exerciseIds) =>
+          withActive((session) => {
+            const byId = new Map(session.exercises.map((e) => [e.id, e]));
+            const reordered = exerciseIds
+              .map((id) => byId.get(id))
+              .filter((e): e is WorkoutExercise => !!e);
+            if (reordered.length === session.exercises.length) session.exercises = reordered;
+          }),
 
-      removeExercise: (exerciseId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          state.activeSession.exercises = state.activeSession.exercises.filter(
-            (e) => e.id !== exerciseId,
-          );
+        removeExercise: (exerciseId) =>
+          withActive((session, state) => {
+            session.exercises = session.exercises.filter((e) => e.id !== exerciseId);
+            if (state.activeExerciseId === exerciseId)
+              state.activeExerciseId = session.exercises[0]?.id ?? null;
+          }),
 
-          if (state.activeExerciseId === exerciseId) {
-            state.activeExerciseId =
-              state.activeSession.exercises.length > 0 ? state.activeSession.exercises[0].id : null;
-          }
+        selectExerciseDefinition: (exerciseId, definition) => {
+          const weightUnit = inferWeightUnit(definition);
+          const trackingMode = inferTrackingMode(definition);
+          withExercise(exerciseId, (ex, state) => {
+            ex.exerciseDefinitionId = definition.id;
+            ex.name = definition.name;
+            ex.muscles = [...definition.muscles];
+            ex.weightUnit = weightUnit;
+            ex.trackingMode = trackingMode;
+            ex.sets = ex.sets.map((s) => normalizeSetForTrackingMode(s, trackingMode));
+            if (state.activeRestTimer?.exerciseId === exerciseId)
+              state.activeRestTimer.exerciseName = definition.name;
+          });
+        },
 
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        updateExerciseField: (exerciseId, field, value) => {
+          const before = get().activeSession?.exercises.find((e) => e.id === exerciseId);
+          const oldRestSeconds = field === "restSeconds" ? (before?.restSeconds ?? null) : null;
+          const next =
+            field === "exerciseDefinitionId" && typeof value === "string"
+              ? value.trim()
+              : field === "trackingMode"
+                ? normalizeTrackingMode(value)
+                : value;
 
-      selectExerciseDefinition: (exerciseId, exerciseDefinition) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((exercise) => exercise.id === exerciseId);
-          if (!ex) return;
-
-          const weightUnit = inferWeightUnit(exerciseDefinition, state.history);
-          const trackingMode = inferTrackingMode(exerciseDefinition, state.history);
-
-          ex.exerciseDefinitionId = exerciseDefinition.id;
-          ex.name = exerciseDefinition.name;
-          ex.muscles = [...exerciseDefinition.muscles];
-          ex.weightUnit = weightUnit;
-          ex.trackingMode = trackingMode;
-          ex.sets = ex.sets.map((set) => normalizeSetForTrackingMode(set, trackingMode));
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-
-          if (state.activeRestTimer?.exerciseId === exerciseId) {
-            state.activeRestTimer.exerciseName = exerciseDefinition.name;
-          }
-        });
-      },
-
-      updateExerciseField: (exerciseId, field, value) => {
-        const currentExercise = get().activeSession?.exercises.find((e) => e.id === exerciseId);
-        const oldRestSeconds =
-          field === "restSeconds" ? (currentExercise?.restSeconds ?? null) : null;
-        const normalizedValue =
-          field === "exerciseDefinitionId" && typeof value === "string"
-            ? value.trim()
-            : field === "trackingMode"
-              ? normalizeTrackingMode(value)
-              : value;
-
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          if (field === "restSeconds") {
-            ex.restSeconds = normalizedValue as number;
-          } else if (field === "exerciseDefinitionId") {
-            ex.exerciseDefinitionId = normalizedValue as string;
-          } else if (field === "trackingMode") {
-            const nextTrackingMode = normalizedValue as WorkoutExercise["trackingMode"];
-            ex.trackingMode = nextTrackingMode;
-            ex.sets = ex.sets.map((set) => normalizeSetForTrackingMode(set, nextTrackingMode));
-          } else if (field === "weightUnit") {
-            ex.weightUnit = normalizedValue as "kg" | "lbs";
-          } else if (field === "muscles") {
-            ex.muscles = normalizedValue as MuscleGroup[];
-            if (
-              typeof ex.exerciseDefinitionId === "string" &&
-              ex.exerciseDefinitionId.startsWith("custom-")
-            ) {
-              useExerciseLibraryStore
-                .getState()
-                .updateCustomExerciseMuscles(
-                  ex.exerciseDefinitionId,
-                  normalizedValue as MuscleGroup[],
-                );
+          withExercise(exerciseId, (ex, state) => {
+            switch (field) {
+              case "trackingMode": {
+                const mode = next as WorkoutExercise["trackingMode"];
+                ex.trackingMode = mode;
+                ex.sets = ex.sets.map((s) => normalizeSetForTrackingMode(s, mode));
+                break;
+              }
+              case "muscles":
+                ex.muscles = next as MuscleGroup[];
+                if (ex.exerciseDefinitionId?.startsWith("custom-")) {
+                  useExerciseLibraryStore
+                    .getState()
+                    .updateCustomExerciseMuscles(ex.exerciseDefinitionId, ex.muscles);
+                }
+                break;
+              case "name":
+                ex.name = next as string;
+                if (state.activeRestTimer?.exerciseId === exerciseId)
+                  state.activeRestTimer.exerciseName = ex.name;
+                break;
+              default:
+                (ex as unknown as Record<string, unknown>)[field] = next;
             }
-          } else if (field === "name") {
-            ex.name = normalizedValue as string;
-          } else if (field === "notes") {
-            ex.notes = normalizedValue as string;
-          } else if (field === "isBodyweight") {
-            ex.isBodyweight = normalizedValue as boolean;
-          }
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-          if (field === "name" && state.activeRestTimer?.exerciseId === exerciseId) {
-            state.activeRestTimer.exerciseName = normalizedValue as string;
-          }
-        });
+          });
 
-        if (field === "name") {
           const timer = get().activeRestTimer;
-          if (timer?.exerciseId === exerciseId) {
+          if (timer?.exerciseId !== exerciseId) return;
+
+          if (field === "name") {
             void updateRestTimerLiveActivity(
               buildActiveRestTimerLiveActivityProps(get().activeSession, timer),
             );
           }
-        }
-
-        if (
-          field === "restSeconds" &&
-          typeof oldRestSeconds === "number" &&
-          Number.isFinite(oldRestSeconds) &&
-          typeof normalizedValue === "number" &&
-          Number.isFinite(normalizedValue)
-        ) {
-          const currentTimer = get().activeRestTimer;
-          if (currentTimer?.exerciseId === exerciseId) {
-            const nextRemainingSeconds =
-              Math.ceil((currentTimer.endTime - Date.now()) / 1000) +
-              (normalizedValue - oldRestSeconds);
-
-            if (nextRemainingSeconds <= 0) {
-              void get().cancelRestTimer();
-            } else {
-              void get().startRestTimer(
-                exerciseId,
-                nextRemainingSeconds,
-                currentExercise?.name || currentTimer.exerciseName,
-              );
-            }
+          if (
+            field === "restSeconds" &&
+            typeof oldRestSeconds === "number" &&
+            typeof next === "number"
+          ) {
+            // Shift the running timer by the change in rest length.
+            const remaining =
+              Math.ceil((timer.endTime - Date.now()) / 1000) + (next - oldRestSeconds);
+            if (remaining <= 0) void get().cancelRestTimer();
+            else
+              void get().startRestTimer(exerciseId, remaining, before?.name || timer.exerciseName);
           }
-        }
-      },
+        },
 
-      toggleExerciseUnit: (exerciseId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          ex.weightUnit = ex.weightUnit === "lbs" ? "kg" : "lbs";
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        toggleExerciseUnit: (exerciseId) =>
+          withExercise(exerciseId, (ex) => {
+            ex.weightUnit = ex.weightUnit === "lbs" ? "kg" : "lbs";
+          }),
 
-      toggleExerciseBodyweight: (exerciseId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          ex.isBodyweight = !ex.isBodyweight;
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        toggleExerciseBodyweight: (exerciseId) =>
+          withExercise(exerciseId, (ex) => {
+            ex.isBodyweight = !ex.isBodyweight;
+          }),
 
-      // ── Set mutations ────────────────────────
+        // ── Set mutations ──
 
-      addSet: (exerciseId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          ex.sets.push(createEmptySet(ex.trackingMode));
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        addSet: (exerciseId) =>
+          withExercise(exerciseId, (ex) => {
+            ex.sets.push(createEmptySet(ex.trackingMode));
+          }),
 
-      removeSet: (exerciseId, setId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          ex.sets = ex.sets.filter((s) => s.id !== setId);
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        removeSet: (exerciseId, setId) =>
+          withExercise(exerciseId, (ex) => {
+            ex.sets = ex.sets.filter((s) => s.id !== setId);
+          }),
 
-      updateSet: (exerciseId, setId, field, value) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          const s = ex.sets.find((s) => s.id === setId);
-          if (!s) return;
-          s[field] = value;
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
+        updateSet: (exerciseId, setId, field, value) =>
+          withExercise(exerciseId, (ex) => {
+            const s = ex.sets.find((x) => x.id === setId);
+            if (s) s[field] = value;
+          }),
 
-      updateHistorySet: (sessionId, exerciseId, setId, field, value) => {
-        const isLoaded = get().history.some((s) => s._id === sessionId);
+        updateHistorySet: (sessionId, exerciseId, setId, field, value) => {
+          if (!workoutRepo.updateSet(sessionId, exerciseId, setId, field, value)) return;
+          set((state) => addUnique(state.dirtyWorkoutIds, sessionId));
+        },
 
-        if (isLoaded) {
-          let updatedSession: WorkoutSession | null = null;
+        toggleSetCompletion: (exerciseId, setId) =>
+          withExercise(exerciseId, (ex) => {
+            const s = ex.sets.find((x) => x.id === setId);
+            if (s) s.completedAt = s.completedAt ? undefined : new Date().toISOString();
+          }),
+
+        toggleSetType: (exerciseId, setId) =>
+          withExercise(exerciseId, (ex) => {
+            const s = ex.sets.find((x) => x.id === setId);
+            if (s) s.type = NEXT_SET_TYPE[s.type ?? "working"];
+          }),
+
+        // ── Rest timer ──
+
+        startRestTimer: async (exerciseId, restSeconds, exerciseName) => {
+          const current = get().activeRestTimer;
+          if (current) {
+            const props = buildActiveRestTimerLiveActivityProps(get().activeSession, current);
+            bankRestTime(current, Date.now());
+            await cancelScheduledNotification(current.notificationId);
+            void endRestTimerLiveActivity(props);
+          }
+
+          const now = Date.now();
+          const endTime = now + restSeconds * 1000;
+          const notificationId = await scheduleRestCompleteNotification(exerciseName, restSeconds);
           set((state) => {
-            const session = state.history.find((s) => s._id === sessionId);
-            if (!session) return;
-            const ex = session.exercises.find((e) => e.id === exerciseId);
-            if (!ex) return;
-            const s = ex.sets.find((s) => s.id === setId);
-            if (!s) return;
-            s[field] = value;
-            session.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-            if (!state.dirtyWorkoutIds.includes(sessionId)) {
-              state.dirtyWorkoutIds.push(sessionId);
-            }
-            state.isDirty = true;
-
-            updatedSession = safeClone(session);
+            state.activeRestTimer = {
+              endTime,
+              startTime: now,
+              exerciseId,
+              exerciseName,
+              notificationId,
+            };
           });
+          void startRestTimerLiveActivity(
+            buildRestTimerLiveActivityProps(
+              get().activeSession,
+              exerciseName,
+              now,
+              endTime,
+              restSeconds,
+            ),
+          );
+        },
 
-          if (updatedSession) {
-            workoutStorage.save(updatedSession);
-          }
-          return;
-        }
-
-        // Not paged into RAM — mutate the on-disk shard directly.
-        void (async () => {
-          const session = await workoutStorage.get(sessionId);
-          if (!session) return;
-          const ex = session.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          const s = ex.sets.find((s) => s.id === setId);
-          if (!s) return;
-
-          s[field] = value;
-          session.updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-
-          await workoutStorage.save(session);
-
-          set((state) => {
-            if (!state.dirtyWorkoutIds.includes(sessionId)) {
-              state.dirtyWorkoutIds.push(sessionId);
-            }
-            state.isDirty = true;
-
-            // Keep the RAM copy in sync if it got paged in while we awaited —
-            // but never clobber a newer edit that landed via the RAM path in
-            // the meantime (compare updatedAt to avoid a lost-write race).
-            const cached = state.history.find((s2) => s2._id === sessionId);
-            const cachedEx = cached?.exercises.find((e) => e.id === exerciseId);
-            const cachedSet = cachedEx?.sets.find((s2) => s2.id === setId);
-            if (cached && cachedSet && cached.updatedAt <= session.updatedAt) {
-              cachedSet[field] = value;
-              cached.updatedAt = session.updatedAt;
-            }
-          });
-        })();
-      },
-
-      toggleSetCompletion: (exerciseId, setId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          const s = ex.sets.find((s) => s.id === setId);
-          if (!s) return;
-
-          if (s.completedAt) {
-            s.completedAt = undefined;
-          } else {
-            s.completedAt = new Date().toISOString();
-          }
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
-
-      toggleSetType: (exerciseId, setId) => {
-        set((state) => {
-          if (!state.activeSession) return;
-          const ex = state.activeSession.exercises.find((e) => e.id === exerciseId);
-          if (!ex) return;
-          const s = ex.sets.find((s) => s.id === setId);
-          if (!s) return;
-
-          s.type = NEXT_SET_TYPE[s.type ?? "working"];
-          state.activeSession.updatedAt = nextLocalUpdatedAt(state.lastSyncedAt);
-        });
-      },
-
-      // ── Queries ──────────────────────────────
-
-      /**
-       * Lazy Loading Implementation:
-       * 1. Check historyIndex for local IDs not currently in memory cache.
-       * 2. If local shards found, load them first (very fast).
-       * 3. If local exhausted, fetch from server.
-       */
-      fetchMoreHistory: async () => {
-        const { history, historyIndex } = get();
-        const loadedIds = new Set(history.map((h) => h._id));
-
-        // Find next IDs in index that aren't loaded
-        const missingIds = historyIndex.filter((id) => !loadedIds.has(id)).slice(0, 20);
-
-        if (missingIds.length > 0) {
-          const localShards = await workoutStorage.getBatch(missingIds);
-          if (localShards.length > 0) {
-            set((state) => {
-              state.history.push(...localShards);
-              // Maintain sort order
-              state.history.sort(byCompletedAtDesc);
-            });
-            return;
-          }
-        }
-
-        // Exhausted local shards, fetch from server
-        const { fetchWorkouts } = await import("@/lib/api/workouts");
-        const currentCount = history.filter((s) => !s.deletedAt).length;
-        const limit = 20;
-        const remote = await fetchWorkouts(limit, currentCount);
-
-        if (remote) {
-          if (remote.length < limit) {
-            set((state) => {
-              state.hasMoreHistory = false;
-            });
-          }
-          get().mergeRemoteWorkouts(remote);
-        } else {
-          set((state) => {
-            state.hasMoreHistory = false;
-          });
-        }
-      },
-
-      // ── Rest timer ────────────────────────────
-
-      startRestTimer: async (exerciseId, restSeconds, exerciseName) => {
-        const current = get().activeRestTimer;
-
-        // If one is already running, accumulate its progress before replacing it.
-        if (current) {
-          const elapsed = Math.max(0, Math.floor((Date.now() - current.startTime) / 1000));
-          set((state) => {
-            if (state.activeSession) {
-              state.activeSession.cumulativeRestSeconds =
-                (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
-            }
-          });
+        cancelRestTimer: async () => {
+          const current = get().activeRestTimer;
+          if (!current) return;
+          const props = buildActiveRestTimerLiveActivityProps(get().activeSession, current);
+          bankRestTime(current, Date.now());
           await cancelScheduledNotification(current.notificationId);
-          void endRestTimerLiveActivity(
-            buildActiveRestTimerLiveActivityProps(get().activeSession, current),
-          );
-        }
+          void endRestTimerLiveActivity(props);
+        },
 
-        const now = Date.now();
-        const endTime = now + restSeconds * 1000;
-        const notificationId = await scheduleRestCompleteNotification(exerciseName, restSeconds);
+        clearExpiredTimer: () => {
+          const timer = get().activeRestTimer;
+          if (!timer || timer.endTime > Date.now()) return;
+          const props = buildActiveRestTimerLiveActivityProps(get().activeSession, timer);
+          bankRestTime(timer, timer.endTime);
+          void endRestTimerLiveActivity(props);
+        },
 
-        set((state) => {
-          state.activeRestTimer = {
-            endTime,
-            startTime: now,
-            exerciseId,
-            exerciseName,
-            notificationId,
-          };
-        });
+        // ── Stats ──
 
-        void startRestTimerLiveActivity(
-          buildRestTimerLiveActivityProps(
-            get().activeSession,
-            exerciseName,
-            now,
-            endTime,
-            restSeconds,
-          ),
-        );
-      },
-
-      cancelRestTimer: async () => {
-        const current = get().activeRestTimer;
-        if (current) {
-          const elapsed = Math.max(0, Math.floor((Date.now() - current.startTime) / 1000));
+        togglePinExercise: (identityKey) => {
+          const key = normalizeExerciseIdentityKey(identityKey);
+          if (!key) return;
           set((state) => {
-            if (state.activeSession) {
-              state.activeSession.cumulativeRestSeconds =
-                (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
-            }
-            state.activeRestTimer = null;
+            state.pinnedExerciseNames = state.pinnedExerciseNames.includes(key)
+              ? state.pinnedExerciseNames.filter((n) => n !== key)
+              : [...state.pinnedExerciseNames, key];
           });
-          await cancelScheduledNotification(current.notificationId);
-          void endRestTimerLiveActivity(
-            buildActiveRestTimerLiveActivityProps(get().activeSession, current),
-          );
-        }
-      },
+        },
 
-      clearExpiredTimer: () => {
-        const timer = get().activeRestTimer;
-        if (timer && timer.endTime <= Date.now()) {
-          const elapsed = Math.max(0, Math.floor((timer.endTime - timer.startTime) / 1000));
-          const liveActivityProps = buildActiveRestTimerLiveActivityProps(
-            get().activeSession,
-            timer,
-          );
-          set((state) => {
-            if (state.activeSession) {
-              state.activeSession.cumulativeRestSeconds =
-                (state.activeSession.cumulativeRestSeconds || 0) + elapsed;
-            }
-            state.activeRestTimer = null;
+        // ── Exercise-definition propagation ──
+
+        updateMusclesInHistory: (exerciseIdentityKey, muscles) => {
+          const key = normalizeExerciseIdentityKey(exerciseIdentityKey);
+          if (!key) return;
+          // Custom ids ("custom-<id>") are read off the raw exerciseDefinitionId: the
+          // normalized key strips the hyphen, so it can never match the prefix itself.
+          const customIds = new Set<string>();
+          propagateExerciseEdit(set, (ex) => {
+            if (getExerciseIdentityKey(ex) !== key) return false;
+            ex.muscles = [...muscles];
+            if (ex.exerciseDefinitionId?.startsWith("custom-"))
+              customIds.add(ex.exerciseDefinitionId);
+            return true;
           });
-          void endRestTimerLiveActivity(liveActivityProps);
-        }
-      },
-
-      // ── Stats ─────────────────────────────────
-
-      togglePinExercise: (identityKey) => {
-        set((state) => {
-          if (!state.pinnedExerciseNames) {
-            state.pinnedExerciseNames = [];
-          }
-          const normalizedKey = normalizeExerciseIdentityKey(identityKey);
-          if (!normalizedKey) return;
-          if (state.pinnedExerciseNames.includes(normalizedKey)) {
-            state.pinnedExerciseNames = state.pinnedExerciseNames.filter(
-              (n) => n !== normalizedKey,
-            );
-          } else {
-            state.pinnedExerciseNames.push(normalizedKey);
-          }
-        });
-      },
-
-      // ── Sync metadata ────────────────────────
-
-      clearDeletedWorkouts: (ids) => {
-        set((state) => {
-          state.deletedWorkoutIds = state.deletedWorkoutIds.filter((id) => !ids.includes(id));
-          state.history = state.history.filter((s) => !ids.includes(s._id) || !s.deletedAt);
-          state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => !ids.includes(id));
-        });
-      },
-
-      clearDirtyWorkouts: (ids) => {
-        set((state) => {
-          if (ids.length === 0) return;
-          state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => !ids.includes(id));
-          state.isDirty = state.deletedWorkoutIds.length > 0 || state.dirtyWorkoutIds.length > 0;
-        });
-      },
-
-      updateMusclesInHistory: (exerciseIdentityKey, muscles) => {
-        const key = normalizeExerciseIdentityKey(exerciseIdentityKey);
-        if (!key) return;
-        // Custom exercises ("custom-<id>") are detected from the raw exerciseDefinitionId:
-        // normalizeExerciseIdentityKey strips the hyphen, so the key itself never matches.
-        const customIds = new Set<string>();
-        const syncLibrary = () =>
           customIds.forEach((id) =>
             useExerciseLibraryStore.getState().updateCustomExerciseMuscles(id, muscles),
           );
-        const done = rewriteExerciseRefs(set, get, (ex) => {
-          if (getExerciseIdentityKey(ex) !== key) return false;
-          ex.muscles = [...muscles];
-          if (ex.exerciseDefinitionId?.startsWith("custom-"))
-            customIds.add(ex.exerciseDefinitionId);
-          return true;
-        });
-        syncLibrary();
-        void done.then(syncLibrary);
-      },
+        },
 
-      renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
-        const defId = String(exerciseDefinitionId).trim();
-        const name = String(nextName).trim();
-        if (!defId || !name) return;
-        void rewriteExerciseRefs(set, get, (ex) => {
-          if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
-          ex.name = name;
-          return true;
-        });
-        set((state) => {
-          const timer = state.activeRestTimer;
-          const timerEx =
-            timer && state.activeSession?.exercises.find((ex) => ex.id === timer.exerciseId);
-          if (timer && timerEx?.exerciseDefinitionId === defId) timer.exerciseName = name;
-        });
-      },
+        renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
+          const defId = String(exerciseDefinitionId).trim();
+          const name = String(nextName).trim();
+          if (!defId || !name) return;
+          propagateExerciseEdit(set, (ex) => {
+            if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
+            ex.name = name;
+            return true;
+          });
+          set((state) => {
+            const timer = state.activeRestTimer;
+            const timerEx =
+              timer && state.activeSession?.exercises.find((ex) => ex.id === timer.exerciseId);
+            if (timer && timerEx?.exerciseDefinitionId === defId) timer.exerciseName = name;
+          });
+        },
 
-      removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
-        const defId = String(exerciseDefinitionId).trim();
-        if (!defId) return;
-        void rewriteExerciseRefs(set, get, (ex) => {
-          if (ex.exerciseDefinitionId !== defId) return false;
-          ex.exerciseDefinitionId = "";
-          return true;
-        });
-      },
+        removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
+          const defId = String(exerciseDefinitionId).trim();
+          if (!defId) return;
+          propagateExerciseEdit(set, (ex) => {
+            if (ex.exerciseDefinitionId !== defId) return false;
+            ex.exerciseDefinitionId = "";
+            return true;
+          });
+        },
 
-      applySyncMerge: (remote, syncStartTime) => {
-        let deletedSessionIds: string[] = [];
-        let shardsToSave: WorkoutSession[] = [];
-        set((state) => {
-          if (remote.length === 0) {
-            state.lastSyncedAt = syncStartTime;
-            state.isDirty =
-              state.dirtyWorkoutIds.length > 0 ||
-              state.deletedWorkoutIds.length > 0 ||
-              state.history.some((w) => w.updatedAt > syncStartTime);
-            return;
-          }
+        // ── Backup bookkeeping ──
 
-          const remoteMap = new Map(remote.map((w) => [w._id, w]));
-          let historyChanged = false;
-          shardsToSave = [];
-          const deletedIds = new Set<string>();
-          // How many sessions are currently paged into RAM. A full sync
-          // (since=undefined) returns the ENTIRE history; we must not keep all
-          // of it in memory, but we also must not evict what the user already
-          // paged in — so the post-merge cap is the larger of the two.
-          const priorLoadedCount = state.history.length;
+        importWorkouts: (sessions, markDirty) => {
+          const completed = sessions.filter((s) => !!s.completedAt);
+          workoutRepo.upsertMany(completed);
+          if (!markDirty) return;
+          set((state) => completed.forEach((s) => addUnique(state.dirtyWorkoutIds, s._id)));
+        },
 
-          for (let i = 0; i < state.history.length; i++) {
-            const lw = state.history[i];
-            const rw = remoteMap.get(lw._id);
+        clearDeletedWorkouts: (ids) =>
+          set((state) => {
+            state.deletedWorkoutIds = state.deletedWorkoutIds.filter((id) => !ids.includes(id));
+          }),
 
-            if (rw) {
-              const winner = lw.updatedAt >= rw.updatedAt ? lw : rw;
-              state.history[i] = winner;
-              if (winner.deletedAt) {
-                deletedIds.add(winner._id);
-              } else {
-                shardsToSave.push(safeClone(winner));
-              }
-              remoteMap.delete(lw._id);
-              historyChanged = true;
-            }
-          }
-
-          // Remaining remotes are either new additions or tombstones for shard-only sessions.
-          if (remoteMap.size > 0) {
-            for (const rw of remoteMap.values()) {
-              if (rw.deletedAt) {
-                deletedIds.add(rw._id);
-                historyChanged = historyChanged || state.historyIndex.includes(rw._id);
-                continue;
-              }
-
-              state.history.push(rw);
-              if (!state.historyIndex.includes(rw._id)) {
-                state.historyIndex.unshift(rw._id);
-              }
-              shardsToSave.push(safeClone(rw));
-              historyChanged = true;
-            }
-          }
-
-          if (deletedIds.size > 0) {
-            const shouldFilterHistory = state.history.some((session) =>
-              deletedIds.has(session._id),
+        clearDirtyWorkouts: (ids, pushedAt) => {
+          if (ids.length === 0) return;
+          const updatedAt = workoutRepo.updatedAtOf(ids);
+          set((state) => {
+            state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter(
+              (id) => !ids.includes(id) || (updatedAt.get(id) ?? 0) > pushedAt,
             );
-            if (shouldFilterHistory) {
-              historyChanged = true;
-            }
-
-            state.history = state.history.filter((session) => !deletedIds.has(session._id));
-            state.historyIndex = state.historyIndex.filter((id) => !deletedIds.has(id));
-            state.deletedWorkoutIds = state.deletedWorkoutIds.filter((id) => !deletedIds.has(id));
-            state.dirtyWorkoutIds = state.dirtyWorkoutIds.filter((id) => !deletedIds.has(id));
-            deletedSessionIds = Array.from(deletedIds);
-          }
-
-          if (historyChanged) {
-            state.history = state.history.filter((w) => !w.deletedAt);
-            state.history.sort(byCompletedAtDesc);
-            // Bound the RAM cache to what was already loaded (min MAX_MEMORY_HISTORY)
-            // so a full sync doesn't hold the entire history in memory, while
-            // never evicting sessions the user paged in. Anything trimmed here
-            // is still on disk shards + in historyIndex, so hasMoreHistory stays
-            // true and fetchMoreHistory can restore it.
-            const cap = Math.max(MAX_MEMORY_HISTORY, priorLoadedCount);
-            if (state.history.length > cap) {
-              state.history = state.history.slice(0, cap);
-            }
-          }
-
-          state.lastSyncedAt = syncStartTime;
-          state.isDirty =
-            state.dirtyWorkoutIds.length > 0 ||
-            state.deletedWorkoutIds.length > 0 ||
-            state.history.some((w) => w.updatedAt > syncStartTime);
-          // Real availability signal — there may still be more to fetch from
-          // the server even when this evaluates to false; fetchMoreHistory
-          // discovers that case once local shards are exhausted.
-          state.hasMoreHistory = state.historyIndex.length > state.history.length;
-        });
-
-        if (shardsToSave.length > 0) {
-          void workoutStorage.saveBatch(shardsToSave);
-        }
-
-        if (deletedSessionIds.length > 0) {
-          void workoutStorage.removeBatch(deletedSessionIds);
-        }
-      },
-
-      mergeRemoteWorkouts: (remote) => {
-        set((state) => {
-          const localIds = new Set(state.history.map((w) => w._id));
-          const newEntries = remote.filter((w) => !localIds.has(w._id) && !w.deletedAt);
-          if (newEntries.length > 0) {
-            // Add all to index
-            newEntries.forEach((w) => {
-              if (!state.historyIndex.includes(w._id)) {
-                state.historyIndex.push(w._id);
-              }
-            });
-
-            // Batch save to shards
-            workoutStorage.saveBatch(newEntries);
-
-            // Grow the visible history cache with the newly fetched page.
-            // Not capped here — this action's job is pagination growth; capping
-            // would immediately discard the older page it just fetched.
-            state.history.push(...newEntries);
-            state.history.sort(byCompletedAtDesc);
-          }
-        });
-      },
-    })),
+          });
+        },
+      };
+    }),
     {
       name: "workout-session-store",
       storage: createJSONStorage(() => zustandAsyncStorage),
-      version: WORKOUT_SESSION_STORE_VERSION,
-      migrate: (persistedState) =>
-        normalizePersistedWorkoutState(persistedState as Partial<WorkoutSessionState> | undefined),
-      // Persist the recent-history cache (kept sorted+capped to MAX_MEMORY_HISTORY
-      // elsewhere) alongside structural metadata. NOTE: write COST is controlled
-      // by the per-key debounce in src/storage/mmkv.ts (coalesces the many
-      // per-keystroke writes during an active workout into ~one write / 400ms),
-      // not by dropping `history` here — persisting it keeps rehydration correct
-      // (historyIndex is a membership set, not recency-sorted) and preserves a
-      // second durable copy of a just-completed session.
+      version: STORE_VERSION,
+      // v6 moved completed sessions out of this store into SQLite; the migration
+      // in src/db/migrateFromAsyncStorage.ts imports the old shards on startup.
+      migrate: (persisted) =>
+        normalizePersistedState(persisted as Partial<WorkoutSessionState> | undefined),
       partialize: (state) => ({
-        history: state.history,
-        historyIndex: state.historyIndex,
         activeSession: state.activeSession,
         activeRestTimer: state.activeRestTimer,
         pinnedExerciseNames: state.pinnedExerciseNames,
         activeExerciseId: state.activeExerciseId,
-        lastSyncedAt: state.lastSyncedAt,
-        deletedWorkoutIds: state.deletedWorkoutIds,
         dirtyWorkoutIds: state.dirtyWorkoutIds,
-        isDirty: state.isDirty,
+        deletedWorkoutIds: state.deletedWorkoutIds,
       }),
     },
   ),

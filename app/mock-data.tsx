@@ -1,139 +1,121 @@
-import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import { useWorkoutSessionStore } from "@/src/stores/workoutSessionStore";
-import { generateId } from "@/src/utils/id";
-import { USER_ID } from "@/src/constants/user";
-import { COLORS } from "@/src/constants/colors";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { MuscleGroup } from "@/src/constants/muscles";
-import type { WorkoutSession } from "@/src/types";
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { generateId } from "@/utils/id";
+import { USER_ID } from "@/constants/user";
+import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
+import type { MuscleGroup } from "@/constants/muscles";
+import type { WorkoutSession } from "@/types";
 
+const ROUTINES: { name: string; exercises: { name: string; muscles: MuscleGroup[] }[] }[] = [
+  {
+    name: "Push Day",
+    exercises: [
+      { name: "Bench Press", muscles: ["chest", "shoulder"] },
+      { name: "Overhead Press", muscles: ["shoulder"] },
+      { name: "Tricep Pushdowns", muscles: ["arms"] },
+    ],
+  },
+  {
+    name: "Pull Day",
+    exercises: [
+      { name: "Deadlift", muscles: ["back", "hamstrings", "glutes"] },
+      { name: "Pullups", muscles: ["back"] },
+      { name: "Bicep Curls", muscles: ["arms"] },
+    ],
+  },
+  {
+    name: "Legs",
+    exercises: [
+      { name: "Squat", muscles: ["quads", "glutes"] },
+      { name: "Leg Press", muscles: ["quads"] },
+      { name: "Calf Raises", muscles: ["calves"] },
+    ],
+  },
+];
+
+/** Dev-only: injects 90 days of completed sessions into the local database. */
 export default function MockDataInjector() {
   const router = useRouter();
   const [status, setStatus] = useState("Ready to inject 90 days of data");
 
-  if (!__DEV__) {
-    return null;
-  }
+  if (!__DEV__) return null;
 
   const injectData = () => {
     setStatus("Injecting...");
-
-    const history: WorkoutSession[] = [];
     const now = new Date();
+    const sessions: WorkoutSession[] = [];
 
-    // Create 3 routine types
-    const routines = [
-      {
-        name: "Push Day",
-        exercises: [
-          { name: "Bench Press", muscles: ["chest", "shoulder"] as MuscleGroup[] },
-          { name: "Overhead Press", muscles: ["shoulder"] as MuscleGroup[] },
-          { name: "Tricep Pushdowns", muscles: ["arms"] as MuscleGroup[] },
-        ],
-      },
-      {
-        name: "Pull Day",
-        exercises: [
-          { name: "Deadlift", muscles: ["back", "hamstrings", "glutes"] as MuscleGroup[] },
-          { name: "Pullups", muscles: ["back"] as MuscleGroup[] },
-          { name: "Bicep Curls", muscles: ["arms"] as MuscleGroup[] },
-        ],
-      },
-      {
-        name: "Legs",
-        exercises: [
-          { name: "Squat", muscles: ["quads", "glutes"] as MuscleGroup[] },
-          { name: "Leg Press", muscles: ["quads"] as MuscleGroup[] },
-          { name: "Calf Raises", muscles: ["calves"] as MuscleGroup[] },
-        ],
-      },
-    ];
-
-    // Inject every ~2 days for 90 days
-    for (let i = 90; i >= 0; i -= 2) {
+    for (let daysAgo = 90; daysAgo >= 0; daysAgo -= 2) {
       const date = new Date(now);
-      date.setDate(date.getDate() - i);
+      date.setDate(date.getDate() - daysAgo);
+      const routine = ROUTINES[Math.floor(Math.random() * ROUTINES.length)];
+      const progress = (90 - daysAgo) / 10; // ~1kg per session of progressive overload
 
-      const routine = routines[Math.floor(Math.random() * routines.length)];
-
-      // Simulate progressive overload (weights go up over time)
-      const progressFactor = (90 - i) / 10; // weight increases by ~1kg every session
-
-      const session: WorkoutSession = {
+      sessions.push({
         _id: generateId(),
         userId: USER_ID,
         startedAt: date.toISOString(),
-        completedAt: new Date(date.getTime() + 3600000).toISOString(),
+        completedAt: new Date(date.getTime() + 3_600_000).toISOString(),
         updatedAt: Date.now(),
         notes: "",
         exercises: routine.exercises.map((ex) => ({
           id: generateId(),
           name: ex.name,
-          trackingMode: "strength" as const,
+          trackingMode: "strength",
           restSeconds: 90,
           notes: "",
           muscles: ex.muscles,
-          sets: [
-            {
-              id: generateId(),
-              weight: 40 + progressFactor,
-              reps: 10,
-              completedAt: date.toISOString(),
-            },
-            {
-              id: generateId(),
-              weight: 40 + progressFactor,
-              reps: 10,
-              completedAt: date.toISOString(),
-            },
-            {
-              id: generateId(),
-              weight: 40 + progressFactor,
-              reps: 10,
-              completedAt: date.toISOString(),
-            },
-          ],
-          weightUnit: "kg" as const,
+          weightUnit: "kg",
+          sets: [1, 2, 3].map(() => ({
+            id: generateId(),
+            weight: 40 + progress,
+            reps: 10,
+            type: "working",
+            completedAt: date.toISOString(),
+          })),
         })),
-      };
-
-      history.push(session);
+      });
     }
 
-    // Directly access store to set history
-    useWorkoutSessionStore.setState((state) => ({
-      history: [...history, ...state.history],
-      isDirty: true,
-    }));
-
-    setStatus(`Success! Injected ${history.length} sessions.`);
+    useWorkoutSessionStore.getState().importWorkouts(sessions, true);
+    setStatus(`Success! Injected ${sessions.length} sessions.`);
     setTimeout(() => router.replace("/programs/"), 1500);
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mock Data Injector</Text>
-      <Text style={styles.status}>{status}</Text>
-
-      <Pressable style={styles.btn} onPress={injectData}>
-        <Text style={styles.btnText}>Inject 90 Days of History</Text>
+      <Text style={[TYPE.title, styles.center]}>Mock Data Injector</Text>
+      <Text style={[TYPE.bodyMuted, styles.center, styles.status]}>{status}</Text>
+      <Pressable style={({ pressed }) => [styles.btn, pressed && UI.pressed]} onPress={injectData}>
+        <Text style={TYPE.body}>Inject 90 Days of History</Text>
       </Pressable>
-
       <Pressable
-        style={[styles.btn, { backgroundColor: "#333", marginTop: 20 }]}
+        style={({ pressed }) => [styles.btn, styles.btnSecondary, pressed && UI.pressed]}
         onPress={() => router.back()}
       >
-        <Text style={styles.btnText}>Go Back</Text>
+        <Text style={TYPE.body}>Go Back</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.BG, justifyContent: "center", padding: 40 },
-  title: { color: "white", fontSize: 32, fontWeight: "900", marginBottom: 20, textAlign: "center" },
-  status: { color: COLORS.TEXT_SECONDARY, fontSize: 16, marginBottom: 40, textAlign: "center" },
-  btn: { backgroundColor: COLORS.ACCENT_BLUE, padding: 20, borderRadius: 20, alignItems: "center" },
-  btnText: { color: "white", fontWeight: "bold", fontSize: 18 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.BG,
+    justifyContent: "center",
+    padding: SPACE.xxxl + SPACE.sm,
+    gap: SPACE.lg,
+  },
+  center: { textAlign: "center" },
+  status: { marginBottom: SPACE.xl },
+  btn: {
+    backgroundColor: COLORS.ACCENT_BLUE,
+    padding: SPACE.xl,
+    borderRadius: RADIUS.container,
+    alignItems: "center",
+  },
+  btnSecondary: { backgroundColor: COLORS.CARD_HOVER },
 });

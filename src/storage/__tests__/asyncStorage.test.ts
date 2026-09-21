@@ -6,7 +6,7 @@
 // trailing write ~400ms after the last change.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { zustandAsyncStorage } from "@/storage/mmkv";
+import { zustandAsyncStorage } from "@/storage/asyncStorage";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   setItem: jest.fn(() => Promise.resolve()),

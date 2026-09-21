@@ -26,12 +26,14 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "11.5.2",
     "expo": "^55.0.31",
+    "expo-clipboard": "~55.0.17",
     "expo-constants": "~55.0.17",
     "expo-font": "~55.0.8",
     "expo-haptics": "~55.0.18",
     "expo-linking": "~55.0.17",
     "expo-notifications": "~55.0.27",
     "expo-router": "~55.0.18",
+    "expo-sqlite": "~55.0.20",
     "expo-widgets": "^55.0.14",
     "immer": "^11.1.4",
     "lucide-react-native": "^0.575.0",
@@ -59,6 +61,7 @@
   "overrides": {
     "shell-quote": ">=1.8.4",
     "node-forge": ">=1.4.0",
-    "picomatch": ">=4.0.4"
+    "picomatch": ">=4.0.4",
+    "react-dom": "19.2.0"
   }
 }

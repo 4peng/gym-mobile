@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useSheet } from "@/hooks/useSheet";
-import { Pressable, StyleSheet, Text, View, Animated } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Check, GripVertical, X } from "lucide-react-native";
 import DraggableFlatList, {
-  RenderItemParams,
+  type RenderItemParams,
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
 import { Pressable as GesturePressable } from "react-native-gesture-handler";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { HapticFeedback } from "@/utils/haptics";
+import { Sheet } from "@/components/ui/Sheet";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface ReorderItem {
   id: string;
@@ -30,11 +29,13 @@ const ReorderRow = React.memo(function ReorderRow({
 }) {
   return (
     <ScaleDecorator>
-      <View style={[styles.row, isActive && styles.rowActive]}>
-        <View style={styles.indexBadge}>
-          <Text style={styles.indexText}>{String(index + 1).padStart(2, "0")}</Text>
+      <View style={[UI.inset, styles.row, isActive && styles.rowActive]}>
+        <View style={styles.badge}>
+          <Text style={[TYPE.monoSmall, { color: COLORS.ACCENT_BLUE }]}>
+            {String(index + 1).padStart(2, "0")}
+          </Text>
         </View>
-        <Text style={styles.rowLabel} numberOfLines={1}>
+        <Text style={[TYPE.mono, styles.label]} numberOfLines={1}>
           {item.name.toUpperCase()}
         </Text>
         <GesturePressable
@@ -42,7 +43,7 @@ const ReorderRow = React.memo(function ReorderRow({
           disabled={isActive}
           delayLongPress={120}
           hitSlop={12}
-          style={styles.dragHandle}
+          style={styles.handle}
         >
           <GripVertical size={18} color={isActive ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY} />
         </GesturePressable>
@@ -51,27 +52,24 @@ const ReorderRow = React.memo(function ReorderRow({
   );
 });
 
+interface ExerciseReorderModalProps {
+  visible: boolean;
+  exercises: ReorderItem[];
+  onClose: () => void;
+  onSave: (exerciseIds: string[]) => void;
+}
+
+/** Drag-to-reorder dialog for a routine's exercises. */
 export default function ExerciseReorderModal({
   visible,
   exercises,
   onClose,
   onSave,
-}: {
-  visible: boolean;
-  exercises: ReorderItem[];
-  onClose: () => void;
-  onSave: (exerciseIds: string[]) => void;
-}) {
-  const [draftOrder, setDraftOrder] = useState<ReorderItem[]>(exercises);
-  const { mounted, progress } = useSheet(visible);
+}: ExerciseReorderModalProps) {
+  const [draft, setDraft] = useState<ReorderItem[]>(exercises);
   useEffect(() => {
-    if (visible) setDraftOrder(exercises);
+    if (visible) setDraft(exercises);
   }, [visible, exercises]);
-
-  const handleSave = useCallback(() => {
-    onSave(draftOrder.map((ex) => ex.id));
-    onClose();
-  }, [draftOrder, onClose, onSave]);
 
   const renderItem = useCallback(
     ({ item, drag, isActive, getIndex }: RenderItemParams<ReorderItem>) => (
@@ -80,111 +78,64 @@ export default function ExerciseReorderModal({
     [],
   );
 
-  if (!mounted) return null;
-
   return (
-    <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.container,
-          {
-            transform: [
-              { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.header}>
-          <Pressable onPress={onClose} style={UI.SHARED.dangerBtn}>
-            <X size={20} color={COLORS.DANGER} />
-          </Pressable>
-          <Text style={styles.title}>REORDER</Text>
-          <Pressable onPress={handleSave} style={UI.SHARED.actionBtn}>
-            <Check size={20} color={COLORS.ACCENT_GREEN} />
-          </Pressable>
-        </View>
-        <DraggableFlatList
-          data={draftOrder}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          onDragBegin={() => HapticFeedback.selection()}
-          onDragEnd={({ data }) => {
-            setDraftOrder(data);
-            HapticFeedback.success();
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      placement="center"
+      title="Reorder"
+      headerLeft={
+        <IconButton size="md" tone="danger" onPress={onClose}>
+          <X size={20} color={COLORS.DANGER} />
+        </IconButton>
+      }
+      headerRight={
+        <IconButton
+          size="md"
+          tone="success"
+          onPress={() => {
+            onSave(draft.map((e) => e.id));
+            onClose();
           }}
-          contentContainerStyle={styles.listContent}
-        />
-      </Animated.View>
-    </View>
+        >
+          <Check size={20} color={COLORS.ACCENT_GREEN} />
+        </IconButton>
+      }
+    >
+      <DraggableFlatList
+        data={draft}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        onDragBegin={() => HapticFeedback.selection()}
+        onDragEnd={({ data }) => {
+          setDraft(data);
+          HapticFeedback.success();
+        }}
+        contentContainerStyle={styles.list}
+      />
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  absoluteOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 10000,
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.85)" },
-  container: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: UI.RADIUS_CONTAINER,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    padding: 16,
-    maxHeight: "80%",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  title: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 12,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
-    letterSpacing: 2,
-  },
-  listContent: { gap: 8 },
+  list: { gap: SPACE.sm, paddingTop: SPACE.lg },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACE.md,
     height: 60,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: UI.RADIUS_ITEM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    paddingHorizontal: 12,
+    paddingHorizontal: SPACE.md,
   },
-  rowActive: { borderColor: COLORS.ACCENT_BLUE, backgroundColor: "rgba(0,122,255,0.05)" },
-  indexBadge: {
+  rowActive: { borderColor: COLORS.ACCENT_BLUE, backgroundColor: SURFACE.blueTint },
+  badge: {
     width: 32,
     height: 32,
-    borderRadius: UI.RADIUS_ITEM,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     alignItems: "center",
     justifyContent: "center",
   },
-  indexText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 12,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  rowLabel: {
-    flex: 1,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  dragHandle: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  label: { flex: 1, fontSize: 13 },
+  handle: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 });

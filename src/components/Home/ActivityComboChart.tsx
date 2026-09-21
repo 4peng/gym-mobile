@@ -1,9 +1,7 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import Svg, { Line, Polyline } from "react-native-svg";
-import { COLORS, withAlpha } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, withAlpha } from "@/constants/theme";
 import type { ActivityChartPoint } from "@/utils/activitySummary";
 
 interface ActivityComboChartProps {
@@ -12,105 +10,84 @@ interface ActivityComboChartProps {
   height?: number;
 }
 
+const BAR_WIDTH = 18;
+const PADDING = SPACE.md;
+const LABEL_WIDTH = 44;
+const LABEL_BAND = 30;
+
+/** Minutes-per-bucket bars with a trend line, for the dashboard. */
 export default function ActivityComboChart({
   points,
   width,
   height = 132,
 }: ActivityComboChartProps) {
-  const barWidth = 18;
-  const padding = 12;
-  const horizontalInset = barWidth / 2 + 4;
-  const labelWidth = 44;
-
-  const chartMax = useMemo(
+  const inset = BAR_WIDTH / 2 + SPACE.xs;
+  const chartCeil = useMemo(
     () =>
-      Math.max(
-        points.reduce((best, point) => Math.max(best, point.minutes), 0),
-        1,
+      Math.ceil(
+        Math.max(
+          points.reduce((best, p) => Math.max(best, p.minutes), 0),
+          1,
+        ) * 1.15,
       ),
     [points],
   );
-  const chartCeil = Math.ceil(chartMax * 1.15); // Add 15% headroom
 
-  if (points.length === 0) {
-    return <View style={[styles.shell, { width }]} />;
-  }
+  if (points.length === 0) return <View style={[styles.shell, { width }]} />;
 
-  const drawWidth = Math.max(width - padding * 2, 0);
-  const plotWidth = Math.max(drawWidth - horizontalInset * 2, 0);
-  const chartStep = points.length > 1 ? plotWidth / (points.length - 1) : 0;
-
-  const linePoints = points.map((point, index) => {
-    const x = horizontalInset + index * chartStep;
-    const normalized = point.minutes / chartCeil;
-    const y = height - Math.max(8, normalized * (height - 8));
-    return { x, y };
-  });
-
-  const linePath = linePoints.map((point) => `${point.x},${point.y}`).join(" ");
-  const areaPath = [
+  const drawWidth = Math.max(width - PADDING * 2, 0);
+  const step = points.length > 1 ? Math.max(drawWidth - inset * 2, 0) / (points.length - 1) : 0;
+  const linePoints = points.map((p, i) => ({
+    x: inset + i * step,
+    y: height - Math.max(8, (p.minutes / chartCeil) * (height - 8)),
+  }));
+  const line = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
+  const area = [
     `${linePoints[0].x},${height}`,
-    ...linePoints.map((p) => `${p.x},${p.y}`),
+    line,
     `${linePoints[linePoints.length - 1].x},${height}`,
   ].join(" ");
 
   return (
     <View style={[styles.shell, { width }]}>
-      <View style={styles.guide} />
-      <View style={[styles.guide, { top: 62 }]} />
-      <View style={[styles.guide, { top: 112 }]} />
+      {[0, 50, 100].map((top) => (
+        <View key={top} style={[styles.guide, { top: PADDING + top }]} />
+      ))}
 
-      <View style={styles.yAxisLabels} pointerEvents="none">
-        <Text style={styles.yAxisText}>{chartCeil}m</Text>
-        <Text style={styles.yAxisText}>{Math.round(chartCeil / 2)}</Text>
-        <Text style={styles.yAxisText}>0</Text>
+      <View style={styles.yAxis} pointerEvents="none">
+        <Text style={styles.axisText}>{chartCeil}m</Text>
+        <Text style={styles.axisText}>{Math.round(chartCeil / 2)}</Text>
+        <Text style={styles.axisText}>0</Text>
       </View>
 
       <Svg width={drawWidth} height={height} style={styles.svg}>
-        {/* Bars */}
-        {points.map((point, index) => {
-          const x = horizontalInset + index * chartStep;
-          const barHeight = Math.max(8, (point.minutes / chartCeil) * (height - 8));
-
-          return (
-            <Line
-              key={point.key}
-              x1={x}
-              y1={height}
-              x2={x}
-              y2={height - barHeight}
-              stroke={withAlpha(COLORS.ACCENT_BLUE, 0.2)}
-              strokeWidth={barWidth}
-              strokeLinecap="butt"
-            />
-          );
-        })}
-
-        {/* Area under line */}
+        {points.map((p, i) => (
+          <Line
+            key={p.key}
+            x1={linePoints[i].x}
+            y1={height}
+            x2={linePoints[i].x}
+            y2={height - Math.max(8, (p.minutes / chartCeil) * (height - 8))}
+            stroke={SURFACE.blueTintStrong}
+            strokeWidth={BAR_WIDTH}
+          />
+        ))}
+        <Polyline points={area} fill={withAlpha(COLORS.ACCENT_GREEN, 0.05)} stroke="transparent" />
         <Polyline
-          points={areaPath}
-          fill={withAlpha(COLORS.ACCENT_GREEN, 0.05)}
-          stroke="transparent"
-        />
-
-        {/* The primary line */}
-        <Polyline
-          points={linePath}
+          points={line}
           fill="none"
           stroke={COLORS.ACCENT_GREEN}
           strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-
-        {/* Data point dots */}
-        {linePoints.map((point, i) => (
+        {linePoints.map((p, i) => (
           <Line
             key={`dot-${i}`}
-            x1={point.x}
-            y1={point.y}
-            x2={point.x}
-            y2={point.y - 0.5}
+            x1={p.x}
+            y1={p.y}
+            x2={p.x}
+            y2={p.y - 0.5}
             stroke={COLORS.ACCENT_GREEN}
             strokeWidth={4}
             strokeLinecap="round"
@@ -118,19 +95,16 @@ export default function ActivityComboChart({
         ))}
       </Svg>
 
-      <View style={styles.labelLayer} pointerEvents="none">
-        {points.map((point, index) => (
+      <View style={styles.labels} pointerEvents="none">
+        {points.map((p, i) => (
           <View
-            key={point.key}
+            key={p.key}
             style={[
-              styles.labelItem,
-              {
-                width: labelWidth,
-                left: padding + linePoints[index].x - labelWidth / 2,
-              },
+              styles.label,
+              { width: LABEL_WIDTH, left: PADDING + linePoints[i].x - LABEL_WIDTH / 2 },
             ]}
           >
-            <Text style={styles.labelText}>{point.label}</Text>
+            <Text style={[TYPE.monoSmall, styles.labelText]}>{p.label}</Text>
           </View>
         ))}
       </View>
@@ -141,57 +115,38 @@ export default function ActivityComboChart({
 const styles = StyleSheet.create({
   shell: {
     height: 190,
-    borderRadius: UI.RADIUS_ITEM,
+    borderRadius: RADIUS.item,
     backgroundColor: COLORS.BG,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    paddingTop: 12,
-    paddingBottom: 10,
+    paddingTop: PADDING,
+    paddingBottom: SPACE.sm + 2,
     justifyContent: "flex-end",
     overflow: "hidden",
   },
   guide: {
     position: "absolute",
-    left: 12,
-    right: 12,
-    top: 12,
+    left: PADDING,
+    right: PADDING,
     borderTopWidth: 1,
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+    borderColor: SURFACE.raisedStrong,
   },
-  svg: {
+  svg: { position: "absolute", left: PADDING, bottom: LABEL_BAND },
+  yAxis: {
     position: "absolute",
-    left: 12,
-    bottom: 30,
-  },
-  yAxisLabels: {
-    position: "absolute",
-    left: 12,
-    top: 12,
-    bottom: 30,
+    left: PADDING,
+    top: PADDING,
+    bottom: LABEL_BAND,
     justifyContent: "space-between",
   },
-  yAxisText: {
-    color: withAlpha(COLORS.TEXT_TERTIARY, 0.5),
+  axisText: {
+    ...TYPE.monoSmall,
     fontSize: 9,
-    fontFamily: FONT_FAMILIES.MONO,
-    paddingLeft: 4,
+    color: COLORS.TEXT_TERTIARY,
+    paddingLeft: SPACE.xs,
     zIndex: 10,
   },
-  labelLayer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 10,
-    height: 16,
-  },
-  labelItem: {
-    position: "absolute",
-    alignItems: "center",
-  },
-  labelText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontFamily: FONT_FAMILIES.MONO,
-    textAlign: "center",
-  },
+  labels: { position: "absolute", left: 0, right: 0, bottom: SPACE.sm + 2, height: 16 },
+  label: { position: "absolute", alignItems: "center" },
+  labelText: { fontSize: 11, color: COLORS.TEXT_TERTIARY, textAlign: "center" },
 });

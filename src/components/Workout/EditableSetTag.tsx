@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Check, X } from "lucide-react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 
 interface EditableSetTagProps {
   weight: number | null;
@@ -11,27 +9,36 @@ interface EditableSetTagProps {
   onSave: (weight: number, reps: number) => void;
 }
 
-/** "100 × 8" chip that flips into an inline weight/reps editor on tap. */
+/** "100 × 8" chip that flips into an inline weight/reps editor on tap. Blank fields keep their old value. */
 export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
   const [draft, setDraft] = useState<{ weight: string; reps: string } | null>(null);
 
   if (!draft) {
     return (
       <Pressable
-        style={({ pressed }) => [styles.tag, pressed && { backgroundColor: COLORS.CARD_HOVER }]}
-        onPress={() => setDraft({ weight: String(weight ?? 0), reps: String(reps ?? 0) })}
+        style={({ pressed }) => [styles.tag, pressed && UI.pressed]}
+        onPress={() =>
+          setDraft({
+            weight: weight == null ? "" : String(weight),
+            reps: reps == null ? "" : String(reps),
+          })
+        }
       >
         <Text style={styles.tagText}>
-          {weight} <Text style={styles.tagX}>×</Text> {reps}
+          {weight ?? "-"} <Text style={styles.tagX}>×</Text> {reps ?? "-"}
         </Text>
       </Pressable>
     );
   }
 
   const save = () => {
-    const w = Number(draft.weight.trim().replace(",", "."));
-    const r = Number(draft.reps.trim());
-    if (Number.isFinite(w) && Number.isFinite(r)) onSave(w, r);
+    const parse = (text: string, fallback: number | null) => {
+      const trimmed = text.trim().replace(",", ".");
+      if (trimmed === "") return fallback ?? 0;
+      const n = Number(trimmed);
+      return Number.isFinite(n) ? n : (fallback ?? 0);
+    };
+    onSave(parse(draft.weight, weight), parse(draft.reps, reps));
     setDraft(null);
   };
 
@@ -51,10 +58,10 @@ export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
         onChangeText={(v) => setDraft({ ...draft, reps: v })}
         keyboardType="numeric"
       />
-      <Pressable onPress={save} style={styles.editIcon}>
+      <Pressable onPress={save} style={styles.editIcon} hitSlop={6}>
         <Check size={14} color={COLORS.ACCENT_GREEN} />
       </Pressable>
-      <Pressable onPress={() => setDraft(null)} style={styles.editIcon}>
+      <Pressable onPress={() => setDraft(null)} style={styles.editIcon} hitSlop={6}>
         <X size={14} color={COLORS.DANGER} />
       </Pressable>
     </View>
@@ -63,43 +70,31 @@ export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
 
 const styles = StyleSheet.create({
   tag: {
-    backgroundColor: "rgba(11, 130, 255, 0.05)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: UI.RADIUS_ITEM,
+    backgroundColor: SURFACE.blueTint,
+    paddingHorizontal: SPACE.sm + 2,
+    paddingVertical: SPACE.sm - 2,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.1)",
+    borderColor: SURFACE.blueBorder,
   },
-  tagText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 12,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  tagX: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 10,
-    marginHorizontal: 2,
-    fontFamily: FONT_FAMILIES.MONO,
-  },
+  tagText: { ...TYPE.monoSmall, color: COLORS.TEXT_PRIMARY },
+  tagX: { ...TYPE.monoSmall, fontSize: 10, color: COLORS.TEXT_TERTIARY, marginHorizontal: 2 },
   editRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: 6,
-    paddingHorizontal: 6,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACE.sm - 2,
     paddingVertical: 2,
     borderWidth: 1,
     borderColor: COLORS.ACCENT_BLUE,
   },
   editInput: {
+    ...TYPE.monoSmall,
     color: COLORS.TEXT_PRIMARY,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontSize: 12,
-    fontWeight: "800",
     textAlign: "center",
     padding: 0,
-    width: 35, // fixed width keeps the text from collapsing while typing
+    width: 36,
   },
-  editIcon: { marginLeft: 4, padding: 2 },
+  editIcon: { marginLeft: SPACE.xs, padding: 2 },
 });

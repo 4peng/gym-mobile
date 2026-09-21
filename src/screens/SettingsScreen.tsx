@@ -1,46 +1,93 @@
-import React, { useCallback, useRef, useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Clipboard,
-  TextInput,
   Animated,
   Easing,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import {
-  ChevronLeft,
+  CloudDownload,
+  CloudUpload,
   Database,
   Download,
-  ShieldAlert,
-  Share2,
   RefreshCw,
   Tags,
 } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useShallow } from "zustand/react/shallow";
 import { useProgramStore } from "@/stores/programStore";
-import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
-import { useShallow } from "zustand/react/shallow";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
-import { showConfirm, showAlert } from "@/utils/alerts";
-import { workoutStorage } from "@/storage/workoutStorage";
+import { workoutRepo } from "@/db";
+import { useDbQuery } from "@/db/dbVersion";
+import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { showAlert, showConfirm } from "@/utils/alerts";
+import { ScreenHeader } from "@/components/ui/ScreenHeader";
+import { SectionLabel } from "@/components/ui/SectionLabel";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+
+const UNITS = [
+  { value: "kg", label: "KG" },
+  { value: "lbs", label: "LBS" },
+] as const;
+
+function SettingsRow({
+  icon,
+  title,
+  description,
+  right,
+  onPress,
+  disabled,
+  danger,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  right?: ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || !onPress}
+      style={({ pressed }) => [
+        styles.row,
+        pressed && onPress && { backgroundColor: COLORS.CARD_HOVER },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      <View
+        style={[
+          styles.iconBox,
+          { backgroundColor: danger ? SURFACE.dangerTint : SURFACE.blueTint },
+        ]}
+      >
+        {icon}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[TYPE.body, danger && { color: COLORS.DANGER }]}>{title}</Text>
+        <Text style={TYPE.caption}>{description}</Text>
+      </View>
+      {right}
+    </Pressable>
+  );
+}
 
 export default function SettingsScreen() {
-  const router = useRouter();
   const isSyncing = useSyncStore((s) => s.isSyncing);
-  const runFullSync = useSyncStore((s) => s.runFullSync);
-  const forceResync = useSyncStore((s) => s.forceResync);
+  const lastSyncSuccess = useSyncStore((s) => s.lastSyncSuccess);
+  const pushPending = useSyncStore((s) => s.pushPending);
+  const backupEverything = useSyncStore((s) => s.backupEverything);
+  const restoreFromCloud = useSyncStore((s) => s.restoreFromCloud);
   const programs = useProgramStore(useShallow((s) => s.programs));
-  const history = useWorkoutSessionStore(useShallow((s) => s.history));
-  const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
-  const showDetailedMuscleGroups = useUiPreferencesStore((s) => s.showDetailedMuscleGroups);
-  const toggleDetailedMuscleGroups = useUiPreferencesStore((s) => s.toggleDetailedMuscleGroups);
+  const showDetailed = useUiPreferencesStore((s) => s.showDetailedMuscleGroups);
+  const toggleDetailed = useUiPreferencesStore((s) => s.toggleDetailedMuscleGroups);
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
   const setAnalyticsBodyweight = useUiPreferencesStore((s) => s.setAnalyticsBodyweight);
@@ -49,255 +96,176 @@ export default function SettingsScreen() {
   );
   const preferredWeightUnit = useUiPreferencesStore((s) => s.preferredWeightUnit);
   const setPreferredWeightUnit = useUiPreferencesStore((s) => s.setPreferredWeightUnit);
-  const [analyticsBodyweightText, setAnalyticsBodyweightText] = useState(
-    analyticsBodyweight !== null ? String(analyticsBodyweight) : "",
+  const sessionCount = useDbQuery(() => workoutRepo.count());
+
+  const [bodyweightText, setBodyweightText] = useState(
+    analyticsBodyweight === null ? "" : String(analyticsBodyweight),
+  );
+  useEffect(
+    () => setBodyweightText(analyticsBodyweight === null ? "" : String(analyticsBodyweight)),
+    [analyticsBodyweight],
   );
 
-  const spinValue = useRef(new Animated.Value(0)).current;
-
+  const spin = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    setAnalyticsBodyweightText(analyticsBodyweight !== null ? String(analyticsBodyweight) : "");
-  }, [analyticsBodyweight]);
+    if (!isSyncing) return spin.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isSyncing, spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
-  useEffect(() => {
-    if (isSyncing) {
-      Animated.loop(
-        Animated.timing(spinValue, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-      ).start();
-    } else {
-      spinValue.setValue(0);
+  const commitBodyweight = () => {
+    const text = bodyweightText.trim().replace(",", ".");
+    if (text === "") return setAnalyticsBodyweight(null);
+    const n = Number(text);
+    if (!Number.isFinite(n) || n <= 0) {
+      setBodyweightText(analyticsBodyweight === null ? "" : String(analyticsBodyweight));
+      return showAlert("Invalid bodyweight", "Enter a positive number or leave it blank.");
     }
-  }, [isSyncing, spinValue]);
-
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  const handleSync = useCallback(() => {
-    runFullSync();
-  }, [runFullSync]);
-
-  const commitAnalyticsBodyweight = useCallback(() => {
-    const normalizedText = analyticsBodyweightText.trim().replace(",", ".");
-    if (normalizedText === "") {
-      setAnalyticsBodyweight(null);
-      return;
-    }
-    const parsed = Number(normalizedText);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setAnalyticsBodyweightText(analyticsBodyweight !== null ? String(analyticsBodyweight) : "");
-      showAlert("Invalid Bodyweight", "Enter a positive number or leave it blank.");
-      return;
-    }
-    setAnalyticsBodyweight(parsed);
-  }, [analyticsBodyweight, analyticsBodyweightText, setAnalyticsBodyweight]);
-
-  const handleExport = async () => {
-    try {
-      // The in-RAM history cache is capped at MAX_MEMORY_HISTORY sessions.
-      // Hydrate every remaining session from its on-disk shard so the export
-      // is complete, not just the recent ~15 sessions.
-      const cachedIds = new Set(history.map((s) => s._id));
-      const missingIds = historyIndex.filter((id) => !cachedIds.has(id));
-      const shards = missingIds.length > 0 ? await workoutStorage.getBatch(missingIds) : [];
-
-      const mergedById = new Map<string, (typeof history)[number]>();
-      for (const session of shards) mergedById.set(session._id, session);
-      for (const session of history) mergedById.set(session._id, session);
-
-      const fullHistory = Array.from(mergedById.values()).filter((s) => !s.deletedAt);
-      const activePrograms = programs.filter((p) => !p.deletedAt);
-
-      const data = {
-        exportDate: new Date().toISOString(),
-        programs: activePrograms,
-        history: fullHistory,
-      };
-      const json = JSON.stringify(data, null, 2);
-      Clipboard.setString(json);
-      showAlert("Success", "Backup data copied to clipboard! Save it in a text file.");
-    } catch (err) {
-      console.error("Failed to export backup:", err);
-      showAlert("Export Failed", "Could not gather your full backup. Please try again.");
-    }
+    setAnalyticsBodyweight(n);
   };
 
-  const handleHardReset = () => {
-    showConfirm(
-      "Deep Hard Reset",
-      "This will WIPE all local data and re-download everything from the database. Un-synced changes WILL be lost. Are you sure?",
-      () => {
-        forceResync();
-        router.push("/programs/");
-      },
+  const handleExport = async () => {
+    const history = workoutRepo.list(sessionCount, 0);
+    await Clipboard.setStringAsync(
+      JSON.stringify({ exportDate: new Date().toISOString(), programs, history }, null, 2),
+    );
+    showAlert(
+      "Copied",
+      `${programs.length} routines and ${history.length} sessions copied to the clipboard as JSON.`,
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={UI.SHARED.iconBtn}>
-          <ChevronLeft size={28} color={COLORS.TEXT_PRIMARY} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
+  const handleRestore = () =>
+    showConfirm(
+      "Restore from cloud",
+      "Replace everything on this phone with the cloud backup? Custom and pinned exercises are kept.",
+      () => void restoreFromCloud(),
+    );
 
+  const statusText = isSyncing
+    ? "Working..."
+    : lastSyncSuccess === false
+      ? "Last attempt failed"
+      : lastSyncSuccess
+        ? "Up to date"
+        : "Push pending edits and deletes";
+
+  return (
+    <View style={UI.screen}>
+      <ScreenHeader title="Settings" back />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionLabel}>Synchronization</Text>
-        <View style={[UI.SHARED.card, { padding: 0, marginBottom: 24 }]}>
-          <Pressable
-            style={({ pressed }) => [styles.option, (pressed || isSyncing) && styles.pressed]}
-            onPress={handleSync}
-            disabled={isSyncing}
-          >
-            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-              <Animated.View style={{ transform: [{ rotate: spin }] }}>
+        <SectionLabel>Cloud backup</SectionLabel>
+        <View style={[UI.card, styles.group]}>
+          <SettingsRow
+            icon={
+              <Animated.View style={{ transform: [{ rotate }] }}>
                 <RefreshCw size={20} color={COLORS.ACCENT_BLUE} />
               </Animated.View>
-            </View>
-            <View style={styles.optionText}>
-              <Text style={styles.optionLabel}>{isSyncing ? "Syncing..." : "Sync with Cloud"}</Text>
-              <Text style={styles.optionDesc}>Push local changes and fetch updates</Text>
-            </View>
-          </Pressable>
+            }
+            title="Back up now"
+            description={statusText}
+            onPress={() => void pushPending()}
+            disabled={isSyncing}
+          />
+          <View style={[UI.hairline, styles.divider]} />
+          <SettingsRow
+            icon={<CloudUpload size={20} color={COLORS.ACCENT_BLUE} />}
+            title="Back up everything"
+            description="Re-upload every routine and session"
+            onPress={() => void backupEverything()}
+            disabled={isSyncing}
+          />
+          <View style={[UI.hairline, styles.divider]} />
+          <SettingsRow
+            icon={<CloudDownload size={20} color={COLORS.DANGER} />}
+            title="Restore from cloud"
+            description="Replace local data with the backup"
+            onPress={handleRestore}
+            disabled={isSyncing}
+            danger
+          />
         </View>
 
-        <Text style={styles.sectionLabel}>Display</Text>
-        <View style={[UI.SHARED.card, { padding: 0, marginBottom: 24 }]}>
-          <Pressable
-            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
-            onPress={toggleDetailedMuscleGroups}
-          >
-            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-              <Tags size={20} color={COLORS.ACCENT_BLUE} />
-            </View>
-            <View style={styles.optionText}>
-              <Text style={styles.optionLabel}>Detailed Muscle Groups</Text>
-              <Text style={styles.optionDesc}>Show advanced tags in muscle picker</Text>
-            </View>
-            <View style={[styles.togglePill, showDetailedMuscleGroups && styles.togglePillActive]}>
-              <Text
-                style={[styles.toggleText, showDetailedMuscleGroups && styles.toggleTextActive]}
-              >
-                {showDetailedMuscleGroups ? "ON" : "OFF"}
-              </Text>
-            </View>
-          </Pressable>
-
-          <View style={styles.divider} />
-
-          <View style={styles.option}>
-            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-              <RefreshCw size={20} color={COLORS.ACCENT_BLUE} />
-            </View>
-            <View style={styles.optionText}>
-              <Text style={styles.optionLabel}>Preferred Weight Unit</Text>
-              <Text style={styles.optionDesc}>Used for new exercise cards</Text>
-            </View>
-            <View style={styles.unitToggleGroup}>
-              <Pressable
-                onPress={() => setPreferredWeightUnit("kg")}
-                style={[styles.unitBtn, preferredWeightUnit === "kg" && styles.unitBtnActive]}
-              >
-                <Text
-                  style={[
-                    styles.unitBtnText,
-                    preferredWeightUnit === "kg" && styles.unitBtnTextActive,
-                  ]}
-                >
-                  KG
+        <SectionLabel>Display</SectionLabel>
+        <View style={[UI.card, styles.group]}>
+          <SettingsRow
+            icon={<Tags size={20} color={COLORS.ACCENT_BLUE} />}
+            title="Detailed muscle groups"
+            description="Show delts, lats, biceps and so on"
+            onPress={toggleDetailed}
+            right={
+              <View style={[styles.togglePill, showDetailed && styles.togglePillOn]}>
+                <Text style={[TYPE.label, showDetailed && { color: COLORS.ACCENT_BLUE }]}>
+                  {showDetailed ? "On" : "Off"}
                 </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setPreferredWeightUnit("lbs")}
-                style={[styles.unitBtn, preferredWeightUnit === "lbs" && styles.unitBtnActive]}
-              >
-                <Text
-                  style={[
-                    styles.unitBtnText,
-                    preferredWeightUnit === "lbs" && styles.unitBtnTextActive,
-                  ]}
-                >
-                  LBS
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        <Text style={styles.sectionLabel}>Training Profile</Text>
-        <View style={[UI.SHARED.card, { marginBottom: 24 }]}>
-          <Text style={styles.profileLabel}>Analytics Bodyweight</Text>
-          <Text style={styles.profileDesc}>
-            Used for bodyweight strength exercise analytics like pull-ups, dips, and push-ups.
-          </Text>
-          <View style={styles.profileRow}>
-            <View style={styles.bodyweightInputShell}>
-              <TextInput
-                style={styles.bodyweightInput}
-                value={analyticsBodyweightText}
-                onChangeText={setAnalyticsBodyweightText}
-                onBlur={commitAnalyticsBodyweight}
-                onEndEditing={commitAnalyticsBodyweight}
-                placeholder="Not set"
-                placeholderTextColor={COLORS.TEXT_TERTIARY}
-                keyboardType="decimal-pad"
+              </View>
+            }
+          />
+          <View style={[UI.hairline, styles.divider]} />
+          <SettingsRow
+            icon={<RefreshCw size={20} color={COLORS.ACCENT_BLUE} />}
+            title="Preferred weight unit"
+            description="Used for new exercises"
+            right={
+              <SegmentedControl
+                compact
+                options={UNITS}
+                value={preferredWeightUnit}
+                onChange={setPreferredWeightUnit}
               />
-            </View>
+            }
+          />
+        </View>
+
+        <SectionLabel>Training profile</SectionLabel>
+        <View style={[UI.card, styles.profile]}>
+          <Text style={TYPE.body}>Analytics bodyweight</Text>
+          <Text style={TYPE.bodyMuted}>
+            Added to the load of bodyweight exercises like pull-ups, dips and push-ups.
+          </Text>
+          <View style={[UI.row, { gap: SPACE.sm + 2 }]}>
+            <TextInput
+              style={[UI.inset, styles.bodyweightInput]}
+              value={bodyweightText}
+              onChangeText={setBodyweightText}
+              onBlur={commitBodyweight}
+              placeholder="Not set"
+              placeholderTextColor={COLORS.TEXT_TERTIARY}
+              keyboardType="decimal-pad"
+            />
             <Pressable
               onPress={toggleAnalyticsBodyweightUnit}
-              style={({ pressed }) => [
-                styles.unitToggle,
-                pressed && { opacity: 0.86, transform: [{ scale: 0.98 }] },
-              ]}
+              style={({ pressed }) => [styles.unitToggle, pressed && UI.pressed]}
             >
-              <Text style={styles.unitToggleText}>{analyticsBodyweightUnit.toUpperCase()}</Text>
+              <Text style={[TYPE.mono, { color: COLORS.ACCENT_BLUE }]}>
+                {analyticsBodyweightUnit.toUpperCase()}
+              </Text>
             </Pressable>
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>Data Management</Text>
-        <View style={[UI.SHARED.card, { padding: 0 }]}>
-          <Pressable
-            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
-            onPress={handleExport}
-          >
-            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
-              <Download size={20} color={COLORS.ACCENT_BLUE} />
-            </View>
-            <View style={styles.optionText}>
-              <Text style={styles.optionLabel}>Export Backup (JSON)</Text>
-              <Text style={styles.optionDesc}>Copies all your data to clipboard</Text>
-            </View>
-            <Share2 size={18} color={COLORS.TEXT_TERTIARY} />
-          </Pressable>
-
-          <View style={styles.divider} />
-
-          <Pressable
-            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
-            onPress={handleHardReset}
-          >
-            <View style={[styles.iconBox, { backgroundColor: "rgba(239, 68, 68, 0.1)" }]}>
-              <ShieldAlert size={20} color={COLORS.DANGER} />
-            </View>
-            <View style={styles.optionText}>
-              <Text style={[styles.optionLabel, { color: COLORS.DANGER }]}>Hard Reset & Sync</Text>
-              <Text style={styles.optionDesc}>Wipe local cache and pull from DB</Text>
-            </View>
-            <Database size={18} color={COLORS.TEXT_TERTIARY} />
-          </Pressable>
+        <SectionLabel>Data</SectionLabel>
+        <View style={[UI.card, styles.group]}>
+          <SettingsRow
+            icon={<Download size={20} color={COLORS.ACCENT_BLUE} />}
+            title="Export as JSON"
+            description="Copy every routine and session to the clipboard"
+            onPress={() => void handleExport()}
+            right={<Database size={18} color={COLORS.TEXT_TERTIARY} />}
+          />
         </View>
 
-        <Text style={styles.infoText}>
-          Gym Tracking App v1.0.0{"\n"}
-          Offline-first architecture with granular deep merging.
+        <Text style={[TYPE.caption, styles.footer]}>
+          {sessionCount} sessions stored locally.{"\n"}Local first; the cloud is a backup.
         </Text>
       </ScrollView>
     </View>
@@ -305,179 +273,53 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG,
-  },
-  header: {
-    paddingTop: UI.HEADER_TOP - 10,
-    paddingHorizontal: UI.LAYOUT_PADDING,
-    paddingBottom: 16,
+  content: { paddingHorizontal: LAYOUT.gutter, paddingBottom: SPACE.xxxl },
+  group: { marginBottom: SPACE.xxl, overflow: "hidden" },
+  divider: { marginHorizontal: SPACE.md },
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: SPACE.sm + 2,
+    paddingVertical: SPACE.md,
+    paddingHorizontal: SPACE.md,
   },
-  headerTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: -1,
-    fontFamily: FONT_FAMILIES.MEDIUM,
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.item,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  content: {
-    paddingHorizontal: UI.LAYOUT_PADDING,
-  },
-  profileLabel: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  profileDesc: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 6,
-    marginBottom: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  profileRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  bodyweightInputShell: {
-    flex: 1,
-    minHeight: 54,
-    borderRadius: UI.RADIUS_CONTAINER,
-    backgroundColor: COLORS.BG,
+  togglePill: {
+    minWidth: 46,
+    paddingHorizontal: SPACE.sm + 2,
+    paddingVertical: SPACE.xs,
+    borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
-    paddingHorizontal: 16,
-    justifyContent: "center",
+    alignItems: "center",
   },
+  togglePillOn: { backgroundColor: SURFACE.blueTintStrong, borderColor: SURFACE.blueBorder },
+  profile: { padding: SPACE.lg, gap: SPACE.sm, marginBottom: SPACE.xxl },
   bodyweightInput: {
-    color: COLORS.TEXT_PRIMARY,
+    ...TYPE.mono,
     fontSize: 18,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    padding: 0,
+    flex: 1,
+    minHeight: 54,
+    paddingHorizontal: SPACE.lg,
+    backgroundColor: COLORS.BG,
+    borderColor: COLORS.BORDER_LIGHT,
+    borderRadius: RADIUS.container,
   },
   unitToggle: {
     minWidth: 72,
     minHeight: 54,
-    borderRadius: UI.RADIUS_CONTAINER,
-    backgroundColor: "rgba(11, 130, 255, 0.08)",
+    borderRadius: RADIUS.container,
+    backgroundColor: SURFACE.blueTint,
     borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.18)",
+    borderColor: SURFACE.blueBorder,
     alignItems: "center",
     justifyContent: "center",
   },
-  unitToggleText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 15,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    letterSpacing: 0.6,
-  },
-  sectionLabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    marginBottom: 6,
-    marginLeft: 4,
-  },
-  option: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  pressed: {
-    backgroundColor: COLORS.CARD_HOVER,
-  },
-  iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: UI.RADIUS_ITEM,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  optionText: {
-    flex: 1,
-  },
-  optionLabel: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontWeight: "700",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  optionDesc: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    marginTop: 0,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    marginHorizontal: 12,
-  },
-  togglePill: {
-    minWidth: 46,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: UI.RADIUS_HUD,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  togglePillActive: {
-    backgroundColor: "rgba(11, 130, 255, 0.2)",
-    borderColor: "rgba(11, 130, 255, 0.4)",
-  },
-  toggleText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  toggleTextActive: {
-    color: COLORS.ACCENT_BLUE,
-  },
-  unitToggleGroup: {
-    flexDirection: "row",
-    backgroundColor: COLORS.BG,
-    borderRadius: UI.RADIUS_ITEM,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-  },
-  unitBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: UI.RADIUS_ITEM,
-  },
-  unitBtnActive: {
-    backgroundColor: "rgba(11, 130, 255, 0.15)",
-  },
-  unitBtnText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  unitBtnTextActive: {
-    color: COLORS.ACCENT_BLUE,
-  },
-  infoText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 40,
-    lineHeight: 18,
-  },
+  footer: { textAlign: "center", marginTop: SPACE.lg, lineHeight: 18 },
 });

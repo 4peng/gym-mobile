@@ -1,9 +1,8 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Menu, X, Check, ChevronLeft, ChevronRight } from "lucide-react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Check, ChevronLeft, ChevronRight, Menu, X } from "lucide-react-native";
+import { COLORS, LAYOUT, SPACE, TYPE, UI } from "@/constants/theme";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface HUDPillNavProps {
   activeIndex: number;
@@ -15,6 +14,7 @@ interface HUDPillNavProps {
   onNextPress: () => void;
 }
 
+/** Floating bottom bar of the live workout: menu, discard, pager, finish. */
 export const HUDPillNav = React.memo(function HUDPillNav({
   activeIndex,
   totalExercises,
@@ -24,60 +24,43 @@ export const HUDPillNav = React.memo(function HUDPillNav({
   onPrevPress,
   onNextPress,
 }: HUDPillNavProps) {
+  const atStart = activeIndex <= 0;
+  const atEnd = activeIndex >= totalExercises - 1;
   return (
-    <View style={[UI.SHARED.hudPill, styles.pillNav]}>
-      <Pressable style={UI.SHARED.iconBtn} onPress={onMenuPress}>
+    <View style={[UI.hudPill, UI.shadow, styles.pill]}>
+      <IconButton onPress={onMenuPress}>
         <Menu size={20} color={COLORS.TEXT_PRIMARY} />
-      </Pressable>
-
-      <Pressable style={UI.SHARED.dangerBtn} onPress={onDiscardPress}>
+      </IconButton>
+      <IconButton tone="danger" onPress={onDiscardPress}>
         <X size={20} color={COLORS.DANGER} strokeWidth={3} />
-      </Pressable>
+      </IconButton>
 
-      <View style={styles.pillPagination}>
-        <Pressable onPress={onPrevPress} disabled={activeIndex <= 0}>
-          <ChevronLeft
-            size={24}
-            color={activeIndex <= 0 ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY}
-          />
+      <View style={styles.pager}>
+        <Pressable onPress={onPrevPress} disabled={atStart} hitSlop={8}>
+          <ChevronLeft size={24} color={atStart ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY} />
         </Pressable>
-        <Text style={styles.paginationText}>
+        <Text style={styles.pagerText}>
           {activeIndex + 1} / {totalExercises || 1}
         </Text>
-        <Pressable onPress={onNextPress} disabled={activeIndex >= totalExercises - 1}>
-          <ChevronRight
-            size={24}
-            color={activeIndex >= totalExercises - 1 ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY}
-          />
+        <Pressable onPress={onNextPress} disabled={atEnd} hitSlop={8}>
+          <ChevronRight size={24} color={atEnd ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY} />
         </Pressable>
       </View>
 
-      <Pressable style={UI.SHARED.actionBtn} onPress={onFinishPress}>
+      <IconButton tone="success" onPress={onFinishPress}>
         <Check size={20} color={COLORS.ACCENT_GREEN} strokeWidth={3} />
-      </Pressable>
+      </IconButton>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  pillNav: {
+  pill: {
     position: "absolute",
-    bottom: 40,
-    left: 20,
-    right: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    bottom: SPACE.xxxl + SPACE.sm,
+    left: LAYOUT.gutter + SPACE.xs,
+    right: LAYOUT.gutter + SPACE.xs,
   },
-  pillPagination: { flexDirection: "row", alignItems: "center", gap: 12 },
-  paginationText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-    minWidth: 50,
-    textAlign: "center",
-  },
+  pager: { flexDirection: "row", alignItems: "center", gap: SPACE.md },
+  pagerText: { ...TYPE.mono, minWidth: 50, textAlign: "center" },
 });

@@ -1,34 +1,38 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import { zustandAsyncStorage } from "@/storage/mmkv";
+import { zustandAsyncStorage } from "@/storage/asyncStorage";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
-import { nextLocalUpdatedAt } from "@/utils/timestamps";
 import type { Program, ProgramExercise } from "@/types";
 import { normalizeExercises } from "@/shared/programs.js";
 
-const PROGRAM_STORE_VERSION = 6;
+const STORE_VERSION = 7;
 
 interface ProgramState {
   programs: Program[];
-  deletedProgramIds: string[];
+  /** Programs changed locally and not yet backed up. */
   dirtyProgramIds: string[];
-  isDirty: boolean;
-  lastSyncedAt: number | null;
+  /** Programs deleted locally and not yet deleted in the cloud. */
+  deletedProgramIds: string[];
 }
 
 interface ProgramActions {
   addProgram: (name: string, exercises: ProgramExercise[]) => void;
-  updateProgram: (id: string, updates: Partial<Program>) => void;
+  updateProgram: (
+    id: string,
+    updates: Partial<Pick<Program, "name" | "exercises" | "pinned">>,
+  ) => void;
   deleteProgram: (id: string) => void;
   togglePin: (id: string) => void;
   renameExerciseDefinitionReferences: (exerciseDefinitionId: string, nextName: string) => void;
   removeExerciseDefinitionReferences: (exerciseDefinitionId: string) => void;
   getProgramById: (id: string) => Program | undefined;
+  /** Replaces every program (cloud restore); nothing is left pending. */
+  importPrograms: (programs: Program[]) => void;
   clearDeletedPrograms: (ids: string[]) => void;
+  /** Clears push bookkeeping, keeping any id edited after `pushedAt`. */
   clearDirtyPrograms: (ids: string[], pushedAt: number) => void;
-  applySyncMerge: (remote: Program[], syncStartTime: number) => void;
 }
 
 function normalizeProgram(raw: unknown): Program {
@@ -45,232 +49,149 @@ function normalizeProgram(raw: unknown): Program {
     createdAt: typeof r?.createdAt === "string" ? r.createdAt : new Date().toISOString(),
     updatedAt:
       typeof r?.updatedAt === "number" && Number.isFinite(r.updatedAt) ? r.updatedAt : Date.now(),
-    deletedAt: typeof r?.deletedAt === "number" || r?.deletedAt === null ? r.deletedAt : undefined,
   };
 }
 
-/** Applies `mutate` to every exercise of every live program; dirties the ones that changed. */
+const addUnique = (list: string[], id: string) => {
+  if (!list.includes(id)) list.push(id);
+};
+
+/** Applies `mutate` to every exercise of every program; dirties the ones that changed. */
 function rewriteProgramExerciseRefs(
   state: ProgramState,
-  updatedAt: number,
   mutate: (exercise: ProgramExercise) => boolean,
 ) {
   state.programs.forEach((program) => {
-    if (program.deletedAt) return; // don't re-dirty tombstoned programs
     let changed = false;
     program.exercises.forEach((ex) => {
       if (mutate(ex)) changed = true;
     });
     if (!changed) return;
-    program.updatedAt = updatedAt;
-    // syncPrograms pushes strictly by dirtyProgramIds; an updatedAt bump alone never syncs.
-    if (!state.dirtyProgramIds.includes(program._id)) state.dirtyProgramIds.push(program._id);
-    state.isDirty = true;
+    program.updatedAt = Date.now();
+    addUnique(state.dirtyProgramIds, program._id);
   });
 }
 
 export const useProgramStore = create<ProgramState & ProgramActions>()(
   persist(
-    immer((set, get) => ({
-      programs: [],
-      deletedProgramIds: [],
-      dirtyProgramIds: [],
-      isDirty: false,
-      lastSyncedAt: null,
-
-      addProgram: (name, exercises) => {
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        const newProgram: Program = {
-          _id: generateId(),
-          userId: USER_ID,
-          name,
-          exercises,
-          createdAt: new Date().toISOString(),
-          updatedAt,
-        };
-        set((state) => {
-          state.programs.push(newProgram);
-          if (!state.dirtyProgramIds.includes(newProgram._id)) {
-            state.dirtyProgramIds.push(newProgram._id);
-          }
-          state.isDirty = true;
-        });
-      },
-
-      updateProgram: (id, updates) => {
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        set((state) => {
-          const index = state.programs.findIndex((p) => p._id === id);
-          if (index !== -1) {
-            const current = state.programs[index];
-            if (updates.name !== undefined) current.name = updates.name;
-            if (updates.exercises !== undefined) current.exercises = updates.exercises;
-            if (updates.pinned !== undefined) current.pinned = updates.pinned;
-            current.updatedAt = updatedAt;
-            if (!state.dirtyProgramIds.includes(id)) {
-              state.dirtyProgramIds.push(id);
-            }
-            state.isDirty = true;
-          }
-        });
-      },
-
-      deleteProgram: (id) => {
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
+    immer((set, get) => {
+      const withProgram = (id: string, recipe: (program: Program) => void) =>
         set((state) => {
           const program = state.programs.find((p) => p._id === id);
-          if (program) {
-            program.deletedAt = updatedAt;
-            program.updatedAt = updatedAt;
-          }
-          if (!state.deletedProgramIds.includes(id)) {
-            state.deletedProgramIds.push(id);
-          }
-          state.dirtyProgramIds = state.dirtyProgramIds.filter((dirtyId) => dirtyId !== id);
-          state.isDirty = true;
+          if (!program) return;
+          recipe(program);
+          program.updatedAt = Date.now();
+          addUnique(state.dirtyProgramIds, id);
         });
-      },
 
-      togglePin: (id) => {
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        set((state) => {
-          const program = state.programs.find((p) => p._id === id);
-          if (program) {
-            program.pinned = !program.pinned;
-            program.updatedAt = updatedAt;
-            if (!state.dirtyProgramIds.includes(id)) {
-              state.dirtyProgramIds.push(id);
-            }
-            state.isDirty = true;
-          }
-        });
-      },
+      return {
+        programs: [],
+        dirtyProgramIds: [],
+        deletedProgramIds: [],
 
-      renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
-        const defId = String(exerciseDefinitionId).trim();
-        const name = String(nextName).trim();
-        if (!defId || !name) return;
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        set((state) =>
-          rewriteProgramExerciseRefs(state, updatedAt, (ex) => {
-            if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
-            ex.name = name;
-            return true;
-          }),
-        );
-      },
-
-      removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
-        const defId = String(exerciseDefinitionId).trim();
-        if (!defId) return;
-        const updatedAt = nextLocalUpdatedAt(get().lastSyncedAt);
-        set((state) =>
-          rewriteProgramExerciseRefs(state, updatedAt, (ex) => {
-            if (ex.exerciseDefinitionId !== defId) return false;
-            ex.exerciseDefinitionId = "";
-            return true;
-          }),
-        );
-      },
-
-      getProgramById: (id) => {
-        return get().programs.find((p) => p._id === id && !p.deletedAt);
-      },
-
-      clearDeletedPrograms: (ids) => {
-        set((state) => {
-          state.deletedProgramIds = state.deletedProgramIds.filter((id) => !ids.includes(id));
-          state.programs = state.programs.filter((p) => !ids.includes(p._id) || !p.deletedAt);
-        });
-      },
-
-      clearDirtyPrograms: (ids, pushedAt) => {
-        set((state) => {
-          if (ids.length === 0) return;
-          state.dirtyProgramIds = state.dirtyProgramIds.filter((id) => {
-            if (!ids.includes(id)) return true;
-            const program = state.programs.find((p) => p._id === id);
-            // Keep the id dirty if it was edited again after the snapshot we
-            // just pushed — otherwise that later edit would never get pushed.
-            return !!program && program.updatedAt > pushedAt;
+        addProgram: (name, exercises) => {
+          const program: Program = {
+            _id: generateId(),
+            userId: USER_ID,
+            name,
+            exercises,
+            createdAt: new Date().toISOString(),
+            updatedAt: Date.now(),
+          };
+          set((state) => {
+            state.programs.push(program);
+            addUnique(state.dirtyProgramIds, program._id);
           });
-          state.isDirty = state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
-        });
-      },
+        },
 
-      applySyncMerge: (remote, syncStartTime) => {
-        set((state) => {
-          if (remote.length === 0) {
-            state.lastSyncedAt = syncStartTime;
-            state.isDirty = state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
-            return;
-          }
+        updateProgram: (id, updates) =>
+          withProgram(id, (program) => {
+            if (updates.name !== undefined) program.name = updates.name;
+            if (updates.exercises !== undefined) program.exercises = updates.exercises;
+            if (updates.pinned !== undefined) program.pinned = updates.pinned;
+          }),
 
-          const remoteMap = new Map(remote.map((p) => [p._id, p]));
-          let historyChanged = false;
+        deleteProgram: (id) =>
+          set((state) => {
+            state.programs = state.programs.filter((p) => p._id !== id);
+            state.dirtyProgramIds = state.dirtyProgramIds.filter((d) => d !== id);
+            addUnique(state.deletedProgramIds, id);
+          }),
 
-          for (let i = 0; i < state.programs.length; i++) {
-            const lp = state.programs[i];
-            const rp = remoteMap.get(lp._id);
+        togglePin: (id) =>
+          withProgram(id, (program) => {
+            program.pinned = !program.pinned;
+          }),
 
-            if (rp) {
-              const winner = lp.updatedAt >= rp.updatedAt ? lp : rp;
-              state.programs[i] = winner;
-              remoteMap.delete(lp._id);
-              historyChanged = true;
-            }
-          }
+        renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
+          const defId = String(exerciseDefinitionId).trim();
+          const name = String(nextName).trim();
+          if (!defId || !name) return;
+          set((state) =>
+            rewriteProgramExerciseRefs(state, (ex) => {
+              if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
+              ex.name = name;
+              return true;
+            }),
+          );
+        },
 
-          if (remoteMap.size > 0) {
-            for (const rp of remoteMap.values()) {
-              if (!rp.deletedAt) {
-                state.programs.push(rp);
-                historyChanged = true;
-              }
-            }
-          }
+        removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
+          const defId = String(exerciseDefinitionId).trim();
+          if (!defId) return;
+          set((state) =>
+            rewriteProgramExerciseRefs(state, (ex) => {
+              if (ex.exerciseDefinitionId !== defId) return false;
+              ex.exerciseDefinitionId = "";
+              return true;
+            }),
+          );
+        },
 
-          if (historyChanged) {
-            state.programs = state.programs.filter((p) => !p.deletedAt);
-          }
+        getProgramById: (id) => get().programs.find((p) => p._id === id),
 
-          state.lastSyncedAt = syncStartTime;
-          state.isDirty = state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
-        });
-      },
-    })),
+        importPrograms: (programs) =>
+          set((state) => {
+            state.programs = programs.map(normalizeProgram);
+            state.dirtyProgramIds = [];
+            state.deletedProgramIds = [];
+          }),
+
+        clearDeletedPrograms: (ids) =>
+          set((state) => {
+            state.deletedProgramIds = state.deletedProgramIds.filter((id) => !ids.includes(id));
+          }),
+
+        clearDirtyPrograms: (ids, pushedAt) => {
+          if (ids.length === 0) return;
+          set((state) => {
+            state.dirtyProgramIds = state.dirtyProgramIds.filter((id) => {
+              if (!ids.includes(id)) return true;
+              const program = state.programs.find((p) => p._id === id);
+              return !!program && program.updatedAt > pushedAt;
+            });
+          });
+        },
+      };
+    }),
     {
       name: "program-store",
       storage: createJSONStorage(() => zustandAsyncStorage),
-      version: PROGRAM_STORE_VERSION,
+      version: STORE_VERSION,
+      // v7 dropped tombstones (deletedAt) and the sync watermark; a pending
+      // delete is only ever an id in deletedProgramIds now.
       migrate: (persistedState) => {
-        const state = persistedState as Partial<ProgramState> | undefined;
-        const programs = Array.isArray(state?.programs)
-          ? state!.programs.map(normalizeProgram)
+        const s = persistedState as Partial<ProgramState & { lastSyncedAt?: number }> | undefined;
+        const ids = (v: unknown) => (Array.isArray(v) ? v.map(String).filter(Boolean) : []);
+        const programs = Array.isArray(s?.programs)
+          ? (s!.programs as unknown[])
+              .filter((p) => !(p as { deletedAt?: unknown })?.deletedAt)
+              .map(normalizeProgram)
           : [];
-        const deletedProgramIds = Array.isArray(state?.deletedProgramIds)
-          ? state!.deletedProgramIds.map((id) => String(id)).filter((id) => id.length > 0)
-          : [];
-        const lastSyncedAt =
-          typeof state?.lastSyncedAt === "number" && Number.isFinite(state.lastSyncedAt)
-            ? state.lastSyncedAt
-            : null;
-        // dirtyProgramIds was introduced in v6. When upgrading from an older
-        // persisted state that predates it, backfill from the previous
-        // watermark criterion (updatedAt > lastSyncedAt) so a pending offline
-        // edit made on the old build is not silently dropped at the version
-        // boundary (syncPrograms now pushes strictly by dirtyProgramIds).
-        const dirtyProgramIds = Array.isArray(state?.dirtyProgramIds)
-          ? state!.dirtyProgramIds.map((id) => String(id)).filter((id) => id.length > 0)
-          : programs
-              .filter((p) => !p.deletedAt && p.updatedAt > (lastSyncedAt || 0))
-              .map((p) => p._id);
         return {
           programs,
-          deletedProgramIds,
-          dirtyProgramIds,
-          isDirty: dirtyProgramIds.length > 0 || deletedProgramIds.length > 0,
-          lastSyncedAt,
+          dirtyProgramIds: ids(s?.dirtyProgramIds),
+          deletedProgramIds: ids(s?.deletedProgramIds),
         } as ProgramState;
       },
     },

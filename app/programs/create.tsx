@@ -1,4 +1,4 @@
-import ProgramEditorScreen from "@/src/screens/ProgramEditorScreen";
+import ProgramEditorScreen from "@/screens/ProgramEditorScreen";
 
 export default function CreateProgramPage() {
   return <ProgramEditorScreen variant="create" />;

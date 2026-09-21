@@ -1,20 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSheet } from "@/hooks/useSheet";
-import { Pressable, StyleSheet, Text, View, Animated, Dimensions } from "react-native";
-import { X, Plus, Menu } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
+import { Menu, Plus, X } from "lucide-react-native";
 import DraggableFlatList, {
+  type RenderItemParams,
   ScaleDecorator,
-  RenderItemParams,
 } from "react-native-draggable-flatlist";
 import { useShallow } from "zustand/react/shallow";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { HapticFeedback } from "@/utils/haptics";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { Swipeable } from "@/components/Swipeable";
-
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+import { Sheet } from "@/components/ui/Sheet";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface ExerciseMeta {
   id: string;
@@ -40,20 +37,21 @@ const NavMenuItem = React.memo(function NavMenuItem({
 }) {
   return (
     <ScaleDecorator>
-      <Swipeable onDelete={() => onDelete(item.id)} borderRadius={UI.RADIUS_ITEM} marginBottom={0}>
+      <Swipeable onDelete={() => onDelete(item.id)} borderRadius={RADIUS.item} marginBottom={0}>
         <Pressable
           onPress={() => onPress(item.id)}
           onLongPress={drag}
           delayLongPress={200}
           disabled={isActive}
           style={[
-            styles.navMenuItem,
-            isFocused && styles.navMenuItemActive,
-            isActive && styles.navMenuItemDragging,
+            UI.inset,
+            styles.item,
+            isFocused && styles.itemFocused,
+            isActive && styles.itemDragging,
           ]}
         >
-          <Text style={styles.navMenuIndex}>{(index + 1).toString().padStart(2, "0")}</Text>
-          <Text style={[styles.navMenuName, isFocused && { color: COLORS.ACCENT_BLUE }]}>
+          <Text style={TYPE.monoSmall}>{String(index + 1).padStart(2, "0")}</Text>
+          <Text style={[TYPE.mono, styles.itemName, isFocused && { color: COLORS.ACCENT_BLUE }]}>
             {item.name.toUpperCase()}
           </Text>
           <Menu size={14} color={COLORS.TEXT_TERTIARY} />
@@ -63,19 +61,22 @@ const NavMenuItem = React.memo(function NavMenuItem({
   );
 });
 
+interface ExerciseNavMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  activeExerciseId: string | null;
+  onSelect: (id: string) => void;
+  onAddPress: () => void;
+}
+
+/** Bottom sheet listing the session's exercises: tap to jump, drag to reorder, swipe to remove. */
 export default function ExerciseNavMenu({
   visible,
   onClose,
   activeExerciseId,
   onSelect,
   onAddPress,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  activeExerciseId: string | null;
-  onSelect: (id: string) => void;
-  onAddPress: () => void;
-}) {
+}: ExerciseNavMenuProps) {
   const exerciseIds = useWorkoutSessionStore(
     useShallow((s) => s.activeSession?.exercises.map((e) => e.id) ?? []),
   );
@@ -84,25 +85,16 @@ export default function ExerciseNavMenu({
   );
   const reorderExercises = useWorkoutSessionStore((s) => s.reorderExercises);
   const removeExercise = useWorkoutSessionStore((s) => s.removeExercise);
-  const localExercises = useMemo(
+
+  const exercises = useMemo(
     () => exerciseIds.map((id, i) => ({ id, name: exerciseNames[i] })),
     [exerciseIds, exerciseNames],
   );
-  const [dragList, setDragList] = useState<ExerciseMeta[]>(localExercises);
-  const { mounted, progress } = useSheet(visible);
+  const [dragList, setDragList] = useState<ExerciseMeta[]>(exercises);
   useEffect(() => {
-    if (visible) setDragList(localExercises);
-  }, [visible, localExercises]);
-  const handleDragEnd = useCallback(
-    ({ data }: { data: ExerciseMeta[] }) => {
-      setDragList(data);
-      setTimeout(() => {
-        reorderExercises(data.map((ex) => ex.id));
-        HapticFeedback.success();
-      }, 0);
-    },
-    [reorderExercises],
-  );
+    if (visible) setDragList(exercises);
+  }, [visible, exercises]);
+
   const handleDelete = useCallback(
     (id: string) => {
       removeExercise(id);
@@ -110,147 +102,83 @@ export default function ExerciseNavMenu({
     },
     [removeExercise],
   );
+
   const renderItem = useCallback(
-    ({ item, drag, isActive, getIndex }: RenderItemParams<ExerciseMeta>) => {
-      const index = getIndex();
-      return (
-        <NavMenuItem
-          item={item}
-          index={index ?? 0}
-          drag={drag}
-          isActive={isActive}
-          isFocused={item.id === activeExerciseId}
-          onPress={(id) => {
-            onSelect(id);
-            onClose();
-          }}
-          onDelete={handleDelete}
-        />
-      );
-    },
+    ({ item, drag, isActive, getIndex }: RenderItemParams<ExerciseMeta>) => (
+      <NavMenuItem
+        item={item}
+        index={getIndex() ?? 0}
+        drag={drag}
+        isActive={isActive}
+        isFocused={item.id === activeExerciseId}
+        onPress={(id) => {
+          onSelect(id);
+          onClose();
+        }}
+        onDelete={handleDelete}
+      />
+    ),
     [activeExerciseId, onSelect, onClose, handleDelete],
   );
-  if (!mounted) return null;
-  const backdropOpacity = progress;
-  const sheetTranslateY = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [SCREEN_HEIGHT * 0.8, 0],
-  });
+
   return (
-    <View style={styles.absoluteContainer} pointerEvents="box-none">
-      <Animated.View style={[styles.modalBackdrop, { opacity: backdropOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
-      <Animated.View
-        style={[styles.navMenuSheet, { transform: [{ translateY: sheetTranslateY }] }]}
-      >
-        <View style={styles.navMenuHeader}>
-          <Text style={styles.navMenuTitle}>EXERCISES</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
-            <X size={20} color={COLORS.DANGER} />
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Exercises"
+      headerRight={
+        <IconButton size="md" ghost onPress={onClose}>
+          <X size={20} color={COLORS.DANGER} />
+        </IconButton>
+      }
+    >
+      <DraggableFlatList
+        data={dragList}
+        keyExtractor={(item) => item.id}
+        onDragEnd={({ data }) => {
+          setDragList(data);
+          setTimeout(() => {
+            reorderExercises(data.map((e) => e.id));
+            HapticFeedback.success();
+          }, 0);
+        }}
+        onDragBegin={() => HapticFeedback.light()}
+        activationDistance={15}
+        contentContainerStyle={styles.list}
+        renderItem={renderItem}
+        ListFooterComponent={
+          <Pressable
+            style={({ pressed }) => [styles.addBtn, pressed && UI.pressed]}
+            onPress={() => {
+              onClose();
+              onAddPress();
+            }}
+          >
+            <Plus size={16} color={COLORS.ACCENT_GREEN} />
+            <Text style={[TYPE.label, { color: COLORS.ACCENT_GREEN }]}>Add new exercise</Text>
           </Pressable>
-        </View>
-        <DraggableFlatList
-          data={dragList}
-          keyExtractor={(item) => item.id}
-          onDragEnd={handleDragEnd}
-          onDragBegin={() => HapticFeedback.light()}
-          activationDistance={15}
-          contentContainerStyle={styles.navMenuList}
-          renderItem={renderItem}
-          ListFooterComponent={
-            <Pressable
-              style={styles.navMenuAddBtn}
-              onPress={() => {
-                onClose();
-                onAddPress();
-              }}
-            >
-              <Plus size={16} color={COLORS.ACCENT_GREEN} />
-              <Text style={styles.navMenuAddText}>ADD NEW EXERCISE</Text>
-            </Pressable>
-          }
-        />
-      </Animated.View>
-    </View>
+        }
+      />
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  absoluteContainer: { ...StyleSheet.absoluteFillObject, zIndex: 9999, justifyContent: "flex-end" },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.75)" },
-  navMenuSheet: {
-    backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "80%",
-    paddingBottom: 40,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-  },
-  navMenuHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER,
-  },
-  navMenuTitle: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
-  navMenuList: { padding: 16, gap: 8 },
-  navMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: UI.RADIUS_ITEM,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    gap: 16,
-  },
-  navMenuItemActive: {
-    backgroundColor: "rgba(0, 122, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0, 122, 255, 0.2)",
-  },
-  navMenuItemDragging: {
-    backgroundColor: "rgba(0, 122, 255, 0.15)",
-    borderColor: COLORS.ACCENT_BLUE,
-    borderWidth: 1,
-  },
-  navMenuIndex: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-  },
-  navMenuName: {
-    flex: 1,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  navMenuAddBtn: {
+  list: { padding: SPACE.lg, gap: SPACE.sm },
+  item: { flexDirection: "row", alignItems: "center", padding: SPACE.lg, gap: SPACE.lg },
+  itemFocused: { backgroundColor: SURFACE.blueTint, borderColor: SURFACE.blueBorder },
+  itemDragging: { backgroundColor: SURFACE.blueTintStrong, borderColor: COLORS.ACCENT_BLUE },
+  itemName: { flex: 1 },
+  addBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    marginTop: 12,
-    padding: 16,
-    borderRadius: UI.RADIUS_ITEM,
+    gap: SPACE.sm + 2,
+    marginTop: SPACE.md,
+    padding: SPACE.lg,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
-    borderColor: "rgba(0, 255, 153, 0.2)",
+    borderColor: SURFACE.greenBorder,
     borderStyle: "dashed",
-  },
-  navMenuAddText: {
-    color: COLORS.ACCENT_GREEN,
-    fontSize: 12,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
   },
 });

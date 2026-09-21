@@ -2,61 +2,44 @@ import { useProgramStore } from "./programStore";
 import { useWorkoutSessionStore } from "./workoutSessionStore";
 import { useSyncStore } from "./syncStore";
 
-const SYNC_DEBOUNCE_MS = 750;
-let _cleanupSyncEffect: (() => void) | null = null;
+const DEBOUNCE_MS = 750;
+let cleanup: (() => void) | null = null;
 
-/**
- * Initializes listeners that trigger background syncs when local data changes.
- * This avoids circular dependencies by using a one-way subscription.
- */
+/** Pushes pending changes to the cloud shortly after anything becomes pending. Idempotent. */
 export function initSyncEffect() {
-  // Idempotent init to avoid duplicate subscriptions across remounts/hot reload.
-  if (_cleanupSyncEffect) return _cleanupSyncEffect;
+  if (cleanup) return cleanup;
 
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  const scheduleBackgroundSync = () => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null;
-      void useSyncStore.getState().backgroundSync();
-    }, SYNC_DEBOUNCE_MS);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const schedule = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      void useSyncStore.getState().pushPending();
+    }, DEBOUNCE_MS);
   };
 
-  const unsubscribePrograms = useProgramStore.subscribe((state, prevState) => {
-    const justBecameDirty = state.isDirty && !prevState.isDirty;
-    const changedWhileDirty =
-      state.isDirty &&
-      (state.programs !== prevState.programs ||
-        state.deletedProgramIds !== prevState.deletedProgramIds);
-
-    if (justBecameDirty || changedWhileDirty) {
-      scheduleBackgroundSync();
+  const unsubPrograms = useProgramStore.subscribe((s, prev) => {
+    if (
+      s.dirtyProgramIds !== prev.dirtyProgramIds ||
+      s.deletedProgramIds !== prev.deletedProgramIds
+    ) {
+      if (s.dirtyProgramIds.length + s.deletedProgramIds.length > 0) schedule();
+    }
+  });
+  const unsubWorkouts = useWorkoutSessionStore.subscribe((s, prev) => {
+    if (
+      s.dirtyWorkoutIds !== prev.dirtyWorkoutIds ||
+      s.deletedWorkoutIds !== prev.deletedWorkoutIds
+    ) {
+      if (s.dirtyWorkoutIds.length + s.deletedWorkoutIds.length > 0) schedule();
     }
   });
 
-  const unsubscribeWorkouts = useWorkoutSessionStore.subscribe((state, prevState) => {
-    const justBecameDirty = state.isDirty && !prevState.isDirty;
-    const changedWhileDirty =
-      state.isDirty &&
-      (state.history !== prevState.history ||
-        state.deletedWorkoutIds !== prevState.deletedWorkoutIds);
-
-    if (justBecameDirty || changedWhileDirty) {
-      scheduleBackgroundSync();
-    }
-  });
-
-  _cleanupSyncEffect = () => {
-    unsubscribePrograms();
-    unsubscribeWorkouts();
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-    }
-    _cleanupSyncEffect = null;
+  cleanup = () => {
+    unsubPrograms();
+    unsubWorkouts();
+    if (timer) clearTimeout(timer);
+    cleanup = null;
   };
-
-  return _cleanupSyncEffect;
+  return cleanup;
 }

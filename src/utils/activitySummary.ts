@@ -87,17 +87,24 @@ function toDurationMinutes(startedAt?: string, completedAt?: string) {
   return Math.max(0, Math.round((end - start) / 60000));
 }
 
+/** First instant included in the activity window for `mode`. */
+export function activityRangeStart(mode: ActivityPeriodMode, now: Date): Date {
+  return mode === "week"
+    ? startOfDay(shiftDays(now, -6))
+    : mode === "month"
+      ? startOfDay(shiftDays(now, -27))
+      : startOfMonth(new Date(now.getFullYear(), now.getMonth() - 11, 1));
+}
+
+/** Only the timestamps are needed; accepts full sessions or bare rows. */
+export type ActivitySession = Pick<WorkoutSession, "startedAt"> & { completedAt?: string };
+
 export function buildActivitySummary(
-  history: WorkoutSession[],
+  history: ActivitySession[],
   periodMode: ActivityPeriodMode,
   now: Date,
 ): ActivitySummary {
-  const rangeStart =
-    periodMode === "week"
-      ? startOfDay(shiftDays(now, -6))
-      : periodMode === "month"
-        ? startOfDay(shiftDays(now, -27))
-        : startOfMonth(new Date(now.getFullYear(), now.getMonth() - 11, 1));
+  const rangeStart = activityRangeStart(periodMode, now);
   const rangeEnd = periodMode === "year" ? endOfMonth(now) : endOfDay(now);
 
   const sessionsInRange = history.filter((session) => {

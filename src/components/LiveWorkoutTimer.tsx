@@ -1,39 +1,30 @@
-import React, { useState, useEffect } from "react";
-import { Text, StyleSheet, TextStyle } from "react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
+import { useEffect, useState } from "react";
+import { Text, type StyleProp, type TextStyle } from "react-native";
+import { COLORS, TYPE } from "@/constants/theme";
 import { formatClock } from "@/utils/conversions";
 
-interface LiveWorkoutTimerProps {
+/** Elapsed time since `startedAt`. Ticks once a second. */
+export default function LiveWorkoutTimer({
+  startedAt,
+  textStyle,
+}: {
   startedAt: string;
-  textStyle?: TextStyle;
-}
-
-export default function LiveWorkoutTimer({ startedAt, textStyle }: LiveWorkoutTimerProps) {
-  const [elapsed, setElapsed] = useState("");
+  textStyle?: StyleProp<TextStyle>;
+}) {
+  const [display, setDisplay] = useState("");
 
   useEffect(() => {
     const start = new Date(startedAt).getTime();
-
-    const updateTimer = () => {
-      const now = Date.now();
-      setElapsed(formatClock(Math.max(0, Math.floor((now - start) / 1000))));
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    const tick = () =>
+      setDisplay(formatClock(Math.max(0, Math.floor((Date.now() - start) / 1000))));
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [startedAt]);
 
-  return <Text style={[styles.timer, textStyle]}>{elapsed}</Text>;
+  return (
+    <Text style={[TYPE.mono, { color: COLORS.ACCENT_GREEN, letterSpacing: 1 }, textStyle]}>
+      {display}
+    </Text>
+  );
 }
-
-const styles = StyleSheet.create({
-  timer: {
-    color: COLORS.ACCENT_GREEN,
-    fontSize: 14,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
-    letterSpacing: 1,
-  },
-});

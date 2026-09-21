@@ -1,79 +1,46 @@
-import type { WorkoutSession, WorkoutSet, WorkoutExercise } from "@/types";
+import type { WorkoutSet, WorkoutExercise } from "@/types";
 import { convertWeight } from "./conversions";
-import { getExerciseIdentityKey, normalizeExerciseIdentityKey } from "./exerciseIdentity";
 
-/**
- * Placeholder values to show in the UI for a set whose weight/reps are null.
- * `null` means no placeholder is available (render empty).
- */
+/** Ghost values shown for a set whose weight/reps are still null. */
 export interface SetPlaceholder {
   weight: number | null;
   reps: number | null;
 }
 
 /**
- * Resolve visual placeholders for every set in an exercise, based on the
- * most recent completed workout AND the current session's progress (fill-forward).
- *
- * Rules:
- * 1. Start with the most recent record from history (positional mapping).
- * 2. If the user has entered a value for any set in the CURRENT session,
- *    that value "fills forward" and overrides history for all SUBSEQUENT sets
- *    that haven't been filled yet.
+ * Placeholders for every set of an exercise:
+ * 1. start from the most recent stored occurrence of the exercise (positional),
+ * 2. then a value typed into an earlier set in this session fills forward into
+ *    later, still-empty sets.
  */
 export function resolveExercisePlaceholders(
-  exerciseIdentityKey: string,
   currentSets: WorkoutSet[],
-  history: WorkoutSession[],
+  previous: WorkoutExercise | null,
   targetUnit: "kg" | "lbs" = "kg",
 ): SetPlaceholder[] {
-  const previousMatch = findMostRecentExercise(exerciseIdentityKey, history);
-  const previousSets = previousMatch?.sets || null;
-  const previousUnit = previousMatch?.weightUnit || "kg";
-  const currentSetCount = currentSets.length;
+  const previousSets = previous?.sets ?? [];
+  const previousUnit = previous?.weightUnit || "kg";
 
-  // 1. Initial pass: use history
-  const placeholders: SetPlaceholder[] = Array.from({ length: currentSetCount }, (_, i) => {
-    if (!previousSets || previousSets.length === 0) return { weight: null, reps: null };
-    const source =
-      i < previousSets.length ? previousSets[i] : previousSets[previousSets.length - 1];
-
-    return {
-      weight: convertWeight(source.weight, previousUnit, targetUnit),
-      reps: source.reps,
-    };
+  const placeholders: SetPlaceholder[] = currentSets.map((_, i) => {
+    if (previousSets.length === 0) return { weight: null, reps: null };
+    const source = previousSets[Math.min(i, previousSets.length - 1)];
+    return { weight: convertWeight(source.weight, previousUnit, targetUnit), reps: source.reps };
   });
 
-  // 2. Fill-forward pass: current entries override history for subsequent sets
   let lastWeight: number | null = null;
   let lastReps: number | null = null;
+  currentSets.forEach((current, i) => {
+    if (current.weight !== null) lastWeight = current.weight;
+    else if (lastWeight !== null) placeholders[i].weight = lastWeight;
 
-  for (let i = 0; i < currentSetCount; i++) {
-    const current = currentSets[i];
-
-    // If this set has a value, it becomes the new "fill-forward" value for the next sets.
-    if (current.weight !== null) {
-      lastWeight = current.weight;
-    } else if (lastWeight !== null) {
-      // If current is empty but we have a previous value, override the placeholder.
-      placeholders[i].weight = lastWeight;
-    }
-
-    if (current.reps !== null) {
-      lastReps = current.reps;
-    } else if (lastReps !== null) {
-      placeholders[i].reps = lastReps;
-    }
-  }
+    if (current.reps !== null) lastReps = current.reps;
+    else if (lastReps !== null) placeholders[i].reps = lastReps;
+  });
 
   return placeholders;
 }
 
-/**
- * When the user completes a set without editing, we must resolve the
- * placeholder into a concrete value. Returns the resolved weight/reps
- * pair; the caller should write them to the store before marking complete.
- */
+/** Concrete values to write when a set is completed without being edited. */
 export function resolveSetOnComplete(
   currentSet: WorkoutSet,
   placeholder: SetPlaceholder,
@@ -82,25 +49,4 @@ export function resolveSetOnComplete(
     weight: currentSet.weight ?? placeholder.weight ?? 0,
     reps: currentSet.reps ?? placeholder.reps ?? 0,
   };
-}
-
-// ──────────────────────────────────────────────
-// Internal helpers
-// ──────────────────────────────────────────────
-
-/**
- * Walk through completed history (already sorted newest-first) and return
- * the first matching exercise.
- */
-function findMostRecentExercise(
-  exerciseIdentityKey: string,
-  history: WorkoutSession[],
-): WorkoutExercise | null {
-  const normalizedTargetKey = normalizeExerciseIdentityKey(exerciseIdentityKey);
-  for (const session of history) {
-    if (!session.completedAt) continue; // skip incomplete
-    const match = session.exercises.find((e) => getExerciseIdentityKey(e) === normalizedTargetKey);
-    if (match) return match;
-  }
-  return null;
 }

@@ -1,37 +1,35 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  View,
+  LayoutAnimation,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  Pressable,
-  StyleSheet,
-  LayoutAnimation,
-  ScrollView,
-  Dimensions,
+  View,
 } from "react-native";
 import {
-  Trash2,
+  Activity,
+  Check,
   Clock,
-  StickyNote,
   Dumbbell,
   Plus,
-  Check,
-  User,
-  Activity,
+  StickyNote,
   Timer,
+  Trash2,
+  User,
 } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { useShallow } from "zustand/react/shallow";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
-import type { WorkoutExercise, ExerciseDefinition, ExerciseTrackingMode } from "@/types";
+import { workoutRepo } from "@/db";
+import { useDbQuery } from "@/db/dbVersion";
+import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import type { ExerciseDefinition, ExerciseTrackingMode, WorkoutExercise } from "@/types";
 import { resolveExercisePlaceholders, type SetPlaceholder } from "@/utils/placeholders";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "@/components/RestTimerPicker";
 import { showConfirm } from "@/utils/alerts";
 import { HapticFeedback } from "@/utils/haptics";
-import { SetRow } from "./SetRow";
+import { SetRow, SET_ROW_LAYOUT } from "./SetRow";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
 import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
 import { getTrackingModeLabel } from "@/utils/exerciseTracking";
@@ -39,157 +37,126 @@ import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelec
 import { formatMuscleLabels } from "@/constants/muscles";
 import ExerciseHistoryGraph from "./ExerciseHistoryGraph";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const PAGE_WIDTH = LAYOUT.screenWidth - LAYOUT.gutter * 2;
+const TRACKING_ICON = { strength: Dumbbell, timed: Timer, cardio: Activity } as const;
 
 interface ExerciseCardProps {
   exercise: WorkoutExercise;
-  onMusclePickerOpen?: (exerciseId: string) => void;
+  onMusclePickerOpen: (exerciseId: string) => void;
 }
 
+/** One exercise of the live session: header, instrument bar, then SETS / HISTORY pager. */
 export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard({
   exercise,
   onMusclePickerOpen,
 }) {
   const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
   const [trackingPickerVisible, setTrackingPickerVisible] = useState(false);
-  const [trackingAnchor, setTrackingAnchor] = useState<
-    { x: number; y: number; width: number; height: number } | undefined
-  >();
+  const [trackingAnchor, setTrackingAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>();
   const [restPickerVisible, setRestPickerVisible] = useState(false);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [activeTab, setActiveTab] = useState<"SETS" | "HISTORY">("SETS");
   const pagerRef = useRef<ScrollView>(null);
   const trackingSegmentRef = useRef<View>(null);
+
   const addSet = useWorkoutSessionStore((s) => s.addSet);
   const removeExercise = useWorkoutSessionStore((s) => s.removeExercise);
   const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
   const toggleExerciseUnit = useWorkoutSessionStore((s) => s.toggleExerciseUnit);
   const toggleExerciseBodyweight = useWorkoutSessionStore((s) => s.toggleExerciseBodyweight);
   const selectExerciseDefinition = useWorkoutSessionStore((s) => s.selectExerciseDefinition);
-  const history = useWorkoutSessionStore(useShallow((s) => s.history));
-  const handleRestSave = useCallback(
-    (seconds: number) => {
-      updateExerciseField(exercise.id, "restSeconds", seconds);
-    },
-    [exercise.id, updateExerciseField],
-  );
-  const handleExerciseSelect = useCallback(
-    (selectedExercise: ExerciseDefinition) => {
-      selectExerciseDefinition(exercise.id, selectedExercise);
-    },
-    [exercise.id, selectExerciseDefinition],
-  );
-  const handleNotesChange = useCallback(
-    (text: string) => {
-      updateExerciseField(exercise.id, "notes", text);
-    },
-    [exercise.id, updateExerciseField],
-  );
-  const handleTrackingModeChange = useCallback(
-    (trackingMode: ExerciseTrackingMode) => {
-      updateExerciseField(exercise.id, "trackingMode", trackingMode);
-    },
-    [exercise.id, updateExerciseField],
-  );
-  const handleShowTrackingPicker = () => {
-    trackingSegmentRef.current?.measureInWindow((x, y, width, height) => {
-      setTrackingAnchor({ x, y, width, height });
-      setTrackingPickerVisible(true);
-    });
-  };
-  const exerciseIdentityKey = getExerciseIdentityKey(exercise);
+
+  const identityKey = getExerciseIdentityKey(exercise);
+  const previous = useDbQuery(() => workoutRepo.latestExercise(identityKey), [identityKey]);
+
+  // Positional identity is kept stable so unaffected SetRows (React.memo) skip re-rendering.
   const lastPlaceholdersRef = useRef<SetPlaceholder[]>([]);
   const placeholders = useMemo(() => {
     const next =
       exercise.trackingMode === "strength"
-        ? resolveExercisePlaceholders(
-            exerciseIdentityKey,
-            exercise.sets,
-            history,
-            exercise.weightUnit || "kg",
-          )
+        ? resolveExercisePlaceholders(exercise.sets, previous, exercise.weightUnit || "kg")
         : [];
     const prev = lastPlaceholdersRef.current;
-    // Keep positional identity stable so unaffected SetRows (React.memo) bail out of re-rendering.
-    const stabilized = next.map((p, i) => {
-      const prevP = prev[i];
-      return prevP && prevP.weight === p.weight && prevP.reps === p.reps ? prevP : p;
+    const stable = next.map((p, i) =>
+      prev[i] && prev[i].weight === p.weight && prev[i].reps === p.reps ? prev[i] : p,
+    );
+    lastPlaceholdersRef.current = stable;
+    return stable;
+  }, [exercise.sets, exercise.trackingMode, exercise.weightUnit, previous]);
+
+  const handleExerciseSelect = useCallback(
+    (def: ExerciseDefinition) => selectExerciseDefinition(exercise.id, def),
+    [exercise.id, selectExerciseDefinition],
+  );
+  const handleTrackingModeChange = useCallback(
+    (mode: ExerciseTrackingMode) => updateExerciseField(exercise.id, "trackingMode", mode),
+    [exercise.id, updateExerciseField],
+  );
+  const handleShowTrackingPicker = () =>
+    trackingSegmentRef.current?.measureInWindow((x, y, width, height) => {
+      setTrackingAnchor({ x, y, width, height });
+      setTrackingPickerVisible(true);
     });
-    lastPlaceholdersRef.current = stabilized;
-    return stabilized;
-  }, [exercise.sets, exercise.trackingMode, exercise.weightUnit, exerciseIdentityKey, history]);
-  const handleAddSet = useCallback(() => {
+  const handleAddSet = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     addSet(exercise.id);
-  }, [exercise.id, addSet]);
-  const handleRemoveExercise = useCallback(() => {
+  };
+  const handleRemoveExercise = () =>
     showConfirm("Remove Exercise", `Remove "${exercise.name}"?`, () => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       removeExercise(exercise.id);
     });
-  }, [exercise.id, exercise.name, removeExercise]);
-  const handleUnitToggle = useCallback(() => {
-    HapticFeedback.selection();
-    toggleExerciseUnit(exercise.id);
-  }, [exercise.id, toggleExerciseUnit]);
-  const handleBodyweightToggle = useCallback(() => {
-    HapticFeedback.selection();
-    toggleExerciseBodyweight(exercise.id);
-  }, [exercise.id, toggleExerciseBodyweight]);
-  const hasNotes = (exercise.notes || "").trim().length > 0;
-  const TrackingIcon =
-    exercise.trackingMode === "strength"
-      ? Dumbbell
-      : exercise.trackingMode === "timed"
-        ? Timer
-        : Activity;
   const handleTabPress = (tab: "SETS" | "HISTORY") => {
     setActiveTab(tab);
-    pagerRef.current?.scrollTo({ x: tab === "SETS" ? 0 : SCREEN_WIDTH, animated: true });
+    pagerRef.current?.scrollTo({ x: tab === "SETS" ? 0 : PAGE_WIDTH, animated: true });
   };
-  const handleScroll = (event: any) => {
-    const x = event.nativeEvent.contentOffset.x;
-    const newTab = x < SCREEN_WIDTH / 2 ? "SETS" : "HISTORY";
-    if (newTab !== activeTab) {
-      setActiveTab(newTab);
-    }
-  };
+
+  const hasNotes = (exercise.notes || "").trim().length > 0;
+  const TrackingIcon = TRACKING_ICON[exercise.trackingMode];
+  const isStrength = exercise.trackingMode === "strength";
+
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.topContent}>
           <Pressable onPress={() => setExercisePickerVisible(true)}>
-            <Text style={styles.exerciseNameText}>{exercise.name}</Text>
+            <Text style={styles.exerciseName}>{exercise.name}</Text>
           </Pressable>
-          <Pressable onPress={() => onMusclePickerOpen?.(exercise.id)}>
+          <Pressable onPress={() => onMusclePickerOpen(exercise.id)}>
             <Text style={styles.muscleText} numberOfLines={1}>
               {formatMuscleLabels(exercise.muscles).toUpperCase()}
             </Text>
           </Pressable>
         </View>
-        <Pressable onPress={handleRemoveExercise} hitSlop={12} style={styles.cardRemoveBtn}>
+        <Pressable onPress={handleRemoveExercise} hitSlop={12} style={styles.removeBtn}>
           <Trash2 size={16} color={COLORS.DANGER} />
         </Pressable>
       </View>
-      <ExercisePickerModal
-        visible={exercisePickerVisible}
-        onClose={() => setExercisePickerVisible(false)}
-        onSelect={handleExerciseSelect}
-        selectedDefinitionId={exercise.exerciseDefinitionId}
-      />
+
       <View style={styles.instrumentBar}>
-        <View ref={trackingSegmentRef} style={{ flex: 1 }} collapsable={false}>
-          <Pressable style={styles.instrumentSegment} onPress={handleShowTrackingPicker}>
+        <View ref={trackingSegmentRef} style={styles.segmentWrap} collapsable={false}>
+          <Pressable style={styles.segment} onPress={handleShowTrackingPicker}>
             <TrackingIcon size={12} color={COLORS.ACCENT_BLUE} />
-            <Text style={styles.instrumentText}>
+            <Text style={styles.segmentText}>
               {getTrackingModeLabel(exercise.trackingMode).toUpperCase()}
             </Text>
           </Pressable>
         </View>
-        <View style={styles.instrumentDivider} />
-        {exercise.trackingMode === "strength" && (
+        {isStrength ? (
           <>
-            <Pressable style={styles.instrumentSegment} onPress={handleBodyweightToggle}>
+            <View style={styles.divider} />
+            <Pressable
+              style={styles.segment}
+              onPress={() => {
+                HapticFeedback.selection();
+                toggleExerciseBodyweight(exercise.id);
+              }}
+            >
               {exercise.isBodyweight ? (
                 <User size={12} color={COLORS.ACCENT_GREEN} />
               ) : (
@@ -197,75 +164,74 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
               )}
               <Text
                 style={[
-                  styles.instrumentText,
+                  styles.segmentText,
                   exercise.isBodyweight && { color: COLORS.ACCENT_GREEN },
                 ]}
               >
                 {exercise.isBodyweight ? "BODYWEIGHT" : "WEIGHTED"}
               </Text>
             </Pressable>
-            {!exercise.isBodyweight && (
+            {!exercise.isBodyweight ? (
               <>
-                <View style={styles.instrumentDivider} />
-                <Pressable style={styles.instrumentSegment} onPress={handleUnitToggle}>
-                  <Text style={[styles.instrumentText, { color: COLORS.ACCENT_BLUE }]}>
+                <View style={styles.divider} />
+                <Pressable
+                  style={styles.segment}
+                  onPress={() => {
+                    HapticFeedback.selection();
+                    toggleExerciseUnit(exercise.id);
+                  }}
+                >
+                  <Text style={[styles.segmentText, { color: COLORS.ACCENT_BLUE }]}>
                     {(exercise.weightUnit || "kg").toUpperCase()}
                   </Text>
                 </Pressable>
               </>
-            )}
-            <View style={styles.instrumentDivider} />
+            ) : null}
           </>
-        )}
-        <Pressable style={styles.instrumentSegment} onPress={() => setRestPickerVisible(true)}>
+        ) : null}
+        <View style={styles.divider} />
+        <Pressable style={styles.segment} onPress={() => setRestPickerVisible(true)}>
           <Clock size={12} color={COLORS.TEXT_TERTIARY} />
-          <Text style={styles.instrumentText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
+          <Text style={styles.segmentText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
         </Pressable>
       </View>
+
       <View style={styles.tabRow}>
-        <Pressable
-          onPress={() => handleTabPress("SETS")}
-          style={[styles.tabItem, activeTab === "SETS" && styles.activeTab]}
-        >
-          <Text style={[styles.tabText, activeTab === "SETS" && styles.activeTabText]}>SETS</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => handleTabPress("HISTORY")}
-          style={[styles.tabItem, activeTab === "HISTORY" && styles.activeTab]}
-        >
-          <Text style={[styles.tabText, activeTab === "HISTORY" && styles.activeTabText]}>
-            HISTORY
-          </Text>
-        </Pressable>
+        {(["SETS", "HISTORY"] as const).map((tab) => (
+          <Pressable
+            key={tab}
+            onPress={() => handleTabPress(tab)}
+            style={[styles.tab, activeTab === tab && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, activeTab === tab && { color: COLORS.ACCENT_BLUE }]}>
+              {tab}
+            </Text>
+          </Pressable>
+        ))}
       </View>
+
       <ScrollView
         ref={pagerRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
+        onScroll={(e) =>
+          setActiveTab(e.nativeEvent.contentOffset.x < PAGE_WIDTH / 2 ? "SETS" : "HISTORY")
+        }
         scrollEventThrottle={16}
         scrollEnabled={!isEditingNotes}
-        style={styles.pager}
       >
-        <View style={styles.pagerPage}>
+        <View style={styles.page}>
           <Pressable
             onPress={() => setIsEditingNotes(true)}
-            style={({ pressed }) => [
-              styles.notesContainer,
-              pressed && !isEditingNotes && { opacity: 0.85 },
-            ]}
+            style={({ pressed }) => [styles.notes, pressed && !isEditingNotes && UI.pressed]}
           >
-            <StickyNote
-              size={12}
-              color={COLORS.TEXT_TERTIARY}
-              style={{ marginTop: isEditingNotes ? 3 : 1 }}
-            />
+            <StickyNote size={12} color={COLORS.TEXT_TERTIARY} style={{ marginTop: 2 }} />
             {isEditingNotes ? (
               <TextInput
                 style={styles.notesInput}
                 value={exercise.notes}
-                onChangeText={handleNotesChange}
+                onChangeText={(text) => updateExerciseField(exercise.id, "notes", text)}
                 onBlur={() => setIsEditingNotes(false)}
                 placeholder="Add cues, pace targets, machine settings..."
                 placeholderTextColor={COLORS.TEXT_TERTIARY}
@@ -273,39 +239,32 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
                 multiline
               />
             ) : (
-              <Text
-                style={[
-                  styles.notesText,
-                  !hasNotes && styles.notesPlaceholder,
-                  !hasNotes && styles.notesTextCompact,
-                ]}
-              >
+              <Text style={[styles.notesText, !hasNotes && { color: COLORS.TEXT_TERTIARY }]}>
                 {hasNotes ? exercise.notes : "Add notes"}
               </Text>
             )}
           </Pressable>
+
           <View style={styles.setsShell}>
             <View style={styles.tableHeader}>
-              <View style={styles.headerCellIndex}>
+              <View style={{ width: SET_ROW_LAYOUT.indexWidth, alignItems: "center" }}>
                 <Text style={styles.headerText}>#</Text>
               </View>
-              <View style={styles.headerInputsWrapper}>
-                <View style={styles.headerCellInput}>
-                  <Text style={styles.headerText}>
-                    {exercise.trackingMode === "strength" ? "WEIGHT" : "TIME"}
-                  </Text>
+              <View style={styles.headerInputs}>
+                <View style={styles.headerCell}>
+                  <Text style={styles.headerText}>{isStrength ? "WEIGHT" : "TIME"}</Text>
                 </View>
-                <View style={styles.headerCellInput}>
-                  <Text style={styles.headerText}>
-                    {exercise.trackingMode === "strength" ? "REPS" : "DIST"}
-                  </Text>
-                </View>
+                {exercise.trackingMode !== "timed" ? (
+                  <View style={styles.headerCell}>
+                    <Text style={styles.headerText}>{isStrength ? "REPS" : "DIST"}</Text>
+                  </View>
+                ) : null}
               </View>
-              <View style={styles.headerCellAction}>
+              <View style={styles.headerActions}>
                 <Check size={12} color={COLORS.ACCENT_GREEN} />
               </View>
             </View>
-            <View style={styles.rowsWrap}>
+            <View style={styles.rows}>
               {exercise.sets.map((s, i) => (
                 <SetRow
                   key={s.id}
@@ -316,31 +275,34 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
                   exerciseName={exercise.name}
                   restSeconds={exercise.restSeconds}
                   trackingMode={exercise.trackingMode}
-                  weightUnit={exercise.weightUnit || "kg"}
                 />
               ))}
             </View>
             <Pressable
               onPress={handleAddSet}
-              style={({ pressed }) => [
-                styles.addSetBtn,
-                pressed && { backgroundColor: "rgba(255, 255, 255, 0.05)" },
-              ]}
+              style={({ pressed }) => [styles.addSet, pressed && UI.pressed]}
             >
               <Plus size={15} color={COLORS.TEXT_SECONDARY} strokeWidth={2} />
-              <Text style={styles.addSetBtnText}>ADD SET</Text>
+              <Text style={styles.addSetText}>ADD SET</Text>
             </Pressable>
           </View>
         </View>
-        <View style={styles.pagerPage}>
-          <ExerciseHistoryGraph exerciseKey={getExerciseIdentityKey(exercise)} />
+        <View style={styles.page}>
+          <ExerciseHistoryGraph exerciseKey={identityKey} />
         </View>
       </ScrollView>
+
+      <ExercisePickerModal
+        visible={exercisePickerVisible}
+        onClose={() => setExercisePickerVisible(false)}
+        onSelect={handleExerciseSelect}
+        selectedDefinitionId={exercise.exerciseDefinitionId}
+      />
       <RestTimerPicker
         visible={restPickerVisible}
         initialSeconds={exercise.restSeconds}
         onClose={() => setRestPickerVisible(false)}
-        onSave={handleRestSave}
+        onSave={(seconds) => updateExerciseField(exercise.id, "restSeconds", seconds)}
       />
       <ExerciseTrackingModeSelector
         value={exercise.trackingMode}
@@ -354,139 +316,100 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
 });
 
 const styles = StyleSheet.create({
-  card: { paddingTop: 16, paddingHorizontal: 16, backgroundColor: COLORS.BG },
+  card: { paddingTop: SPACE.lg, paddingHorizontal: LAYOUT.gutter },
   topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 16,
+    gap: SPACE.sm + 2,
+    marginBottom: SPACE.lg,
   },
   topContent: { flex: 1 },
-  exerciseNameText: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: COLORS.TEXT_PRIMARY,
-    fontFamily: FONT_FAMILIES.MEDIUM,
+  exerciseName: { ...TYPE.title, fontSize: 24 },
+  muscleText: { ...TYPE.monoSmall, color: COLORS.ORANGE, fontSize: 13, marginTop: SPACE.xs },
+  removeBtn: {
+    width: LAYOUT.buttonSm,
+    height: LAYOUT.buttonSm,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  muscleText: {
-    color: COLORS.ORANGE,
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 4,
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  cardRemoveBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   instrumentBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "transparent",
-    borderRadius: UI.RADIUS_ITEM,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     height: 36,
-    marginBottom: 20,
+    marginBottom: SPACE.xl,
     overflow: "hidden",
   },
-  instrumentSegment: {
+  segmentWrap: { flex: 1 },
+  segment: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: SPACE.sm - 2,
     height: "100%",
-    paddingHorizontal: 8,
+    paddingHorizontal: SPACE.sm,
   },
-  instrumentDivider: { width: 1, height: "60%", backgroundColor: COLORS.BORDER },
-  instrumentText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 10,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
+  segmentText: { ...TYPE.label, letterSpacing: 0, color: COLORS.TEXT_SECONDARY },
+  divider: { width: 1, height: "60%", backgroundColor: COLORS.BORDER },
   tabRow: {
     flexDirection: "row",
-    gap: 16,
-    marginBottom: 20,
+    gap: SPACE.lg,
+    marginBottom: SPACE.xl,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER,
   },
-  tabItem: { paddingBottom: 8 },
-  activeTab: { borderBottomWidth: 2, borderBottomColor: COLORS.ACCENT_BLUE },
-  tabText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  activeTabText: { color: COLORS.ACCENT_BLUE },
-  pager: { flex: 1 },
-  pagerPage: { width: SCREEN_WIDTH - 32 },
-  notesContainer: {
+  tab: { paddingBottom: SPACE.sm },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.ACCENT_BLUE },
+  tabText: { ...TYPE.bodyMuted, color: COLORS.TEXT_TERTIARY, lineHeight: undefined },
+  page: { width: PAGE_WIDTH },
+  notes: {
     flexDirection: "row",
-    gap: 10,
-    backgroundColor: "transparent",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: UI.RADIUS_ITEM,
-    marginTop: 0,
-    marginBottom: 12,
+    gap: SPACE.sm + 2,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm + 2,
+    borderRadius: RADIUS.item,
+    marginBottom: SPACE.md,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
   },
-  notesText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    flex: 1,
-  },
-  notesTextCompact: { fontSize: 12 },
-  notesPlaceholder: { color: COLORS.TEXT_TERTIARY },
-  notesInput: {
-    flex: 1,
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    padding: 0,
-    textAlignVertical: "top",
-  },
+  notesText: { ...TYPE.bodyMuted, flex: 1 },
+  notesInput: { ...TYPE.bodyMuted, flex: 1, padding: 0, textAlignVertical: "top" },
   setsShell: {
-    marginTop: 0,
-    backgroundColor: "transparent",
-    borderRadius: UI.RADIUS_ITEM,
-    padding: 8,
+    borderRadius: RADIUS.item,
+    padding: SPACE.sm,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
   },
-  tableHeader: { flexDirection: "row", paddingHorizontal: 4, marginBottom: 8 },
-  headerText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 10,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
+  tableHeader: { flexDirection: "row", paddingHorizontal: SPACE.xs, marginBottom: SPACE.sm },
+  headerText: { ...TYPE.label, letterSpacing: 0, color: COLORS.TEXT_PRIMARY },
+  headerInputs: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: SET_ROW_LAYOUT.gap,
   },
-  headerCellIndex: { width: 32, alignItems: "center" },
-  headerInputsWrapper: { flex: 1, flexDirection: "row", justifyContent: "center", gap: 12 },
-  headerCellInput: { width: 72, alignItems: "center" },
-  headerCellAction: { width: 60, alignItems: "flex-end", paddingRight: 10 },
-  rowsWrap: { gap: 2 },
-  addSetBtn: {
+  headerCell: { width: SET_ROW_LAYOUT.inputWidth, alignItems: "center" },
+  headerActions: {
+    width: SET_ROW_LAYOUT.actionsWidth,
+    alignItems: "flex-end",
+    paddingRight: SPACE.sm + 2,
+  },
+  rows: { gap: 2 },
+  addSet: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    marginTop: 8,
+    gap: SPACE.sm,
+    marginTop: SPACE.sm,
     height: 40,
-    borderRadius: UI.RADIUS_ITEM,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
+    backgroundColor: SURFACE.raised,
   },
-  addSetBtnText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontWeight: "800",
-    fontSize: 11,
-    fontFamily: FONT_FAMILIES.MONO,
-  },
+  addSetText: { ...TYPE.label, letterSpacing: 0, color: COLORS.TEXT_SECONDARY },
 });

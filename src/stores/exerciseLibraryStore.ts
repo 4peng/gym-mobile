@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { zustandAsyncStorage } from "@/storage/mmkv";
+import { zustandAsyncStorage } from "@/storage/asyncStorage";
 import { generateId } from "@/utils/id";
 import type { ExerciseDefinition } from "@/types";
 import type { MuscleGroup } from "@/constants/muscles";

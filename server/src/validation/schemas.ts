@@ -29,7 +29,6 @@ export const programSchema = z.object({
   exercises: z.array(programExerciseSchema),
   createdAt: z.string().optional(),
   updatedAt: z.number().optional(),
-  deletedAt: z.number().nullable().optional(),
 });
 
 const workoutSetSchema = z.object({
@@ -65,7 +64,6 @@ export const workoutSchema = z.object({
   notes: z.string().optional(),
   exercises: z.array(workoutExerciseSchema),
   updatedAt: z.number().optional(),
-  deletedAt: z.number().nullable().optional(),
 });
 
 export const batchProgramSchema = z.object({

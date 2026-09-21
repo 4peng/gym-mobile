@@ -18,9 +18,11 @@
     "jsx": "react-jsx",
     "incremental": true,
     "paths": {
+      "@/shared/*": [
+        "./shared/*"
+      ],
       "@/*": [
-        "./src/*",
-        "./*"
+        "./src/*"
       ]
     }
   },

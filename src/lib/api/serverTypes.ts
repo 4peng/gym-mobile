@@ -29,7 +29,6 @@ export interface ProgramServer {
   exercises: ProgramExerciseServer[];
   createdAt: string; // ISO-8601
   updatedAt: number; // epoch-ms
-  deletedAt?: number | null;
 }
 
 interface WorkoutSetServer {
@@ -62,7 +61,6 @@ export interface WorkoutServer {
   startedAt: string;
   completedAt?: string;
   updatedAt: number; // epoch-ms
-  deletedAt?: number | null;
   notes: string;
   exercises: WorkoutExerciseServer[];
 }

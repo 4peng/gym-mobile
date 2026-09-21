@@ -1,4 +1,4 @@
-import ProgramEditorScreen from "@/src/screens/ProgramEditorScreen";
+import ProgramEditorScreen from "@/screens/ProgramEditorScreen";
 
 export default function EditProgramPage() {
   return <ProgramEditorScreen variant="edit" />;

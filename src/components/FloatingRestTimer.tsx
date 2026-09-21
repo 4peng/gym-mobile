@@ -1,50 +1,41 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
-import { useWorkoutSessionStore, type ActiveRestTimer } from "@/stores/workoutSessionStore";
-import { cancelScheduledNotification } from "@/utils/notifications";
+import React, { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 
-const selectTimer = (s: { activeRestTimer: ActiveRestTimer | null }) => s.activeRestTimer;
-
+/** Countdown chip for the active rest timer; hidden when no timer is running. */
 const FloatingRestTimer = React.memo(function FloatingRestTimer() {
-  const timer = useWorkoutSessionStore(selectTimer);
+  const timer = useWorkoutSessionStore((s) => s.activeRestTimer);
   const cancelRestTimer = useWorkoutSessionStore((s) => s.cancelRestTimer);
-  const [displayMs, setDisplayMs] = useState<number>(0);
+  const clearExpiredTimer = useWorkoutSessionStore((s) => s.clearExpiredTimer);
+  const [remainingMs, setRemainingMs] = useState(0);
+
   useEffect(() => {
     if (!timer) {
-      setDisplayMs(0);
+      setRemainingMs(0);
       return;
     }
-    const remaining = timer.endTime - Date.now();
-    setDisplayMs(remaining);
-    if (remaining <= 0) {
-      useWorkoutSessionStore.getState().clearExpiredTimer();
-      return;
-    }
-    const interval = setInterval(() => {
+    const tick = () => {
       const rem = timer.endTime - Date.now();
-      if (rem <= 0) {
-        clearInterval(interval);
-        setDisplayMs(0);
-        useWorkoutSessionStore.getState().clearExpiredTimer();
-        cancelScheduledNotification(timer.notificationId);
-      } else {
-        setDisplayMs(rem);
-      }
-    }, 1000);
+      setRemainingMs(rem);
+      if (rem <= 0) clearExpiredTimer();
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [timer]);
-  const handleCancel = useCallback(() => {
-    cancelRestTimer();
-  }, [cancelRestTimer]);
-  if (!timer || displayMs <= 0) return null;
+  }, [timer, clearExpiredTimer]);
+
+  if (!timer || remainingMs <= 0) return null;
+
   return (
     <View style={styles.card}>
-      <Text style={styles.countdown}>{formatSecondsToMMSS(Math.ceil(displayMs / 1000))}</Text>
-      <Pressable onPress={handleCancel} hitSlop={12} style={styles.cancelBtn}>
+      <Text style={styles.countdown}>{formatSecondsToMMSS(Math.ceil(remainingMs / 1000))}</Text>
+      <Pressable
+        onPress={() => void cancelRestTimer()}
+        hitSlop={12}
+        style={({ pressed }) => [styles.cancel, pressed && UI.pressed]}
+      >
         <Text style={styles.cancelText}>X</Text>
       </Pressable>
     </View>
@@ -57,35 +48,22 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "transparent",
-    borderRadius: UI.RADIUS_ITEM,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    borderRadius: RADIUS.item,
+    paddingVertical: SPACE.sm - 2,
+    paddingHorizontal: SPACE.md,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    gap: 10,
+    gap: SPACE.sm + 2,
   },
-  countdown: {
-    color: COLORS.TEXT_PRIMARY,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  cancelBtn: {
+  countdown: { ...TYPE.mono, fontSize: 18, letterSpacing: 0.5 },
+  cancel: {
     width: 24,
     height: 24,
-    borderRadius: 6,
-    backgroundColor: "transparent",
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     alignItems: "center",
     justifyContent: "center",
   },
-  cancelText: {
-    color: COLORS.DANGER,
-    fontWeight: "900",
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MONO,
-  },
+  cancelText: { ...TYPE.monoSmall, color: COLORS.DANGER },
 });

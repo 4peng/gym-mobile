@@ -1,24 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-  View,
+  KeyboardAvoidingView,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  ScrollView,
-  Pressable,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Animated,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowUpDown, Check, ChevronRight, Play, Plus, Save, Trash2, X } from "lucide-react-native";
-
 import { showAlert } from "@/utils/alerts";
-import { COLORS, withAlpha } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import ExerciseEditor, { type ExerciseFormData } from "@/components/ExerciseEditor";
 import ExerciseReorderModal from "@/components/Workout/ExerciseReorderModal";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
+import { Sheet } from "@/components/ui/Sheet";
+import { IconButton } from "@/components/ui/IconButton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   buildRoutineDraft,
   createEmptyExercise,
@@ -28,9 +27,6 @@ import {
 import { generateId } from "@/utils/id";
 import type { ExerciseDefinition } from "@/types";
 import { inferTrackingModeFromExerciseDefinition } from "@/utils/exerciseTracking";
-import { useSheet } from "@/hooks/useSheet";
-
-type Mode = "create" | "edit";
 
 export interface RoutineDraft {
   name: string;
@@ -38,7 +34,7 @@ export interface RoutineDraft {
 }
 
 interface RoutineEditorScreenProps {
-  mode: Mode;
+  mode: "create" | "edit";
   initialName?: string;
   initialExercises?: ExerciseFormData[];
   onCancel: (draft: RoutineDraft, hasChanges: boolean) => void;
@@ -47,6 +43,7 @@ interface RoutineEditorScreenProps {
   onDelete?: (draft: RoutineDraft) => void;
 }
 
+/** Routine form: name, add/reorder exercises, per-exercise editors. */
 export default function RoutineEditorScreen({
   mode,
   initialName = "",
@@ -56,326 +53,219 @@ export default function RoutineEditorScreen({
   onSaveAndStart,
   onDelete,
 }: RoutineEditorScreenProps) {
+  // Seeded once: the props derive from the store and may change identity mid-edit.
   const [name, setName] = useState(initialName);
   const [exercises, setExercises] = useState<ExerciseFormData[]>(initialExercises);
   const [reorderVisible, setReorderVisible] = useState(false);
-  const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
-  const { mounted: optionsMounted, progress: optionsProgress } = useSheet(optionsVisible);
-
-  const isCreateLike = mode === "create";
-
-  // Seed the form from props only once, on initial mount. `initialName`/
-  // `initialExercises` are derived from the programs store and can change
-  // identity mid-edit (e.g. a background sync merge) — re-running this on
-  // every such change would clobber in-progress unsaved edits.
-  const hasSeededRef = useRef(false);
-  useEffect(() => {
-    if (hasSeededRef.current) return;
-    hasSeededRef.current = true;
-    setName(initialName);
-    setExercises(initialExercises);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const isCreate = mode === "create";
 
   const initialSnapshot = useMemo(
     () => createRoutineSnapshot(initialName, initialExercises),
     [initialExercises, initialName],
   );
-  const currentSnapshot = useMemo(() => createRoutineSnapshot(name, exercises), [exercises, name]);
-  const hasChanges = currentSnapshot !== initialSnapshot;
+  const hasChanges = createRoutineSnapshot(name, exercises) !== initialSnapshot;
+  const totalSets = exercises.reduce((n, e) => n + (e.defaultSets?.length || 0), 0);
 
-  const exerciseCount = exercises.length;
-  const totalPlannedSets = useMemo(
-    () => exercises.reduce((total, exercise) => total + (exercise.defaultSets?.length || 0), 0),
-    [exercises],
+  const draft = useCallback(
+    (): RoutineDraft => buildRoutineDraft(name, exercises) as RoutineDraft,
+    [exercises, name],
   );
 
-  const openOptions = useCallback(() => setOptionsVisible(true), []);
-  const closeOptions = useCallback(() => setOptionsVisible(false), []);
+  const validate = () => {
+    const error = validateRoutineDraft(name, exercises);
+    if (error) showAlert("Error", error);
+    return !error;
+  };
 
   const handleUpdateExercise = useCallback(
     (id: string, updates: Partial<Omit<ExerciseFormData, "id">>) => {
-      setExercises((prev) =>
-        prev.map((exercise) => (exercise.id === id ? { ...exercise, ...updates } : exercise)),
-      );
+      setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
     },
     [],
   );
-
-  const handleRemoveExercise = useCallback((id: string) => {
-    setExercises((prev) => prev.filter((exercise) => exercise.id !== id));
-  }, []);
-
-  const handleAddExerciseFromPicker = useCallback((definition: ExerciseDefinition) => {
-    const nextExercise = createEmptyExercise(generateId) as ExerciseFormData;
-    nextExercise.exerciseDefinitionId = definition.id;
-    nextExercise.trackingMode = inferTrackingModeFromExerciseDefinition(definition);
-    nextExercise.name = definition.name;
-    nextExercise.muscles = definition.muscles;
-    setExercises((prev) => [...prev, nextExercise]);
-    setExercisePickerVisible(false);
-  }, []);
-
-  const reorderItems = useMemo(
-    () => exercises.map((exercise) => ({ id: exercise.id, name: exercise.name })),
-    [exercises],
+  const handleRemoveExercise = useCallback(
+    (id: string) => setExercises((prev) => prev.filter((e) => e.id !== id)),
+    [],
   );
-
-  const handleReorderSave = useCallback((exerciseIds: string[]) => {
+  const handleAddFromPicker = useCallback((def: ExerciseDefinition) => {
+    const next = createEmptyExercise(generateId) as ExerciseFormData;
+    next.exerciseDefinitionId = def.id;
+    next.trackingMode = inferTrackingModeFromExerciseDefinition(def);
+    next.name = def.name;
+    next.muscles = def.muscles;
+    setExercises((prev) => [...prev, next]);
+    setPickerVisible(false);
+  }, []);
+  const handleReorder = useCallback((ids: string[]) => {
     setExercises((prev) => {
-      const byId = new Map(prev.map((exercise) => [exercise.id, exercise]));
-      const reordered = exerciseIds
-        .map((id) => byId.get(id))
-        .filter((exercise): exercise is ExerciseFormData => !!exercise);
-
-      return reordered.length === prev.length ? reordered : prev;
+      const byId = new Map(prev.map((e) => [e.id, e]));
+      const next = ids.map((id) => byId.get(id)).filter((e): e is ExerciseFormData => !!e);
+      return next.length === prev.length ? next : prev;
     });
   }, []);
 
-  const validate = useCallback((): boolean => {
-    const error = validateRoutineDraft(name, exercises);
-    if (!error) {
-      return true;
-    }
-
-    showAlert("Error", error);
-    return false;
-  }, [exercises, name]);
-
-  const doSave = useCallback(() => {
-    if (!validate()) return;
-    onSave(buildRoutineDraft(name, exercises) as RoutineDraft);
-  }, [exercises, name, onSave, validate]);
-
-  const doSaveAndStart = useCallback(() => {
-    if (!validate() || !onSaveAndStart) return;
-    onSaveAndStart(buildRoutineDraft(name, exercises) as RoutineDraft);
-  }, [exercises, name, onSaveAndStart, validate]);
-
-  const doDelete = useCallback(() => {
-    if (!onDelete) return;
-    onDelete(buildRoutineDraft(name, exercises) as RoutineDraft);
-  }, [exercises, name, onDelete]);
-
-  const handlePrimaryAction = useCallback(() => {
-    if (isCreateLike) {
-      doSave();
-      return;
-    }
-
-    openOptions();
-  }, [doSave, isCreateLike, openOptions]);
-
-  const handleCancel = useCallback(() => {
-    onCancel(buildRoutineDraft(name, exercises) as RoutineDraft, hasChanges);
-  }, [exercises, hasChanges, name, onCancel]);
-
-  const optionsTranslateY = optionsProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [28, 0],
-  });
-
-  const optionsOpacity = optionsProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const doSave = () => validate() && onSave(draft());
+  const doSaveAndStart = () => onSaveAndStart && validate() && onSaveAndStart(draft());
+  const withOptionsClosed = (fn: () => void) => () => {
+    setOptionsVisible(false);
+    fn();
+  };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior="padding">
-      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <KeyboardAvoidingView style={UI.screen} behavior="padding">
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
         <View style={styles.topBar}>
-          <Pressable
-            onPress={handleCancel}
-            style={({ pressed }) => [UI.SHARED.dangerBtn, pressed && styles.hudPressed]}
-          >
+          <IconButton tone="danger" onPress={() => onCancel(draft(), hasChanges)}>
             <X size={20} color={COLORS.DANGER} strokeWidth={2.8} />
-          </Pressable>
-
-          <View style={styles.hudReadout}>
-            <Text style={styles.hudReadoutTitle}>
-              {isCreateLike ? "New Routine" : "Edit Routine"}
-            </Text>
-            <Text style={styles.hudReadoutMeta}>
-              {hasChanges ? "Unsaved changes" : "All changes saved"}
-            </Text>
+          </IconButton>
+          <View style={{ flex: 1 }}>
+            <Text style={TYPE.body}>{isCreate ? "New routine" : "Edit routine"}</Text>
+            <Text style={TYPE.caption}>{hasChanges ? "Unsaved changes" : "All changes saved"}</Text>
           </View>
-
-          <Pressable
-            onPress={handlePrimaryAction}
-            style={({ pressed }) => [UI.SHARED.actionBtn, pressed && styles.hudPressed]}
-          >
+          <IconButton tone="success" onPress={isCreate ? doSave : () => setOptionsVisible(true)}>
             <Check size={20} color={COLORS.ACCENT_GREEN} strokeWidth={2.8} />
-          </Pressable>
+          </IconButton>
         </View>
 
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.headerArea}>
-            <View style={styles.titleRow}>
-              <TextInput
-                style={styles.nameInput}
-                value={name}
-                onChangeText={setName}
-                placeholder="Routine Name"
-                placeholderTextColor={withAlpha(COLORS.TEXT_TERTIARY, 0.4)}
-                autoFocus={isCreateLike}
-              />
+          <TextInput
+            style={styles.nameInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Routine name"
+            placeholderTextColor={COLORS.TEXT_TERTIARY}
+            autoFocus={isCreate}
+          />
+
+          <View style={[UI.inset, styles.summary]}>
+            <View style={styles.summaryItem}>
+              <Text style={TYPE.mono}>{exercises.length}</Text>
+              <Text style={TYPE.caption}>Exercises</Text>
             </View>
-
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryVal}>{exerciseCount}</Text>
-                <Text style={styles.summaryLbl}>Exercises</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryVal}>{totalPlannedSets}</Text>
-                <Text style={styles.summaryLbl}>Sets</Text>
-              </View>
-            </View>
-
-            <View style={styles.actionGrid}>
-              <Pressable
-                onPress={() => setExercisePickerVisible(true)}
-                style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
-              >
-                <Plus size={18} color={COLORS.ACCENT_BLUE} />
-                <Text style={styles.actionBtnText}>Add Exercise</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setReorderVisible(true)}
-                disabled={exercises.length < 2}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  exercises.length < 2 && styles.actionBtnDisabled,
-                  pressed && exercises.length >= 2 && styles.pressed,
-                ]}
-              >
-                <ArrowUpDown size={18} color={COLORS.TEXT_PRIMARY} />
-                <Text style={[styles.actionBtnText, { color: COLORS.TEXT_PRIMARY }]}>Reorder</Text>
-              </Pressable>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={TYPE.mono}>{totalSets}</Text>
+              <Text style={TYPE.caption}>Sets</Text>
             </View>
           </View>
+
+          <View style={styles.actions}>
+            <Pressable
+              onPress={() => setPickerVisible(true)}
+              style={({ pressed }) => [UI.inset, styles.actionBtn, pressed && UI.pressed]}
+            >
+              <Plus size={18} color={COLORS.ACCENT_BLUE} />
+              <Text style={[TYPE.body, { color: COLORS.ACCENT_BLUE }]}>Add exercise</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setReorderVisible(true)}
+              disabled={exercises.length < 2}
+              style={({ pressed }) => [
+                UI.inset,
+                styles.actionBtn,
+                exercises.length < 2 && { opacity: 0.3 },
+                pressed && UI.pressed,
+              ]}
+            >
+              <ArrowUpDown size={18} color={COLORS.TEXT_PRIMARY} />
+              <Text style={TYPE.body}>Reorder</Text>
+            </Pressable>
+          </View>
+
           {exercises.map((item, index) => (
-            <View key={item.id} style={styles.exerciseWrap}>
-              <ExerciseEditor
-                exercise={item}
-                index={index}
-                onUpdate={handleUpdateExercise}
-                onRemove={handleRemoveExercise}
-              />
-            </View>
+            <ExerciseEditor
+              key={item.id}
+              exercise={item}
+              index={index}
+              onUpdate={handleUpdateExercise}
+              onRemove={handleRemoveExercise}
+            />
           ))}
-
-          {exercises.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No exercises yet</Text>
-            </View>
-          )}
-
-          <View style={styles.listFooterSpacer} />
+          {exercises.length === 0 ? (
+            <EmptyState
+              title="No exercises yet"
+              subtitle="Add one from the library to build the routine."
+            />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
 
-      {optionsMounted ? (
-        <>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeOptions}>
-            <Animated.View style={[styles.backdrop, { opacity: optionsOpacity }]} />
-          </Pressable>
-
-          <Animated.View
-            style={[
-              styles.optionsSheet,
-              { opacity: optionsOpacity, transform: [{ translateY: optionsTranslateY }] },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Routine Options</Text>
-              <Pressable onPress={closeOptions}>
-                <X size={20} color={COLORS.TEXT_TERTIARY} />
-              </Pressable>
-            </View>
-
+      <Sheet
+        visible={optionsVisible}
+        onClose={() => setOptionsVisible(false)}
+        placement="center"
+        title="Routine options"
+      >
+        <View style={styles.options}>
+          <OptionItem
+            icon={<Save size={20} color={COLORS.ACCENT_BLUE} />}
+            title="Save changes"
+            subtitle="Update the routine and go back"
+            onPress={withOptionsClosed(doSave)}
+          />
+          {onSaveAndStart ? (
             <OptionItem
-              icon={<Save size={20} color={COLORS.ACCENT_BLUE} />}
-              title="Save Changes"
-              subtitle="Update template and return to list"
-              onPress={() => {
-                closeOptions();
-                doSave();
-              }}
+              icon={<Play size={20} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />}
+              title="Save and start"
+              subtitle="Launch this routine now"
+              onPress={withOptionsClosed(doSaveAndStart)}
             />
-
-            {onSaveAndStart ? (
-              <OptionItem
-                icon={<Play size={20} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />}
-                title="Save and Start"
-                subtitle="Launch this routine immediately"
-                onPress={() => {
-                  closeOptions();
-                  doSaveAndStart();
-                }}
-              />
-            ) : null}
-
-            {onDelete ? (
-              <OptionItem
-                icon={<Trash2 size={20} color={COLORS.DANGER} />}
-                title="Delete Routine"
-                subtitle="Permanently remove this program"
-                danger
-                onPress={() => {
-                  closeOptions();
-                  doDelete();
-                }}
-              />
-            ) : null}
-          </Animated.View>
-        </>
-      ) : null}
+          ) : null}
+          {onDelete ? (
+            <OptionItem
+              icon={<Trash2 size={20} color={COLORS.DANGER} />}
+              title="Delete routine"
+              subtitle="Remove this routine permanently"
+              danger
+              onPress={withOptionsClosed(() => onDelete(draft()))}
+            />
+          ) : null}
+        </View>
+      </Sheet>
 
       <ExerciseReorderModal
         visible={reorderVisible}
-        exercises={reorderItems}
+        exercises={exercises.map((e) => ({ id: e.id, name: e.name }))}
         onClose={() => setReorderVisible(false)}
-        onSave={handleReorderSave}
+        onSave={handleReorder}
       />
-
       <ExercisePickerModal
-        visible={exercisePickerVisible}
-        onClose={() => setExercisePickerVisible(false)}
-        onSelect={handleAddExerciseFromPicker}
-        title="Add Exercise"
-        subtitle="Search library or create custom"
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onSelect={handleAddFromPicker}
+        title="Add exercise"
       />
     </KeyboardAvoidingView>
   );
 }
 
-interface OptionItemProps {
+function OptionItem({
+  icon,
+  title,
+  subtitle,
+  onPress,
+  danger,
+}: {
   icon: React.ReactNode;
   title: string;
   subtitle: string;
   onPress: () => void;
   danger?: boolean;
-}
-
-function OptionItem({ icon, title, subtitle, onPress, danger }: OptionItemProps) {
+}) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.optionItem, pressed && styles.pressed]}
-    >
-      <View style={[styles.optionIcon, danger && styles.optionIconDanger]}>{icon}</View>
-      <View style={styles.optionCopy}>
-        <Text style={[styles.optionTitle, danger && { color: COLORS.DANGER }]}>{title}</Text>
-        <Text style={styles.optionSubtitle}>{subtitle}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.option, pressed && UI.pressed]}>
+      <View style={[styles.optionIcon, danger && { backgroundColor: SURFACE.dangerTint }]}>
+        {icon}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[TYPE.body, danger && { color: COLORS.DANGER }]}>{title}</Text>
+        <Text style={TYPE.caption}>{subtitle}</Text>
       </View>
       <ChevronRight size={16} color={COLORS.TEXT_TERTIARY} />
     </Pressable>
@@ -383,194 +273,42 @@ function OptionItem({ icon, title, subtitle, onPress, danger }: OptionItemProps)
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 126,
-  },
-  headerArea: {
-    paddingVertical: 24,
-  },
-  titleRow: {
-    marginBottom: 16,
-  },
-  nameInput: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 28,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    fontWeight: "700",
-    padding: 0,
-  },
-  summaryRow: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: withAlpha(COLORS.CARD_BG, 0.5),
-    padding: 12,
-    borderRadius: UI.RADIUS_ITEM,
-    borderWidth: 1,
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
-    marginBottom: 20,
+    gap: SPACE.md,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.md,
+    borderBottomWidth: 1,
+    borderBottomColor: SURFACE.hairline,
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  summaryVal: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 18,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-  },
-  summaryLbl: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginTop: 2,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
-  },
-  actionGrid: {
+  content: { paddingHorizontal: LAYOUT.gutter, paddingTop: SPACE.xxl, paddingBottom: 140 },
+  nameInput: { ...TYPE.title, fontSize: 28, padding: 0, marginBottom: SPACE.lg },
+  summary: {
     flexDirection: "row",
-    gap: 12,
+    alignItems: "center",
+    padding: SPACE.md,
+    marginBottom: SPACE.xl,
   },
+  summaryItem: { flex: 1, alignItems: "center", gap: 2 },
+  summaryDivider: { width: 1, height: 24, backgroundColor: SURFACE.hairline },
+  actions: { flexDirection: "row", gap: SPACE.md, marginBottom: SPACE.xxl },
   actionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: SPACE.sm,
     height: 46,
-    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
-    borderRadius: UI.RADIUS_ITEM,
-    borderWidth: 1,
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
   },
-  actionBtnDisabled: {
-    opacity: 0.3,
-  },
-  actionBtnText: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    fontWeight: "600",
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  exerciseWrap: {
-    marginBottom: 0,
-  },
-  emptyContainer: {
-    paddingVertical: 60,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
-    borderStyle: "dashed",
-    borderRadius: UI.RADIUS_ITEM,
-  },
-  emptyTitle: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  listFooterSpacer: {
-    height: 40,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.8)",
-  },
-  optionsSheet: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 24,
-    borderRadius: UI.RADIUS_HUD,
-    backgroundColor: COLORS.CARD_BG,
-    borderWidth: 1,
-    borderColor: withAlpha(COLORS.TEXT_PRIMARY, 0.1),
-    padding: 20,
-    paddingBottom: 30,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 18,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    fontWeight: "700",
-  },
-  optionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    gap: 16,
-  },
+  options: { paddingTop: SPACE.sm },
+  option: { flexDirection: "row", alignItems: "center", paddingVertical: SPACE.md, gap: SPACE.lg },
   optionIcon: {
     width: 44,
     height: 44,
-    borderRadius: UI.RADIUS_ITEM,
-    backgroundColor: withAlpha(COLORS.TEXT_PRIMARY, 0.05),
+    borderRadius: RADIUS.item,
+    backgroundColor: SURFACE.raisedStrong,
     justifyContent: "center",
     alignItems: "center",
-  },
-  optionIconDanger: {
-    backgroundColor: withAlpha(COLORS.DANGER, 0.1),
-  },
-  optionCopy: {
-    flex: 1,
-  },
-  optionTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    fontWeight: "600",
-  },
-  optionSubtitle: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginTop: 2,
-  },
-  hudPressed: {
-    opacity: 0.8,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: withAlpha(COLORS.TEXT_PRIMARY, 0.08),
-    backgroundColor: COLORS.BG,
-  },
-  hudReadout: {
-    flex: 1,
-    paddingHorizontal: 8,
-  },
-  hudReadoutTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    fontWeight: "700",
-  },
-  hudReadoutMeta: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginTop: 1,
   },
 });

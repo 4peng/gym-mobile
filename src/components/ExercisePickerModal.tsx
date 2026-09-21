@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -7,20 +7,16 @@ import {
   Text,
   TextInput,
   View,
-  Animated,
 } from "react-native";
-import { useDragToClose, useSheet } from "@/hooks/useSheet";
 import { Check, Pencil, Search, X } from "lucide-react-native";
 import { EXERCISE_CATALOG } from "@/data/exerciseCatalog";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import type { ExerciseDefinition } from "@/types";
 import {
   matchesCustomExerciseNameOrAlias,
   useExerciseLibraryStore,
 } from "@/stores/exerciseLibraryStore";
-import { MUSCLE_LABELS, type MuscleGroup } from "@/constants/muscles";
+import { formatMuscleLabels } from "@/constants/muscles";
 import {
   matchesExerciseSearchQuery,
   normalizeExerciseDisplayName,
@@ -30,6 +26,8 @@ import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { showAlert } from "@/utils/alerts";
 import { Swipeable } from "./Swipeable";
+import { Sheet } from "@/components/ui/Sheet";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -37,51 +35,30 @@ interface ExercisePickerModalProps {
   onSelect: (exercise: ExerciseDefinition) => void;
   selectedDefinitionId?: string;
   title?: string;
-  subtitle?: string;
 }
 
+/** Search the catalog or custom exercises; create, rename and delete custom ones. */
 export default function ExercisePickerModal({
   visible,
   onClose,
   onSelect,
   selectedDefinitionId,
-  title = "Select Exercise",
-  subtitle = "Search the library or add a custom exercise.",
+  title = "Select exercise",
 }: ExercisePickerModalProps) {
   const [search, setSearch] = useState("");
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [renameTarget, setRenameTarget] = useState<ExerciseDefinition | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const renameInputRef = useRef<TextInput>(null);
-  const { mounted, progress } = useSheet(visible);
-  const { mounted: renameMounted, progress: renameProgress } = useSheet(!!renameTarget);
-  const { dragOffset, panHandlers } = useDragToClose(onClose);
 
-  const customExercises = useExerciseLibraryStore((state) => state.customExercises);
-  const addCustomExercise = useExerciseLibraryStore((state) => state.addCustomExercise);
-  const renameCustomExercise = useExerciseLibraryStore((state) => state.renameCustomExercise);
-  const removeCustomExercise = useExerciseLibraryStore((state) => state.removeCustomExercise);
-  const renameExerciseDefinitionReferencesInPrograms = useProgramStore(
-    (state) => state.renameExerciseDefinitionReferences,
-  );
-  const removeExerciseDefinitionReferencesInPrograms = useProgramStore(
-    (state) => state.removeExerciseDefinitionReferences,
-  );
-  const renameExerciseDefinitionReferencesInWorkouts = useWorkoutSessionStore(
-    (state) => state.renameExerciseDefinitionReferences,
-  );
-  const removeExerciseDefinitionReferencesInHistory = useWorkoutSessionStore(
-    (state) => state.removeExerciseDefinitionReferences,
-  );
-
-  const handleDeleteCustomExercise = (id: string) => {
-    // 1. Orphanize references in programs and history
-    removeExerciseDefinitionReferencesInPrograms(id);
-    removeExerciseDefinitionReferencesInHistory(id);
-
-    // 2. Remove the custom definition
-    removeCustomExercise(id);
-  };
+  const customExercises = useExerciseLibraryStore((s) => s.customExercises);
+  const addCustomExercise = useExerciseLibraryStore((s) => s.addCustomExercise);
+  const renameCustomExercise = useExerciseLibraryStore((s) => s.renameCustomExercise);
+  const removeCustomExercise = useExerciseLibraryStore((s) => s.removeCustomExercise);
+  const renameInPrograms = useProgramStore((s) => s.renameExerciseDefinitionReferences);
+  const removeInPrograms = useProgramStore((s) => s.removeExerciseDefinitionReferences);
+  const renameInWorkouts = useWorkoutSessionStore((s) => s.renameExerciseDefinitionReferences);
+  const removeInWorkouts = useWorkoutSessionStore((s) => s.removeExerciseDefinitionReferences);
 
   useEffect(() => {
     if (!visible) {
@@ -93,589 +70,277 @@ export default function ExercisePickerModal({
 
   useEffect(() => {
     if (!renameTarget) return;
-
-    const timeout = setTimeout(() => {
-      renameInputRef.current?.focus();
-    }, 50);
-
-    return () => clearTimeout(timeout);
-  }, [renameTarget?.id]);
+    const t = setTimeout(() => renameInputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [renameTarget]);
 
   const allExercises = useMemo(() => [...customExercises, ...EXERCISE_CATALOG], [customExercises]);
-
-  const filteredExercises = useMemo(
-    () => allExercises.filter((exercise) => matchesExerciseSearchQuery(exercise, search)),
+  const filtered = useMemo(
+    () => allExercises.filter((e) => matchesExerciseSearchQuery(e, search)),
     [allExercises, search],
   );
 
   const normalizedSearch = normalizeExerciseDisplayName(search);
-  const normalizedSearchIdentityKey = normalizeExerciseIdentityKey(normalizedSearch);
-  const normalizedRenameDraft = normalizeExerciseDisplayName(renameDraft);
-  const normalizedRenameDraftIdentityKey = normalizeExerciseIdentityKey(normalizedRenameDraft);
+  const searchConflict = normalizedSearch
+    ? EXERCISE_CATALOG.find((e) => e.id === normalizeExerciseIdentityKey(normalizedSearch))
+    : undefined;
+  const canAddCustom = normalizedSearch.length > 0 && filtered.length === 0 && !searchConflict;
 
-  const conflictingSearchCatalogExercise = useMemo(
-    () =>
-      normalizedSearchIdentityKey
-        ? EXERCISE_CATALOG.find((exercise) => exercise.id === normalizedSearchIdentityKey)
-        : undefined,
-    [normalizedSearchIdentityKey],
-  );
-
-  const conflictingRenameCatalogExercise = useMemo(
-    () =>
-      normalizedRenameDraftIdentityKey
-        ? EXERCISE_CATALOG.find((exercise) => exercise.id === normalizedRenameDraftIdentityKey)
-        : undefined,
-    [normalizedRenameDraftIdentityKey],
-  );
-
-  const conflictingRenameCustomExercise = useMemo(
-    () =>
-      normalizedRenameDraft.length > 0
-        ? customExercises.find(
-            (exercise) =>
-              exercise.id !== renameTarget?.id &&
-              matchesCustomExerciseNameOrAlias(exercise, normalizedRenameDraft),
-          )
-        : undefined,
-    [customExercises, normalizedRenameDraft, renameTarget?.id],
-  );
-
-  const canAddCustomExercise =
-    normalizedSearch.length > 0 &&
-    filteredExercises.length === 0 &&
-    !conflictingSearchCatalogExercise;
-
-  const canRenameCustomExercise =
-    !!renameTarget &&
-    normalizedRenameDraft.length > 0 &&
-    normalizedRenameDraft.toLowerCase() !== renameTarget.name.toLowerCase() &&
-    !conflictingRenameCatalogExercise &&
-    !conflictingRenameCustomExercise;
-
-  const renameValidationMessage = renameTarget
-    ? normalizedRenameDraft.length === 0
+  const normalizedRename = normalizeExerciseDisplayName(renameDraft);
+  const renameCatalogConflict = normalizedRename
+    ? EXERCISE_CATALOG.find((e) => e.id === normalizeExerciseIdentityKey(normalizedRename))
+    : undefined;
+  const renameCustomConflict = normalizedRename
+    ? customExercises.find(
+        (e) => e.id !== renameTarget?.id && matchesCustomExerciseNameOrAlias(e, normalizedRename),
+      )
+    : undefined;
+  const renameHint = !renameTarget
+    ? null
+    : normalizedRename.length === 0
       ? "Enter a name for this custom exercise."
-      : normalizedRenameDraft.toLowerCase() === renameTarget.name.toLowerCase()
-        ? "Enter a different name to rename this custom exercise."
-        : conflictingRenameCatalogExercise
-          ? `Built-in exercise already exists: ${conflictingRenameCatalogExercise.name}.`
-          : conflictingRenameCustomExercise
-            ? `Custom exercise already exists: ${conflictingRenameCustomExercise.name}.`
-            : null
-    : null;
+      : normalizedRename.toLowerCase() === renameTarget.name.toLowerCase()
+        ? "Enter a different name."
+        : renameCatalogConflict
+          ? `Built-in exercise already exists: ${renameCatalogConflict.name}.`
+          : renameCustomConflict
+            ? `Custom exercise already exists: ${renameCustomConflict.name}.`
+            : null;
+  const canRename = !!renameTarget && normalizedRename.length > 0 && renameHint === null;
 
-  const handleSelect = (exercise: ExerciseDefinition) => {
+  const select = (exercise: ExerciseDefinition) => {
     onSelect(exercise);
     onClose();
   };
 
-  const handleAddCustomExercise = () => {
-    const next = addCustomExercise(normalizedSearch);
-    handleSelect(next);
+  const deleteCustom = (id: string) => {
+    removeInPrograms(id);
+    removeInWorkouts(id);
+    removeCustomExercise(id);
   };
 
-  const startRenameCustomExercise = (exercise: ExerciseDefinition) => {
-    setRenameTarget(exercise);
-    setRenameDraft(exercise.name);
-  };
-
-  const cancelRenameCustomExercise = () => {
-    setRenameTarget(null);
-    setRenameDraft("");
-  };
-
-  const handleRenameCustomExercise = () => {
-    if (!renameTarget) return;
-
-    if (conflictingRenameCatalogExercise) {
-      showAlert(
-        "Built-In Exercise Exists",
-        `Use ${conflictingRenameCatalogExercise.name} from the library instead of renaming this custom exercise to match it.`,
-      );
-      return;
-    }
-
-    if (conflictingRenameCustomExercise) {
-      showAlert(
-        "Custom Exercise Exists",
-        `A custom exercise named ${conflictingRenameCustomExercise.name} already exists.`,
-      );
-      return;
-    }
-
-    const renamed = renameCustomExercise(renameTarget.id, normalizedRenameDraft);
+  const commitRename = () => {
+    if (!renameTarget || !canRename) return;
+    const renamed = renameCustomExercise(renameTarget.id, normalizedRename);
     if (!renamed) {
-      showAlert("Rename Failed", "Pick a different name for this custom exercise.");
+      showAlert("Rename failed", "Pick a different name for this custom exercise.");
       return;
     }
-
-    renameExerciseDefinitionReferencesInPrograms(renamed.id, renamed.name);
-    renameExerciseDefinitionReferencesInWorkouts(renamed.id, renamed.name);
-
-    const shouldReselect = renamed.id === selectedDefinitionId;
+    renameInPrograms(renamed.id, renamed.name);
+    renameInWorkouts(renamed.id, renamed.name);
     setRenameTarget(null);
     setRenameDraft("");
-
-    if (shouldReselect) {
-      onSelect(renamed);
-    }
+    if (renamed.id === selectedDefinitionId) onSelect(renamed);
   };
 
-  const renderExerciseItem = ({ item }: { item: ExerciseDefinition }) => {
+  const renderItem = ({ item }: { item: ExerciseDefinition }) => {
     const isSelected = item.id === selectedDefinitionId;
-    const subtitleText =
-      (item.muscles || []).length > 0
-        ? item.muscles.map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle).join(" - ")
-        : item.isCustom
-          ? "Custom exercise"
-          : "Uncategorized";
-
-    const content = (
+    const subtitle = item.muscles?.length
+      ? formatMuscleLabels(item.muscles, " · ")
+      : item.isCustom
+        ? "Custom exercise"
+        : "Uncategorized";
+    const row = (
       <View
-        style={[styles.item, item.isCustom && styles.itemCustom, isSelected && styles.itemSelected]}
+        style={[
+          UI.inset,
+          styles.item,
+          item.isCustom && { backgroundColor: COLORS.CARD_BG },
+          isSelected && styles.itemSelected,
+        ]}
       >
-        <Pressable onPress={() => handleSelect(item)} style={styles.itemMain}>
-          <View style={styles.itemCopy}>
-            <Text style={styles.itemTitle}>{item.name}</Text>
-            <Text style={styles.itemSubtitle}>{subtitleText}</Text>
+        <Pressable onPress={() => select(item)} style={styles.itemMain}>
+          <View style={{ flex: 1 }}>
+            <Text style={TYPE.body}>{item.name}</Text>
+            <Text style={[TYPE.caption, { marginTop: SPACE.xs }]}>{subtitle}</Text>
           </View>
           {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
         </Pressable>
-
         {item.isCustom ? (
-          <Pressable
-            onPress={() => startRenameCustomExercise(item)}
-            hitSlop={16}
-            style={({ pressed }) => [
-              styles.customBadge,
-              pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
-            ]}
+          <IconButton
+            size="sm"
+            tone="success"
+            onPress={() => {
+              setRenameTarget(item);
+              setRenameDraft(item.name);
+            }}
+            style={{ marginRight: SPACE.md }}
           >
             <Pencil size={14} color={COLORS.ACCENT_GREEN} />
-          </Pressable>
+          </IconButton>
         ) : null}
       </View>
     );
-
-    if (item.isCustom) {
-      return (
-        <View style={styles.swipeWrapper}>
+    return (
+      <View style={styles.rowWrap}>
+        {item.isCustom ? (
           <Swipeable
-            onDelete={() => handleDeleteCustomExercise(item.id)}
+            onDelete={() => deleteCustom(item.id)}
             onToggleScroll={setScrollEnabled}
-            borderRadius={UI.RADIUS_INPUT}
+            borderRadius={RADIUS.item}
             marginBottom={0}
           >
-            {content}
+            {row}
           </Swipeable>
-        </View>
-      );
-    }
-
-    return <View style={{ marginHorizontal: 16 }}>{content}</View>;
+        ) : (
+          row
+        )}
+      </View>
+    );
   };
 
-  if (!mounted) return null;
-
   return (
-    <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.container,
-          {
-            transform: [
-              {
-                translateY: progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [600, 0],
-                }),
-              },
-              { translateY: dragOffset },
-            ],
-          },
-        ]}
-        {...panHandlers}
-      >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
-          </View>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
-            <X size={20} color={COLORS.TEXT_TERTIARY} />
-          </Pressable>
-        </View>
-
-        <View style={styles.searchShell}>
-          <Search size={16} color={COLORS.TEXT_TERTIARY} />
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search exercises..."
-            placeholderTextColor={COLORS.TEXT_TERTIARY}
-            autoFocus
-          />
-        </View>
-
-        {canAddCustomExercise ? (
-          <Pressable
-            style={({ pressed }) => [styles.customAddBtn, pressed && styles.customAddBtnPressed]}
-            onPress={handleAddCustomExercise}
-          >
-            <Text style={styles.customAddLabel}>Add Custom Exercise</Text>
-            <Text style={styles.customAddValue}>{normalizedSearch}</Text>
-          </Pressable>
-        ) : null}
-
-        <FlatList
-          data={filteredExercises}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          scrollEnabled={scrollEnabled}
-          renderItem={renderExerciseItem}
-          ListEmptyComponent={
-            !canAddCustomExercise ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No exercises found.</Text>
-              </View>
-            ) : null
-          }
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      dragToClose
+      title={title}
+      headerRight={
+        <IconButton size="md" ghost onPress={onClose}>
+          <X size={20} color={COLORS.TEXT_TERTIARY} />
+        </IconButton>
+      }
+    >
+      <View style={[UI.inset, styles.search]}>
+        <Search size={16} color={COLORS.TEXT_TERTIARY} />
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search exercises..."
+          placeholderTextColor={COLORS.TEXT_TERTIARY}
+          autoFocus
         />
+      </View>
 
-        {/* Rename Modal */}
-        {renameMounted ? (
-          <Animated.View style={[styles.renameOverlay, { opacity: renameProgress }]}>
-            <KeyboardAvoidingView
-              style={styles.renameSheetWrapper}
-              behavior="padding"
-              keyboardVerticalOffset={0}
+      {canAddCustom ? (
+        <Pressable
+          style={({ pressed }) => [styles.addCustom, pressed && UI.pressed]}
+          onPress={() => select(addCustomExercise(normalizedSearch))}
+        >
+          <Text style={[TYPE.label, { color: COLORS.ACCENT_BLUE }]}>Add custom exercise</Text>
+          <Text style={[TYPE.body, { marginTop: SPACE.xs }]}>{normalizedSearch}</Text>
+        </Pressable>
+      ) : null}
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={scrollEnabled}
+        renderItem={renderItem}
+        ListEmptyComponent={
+          !canAddCustom ? (
+            <Text style={[TYPE.bodyMuted, styles.empty]}>No exercises found.</Text>
+          ) : null
+        }
+      />
+
+      <Sheet visible={!!renameTarget} onClose={() => setRenameTarget(null)} placement="center">
+        <KeyboardAvoidingView behavior="padding">
+          <Text style={[TYPE.label, { color: COLORS.ACCENT_GREEN }]}>Rename custom exercise</Text>
+          <Text style={[TYPE.heading, { marginTop: SPACE.sm }]}>{renameTarget?.name}</Text>
+          <TextInput
+            ref={renameInputRef}
+            style={[UI.inset, styles.renameInput]}
+            value={renameDraft}
+            onChangeText={setRenameDraft}
+            placeholder="Exercise name"
+            placeholderTextColor={COLORS.TEXT_TERTIARY}
+            returnKeyType="done"
+            onSubmitEditing={commitRename}
+          />
+          {renameHint ? (
+            <Text style={[TYPE.caption, { marginTop: SPACE.sm }]}>{renameHint}</Text>
+          ) : null}
+          <View style={styles.renameActions}>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryBtn, pressed && UI.pressed]}
+              onPress={() => setRenameTarget(null)}
             >
-              <Pressable style={StyleSheet.absoluteFill} onPress={cancelRenameCustomExercise} />
-
-              <Animated.View
-                style={[
-                  styles.renameSheet,
-                  {
-                    transform: [
-                      {
-                        scale: renameProgress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.95, 1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.customRenameLabel}>Rename Custom Exercise</Text>
-                <Text style={styles.renameSheetTitle}>{renameTarget?.name}</Text>
-                <TextInput
-                  ref={renameInputRef}
-                  style={styles.customRenameInput}
-                  value={renameDraft}
-                  onChangeText={setRenameDraft}
-                  placeholder="Exercise name"
-                  placeholderTextColor={COLORS.TEXT_TERTIARY}
-                  returnKeyType="done"
-                  onSubmitEditing={handleRenameCustomExercise}
-                />
-                {renameValidationMessage ? (
-                  <Text style={styles.customRenameHint}>{renameValidationMessage}</Text>
-                ) : null}
-
-                <View style={styles.customRenameActions}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.renameSecondaryBtn,
-                      pressed && styles.renameSecondaryBtnPressed,
-                    ]}
-                    onPress={cancelRenameCustomExercise}
-                  >
-                    <X size={14} color={COLORS.TEXT_SECONDARY} />
-                    <Text style={styles.renameSecondaryText}>Cancel</Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.renamePrimaryBtn,
-                      !canRenameCustomExercise && styles.renamePrimaryBtnDisabled,
-                      pressed && canRenameCustomExercise && styles.renamePrimaryBtnPressed,
-                    ]}
-                    onPress={handleRenameCustomExercise}
-                    disabled={!canRenameCustomExercise}
-                  >
-                    <Pencil size={14} color={COLORS.TEXT_PRIMARY} />
-                    <Text style={styles.renamePrimaryText}>Save Name</Text>
-                  </Pressable>
-                </View>
-              </Animated.View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        ) : null}
-      </Animated.View>
-    </View>
+              <X size={14} color={COLORS.TEXT_SECONDARY} />
+              <Text style={[TYPE.bodyMuted, { lineHeight: undefined }]}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                !canRename && { opacity: 0.45 },
+                pressed && UI.pressed,
+              ]}
+              onPress={commitRename}
+              disabled={!canRename}
+            >
+              <Pencil size={14} color={COLORS.BG} />
+              <Text style={[TYPE.body, { color: COLORS.BG }]}>Save name</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Sheet>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  absoluteOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 10000,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.85)",
-  },
-  renameSheetWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    zIndex: 10001,
-  },
-  container: {
-    flex: 1,
-    maxHeight: "80%",
-    backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: UI.RADIUS_HUD,
-    borderTopRightRadius: UI.RADIUS_HUD,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-  title: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  subtitle: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 13,
-    marginTop: 4,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  closeBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: UI.RADIUS_ITEM,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.03)",
-  },
-  searchShell: {
+  search: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 24,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderRadius: UI.RADIUS_CONTAINER,
+    marginHorizontal: SPACE.xl,
+    marginTop: SPACE.lg,
+    marginBottom: SPACE.lg,
+    paddingHorizontal: SPACE.lg,
     backgroundColor: COLORS.BG,
-    borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
   },
-  searchInput: {
-    flex: 1,
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    paddingVertical: 14,
-    marginLeft: 10,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  customAddBtn: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: "rgba(11, 130, 255, 0.08)",
+  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md + 2, marginLeft: SPACE.sm + 2 },
+  addCustom: {
+    marginHorizontal: SPACE.lg,
+    marginBottom: SPACE.md,
+    backgroundColor: SURFACE.blueTint,
     borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.2)",
-    borderRadius: UI.RADIUS_INPUT,
-    padding: 16,
+    borderColor: SURFACE.blueBorder,
+    borderRadius: RADIUS.container,
+    padding: SPACE.lg,
   },
-  customAddBtnPressed: {
-    backgroundColor: "rgba(11, 130, 255, 0.12)",
-  },
-  customAddLabel: {
-    color: COLORS.ACCENT_BLUE,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  customAddValue: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  listContent: {
-    paddingHorizontal: 0,
-    gap: 8,
-  },
-  swipeWrapper: {
-    marginHorizontal: 16,
-    borderRadius: UI.RADIUS_INPUT,
-    overflow: "hidden",
-    backgroundColor: "transparent",
-  },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: UI.RADIUS_INPUT,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
-    marginBottom: 0, // Handled by gap or marginHorizontal wrapper
-  },
-  itemCustom: {
-    backgroundColor: COLORS.CARD_BG, // Solid opaque background for swiping, slightly darker than standard
-  },
-  itemSelected: {
-    borderColor: "rgba(11, 130, 255, 0.25)",
-    backgroundColor: "rgba(11, 130, 255, 0.12)", // Selection color
-  },
+  list: { gap: SPACE.sm, paddingBottom: SPACE.lg },
+  rowWrap: { marginHorizontal: SPACE.lg },
+  item: { flexDirection: "row", alignItems: "center" },
+  itemSelected: { borderColor: SURFACE.blueBorder, backgroundColor: SURFACE.blueTint },
   itemMain: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    gap: 12,
+    padding: SPACE.lg,
+    gap: SPACE.md,
   },
-  itemCopy: {
-    flex: 1,
-  },
-  itemTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  itemSubtitle: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 12,
-    marginTop: 4,
-    textTransform: "capitalize",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  customBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: UI.RADIUS_ITEM,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(16, 217, 75, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(16, 217, 75, 0.25)",
-    marginRight: 12,
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 32,
-  },
-  emptyText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  renameOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    zIndex: 10001,
-  },
-  renameSheet: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: UI.RADIUS_HUD,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-  },
-  customRenameLabel: {
-    color: COLORS.ACCENT_GREEN,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  renameSheetTitle: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  customRenameInput: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 15,
-    fontFamily: FONT_FAMILIES.MEDIUM,
+  empty: { textAlign: "center", paddingVertical: SPACE.xxxl },
+  renameInput: {
+    ...TYPE.body,
     backgroundColor: COLORS.BG,
-    borderRadius: UI.RADIUS_ITEM,
-    borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 12,
+    paddingHorizontal: SPACE.md + 2,
+    paddingVertical: SPACE.md,
+    marginTop: SPACE.md,
   },
-  customRenameHint: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 12,
-    fontFamily: FONT_FAMILIES.MEDIUM,
-    marginTop: 8,
-  },
-  customRenameActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
-  },
-  renameSecondaryBtn: {
+  renameActions: { flexDirection: "row", gap: SPACE.sm + 2, marginTop: SPACE.lg },
+  secondaryBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: UI.RADIUS_ITEM,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    gap: SPACE.sm,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm + 2,
+    borderRadius: RADIUS.item,
+    backgroundColor: SURFACE.raisedStrong,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
   },
-  renameSecondaryBtnPressed: {
-    opacity: 0.82,
-  },
-  renameSecondaryText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  renamePrimaryBtn: {
+  primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: UI.RADIUS_ITEM,
+    gap: SPACE.sm,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm + 2,
+    borderRadius: RADIUS.item,
     backgroundColor: COLORS.ACCENT_GREEN,
-  },
-  renamePrimaryBtnPressed: {
-    opacity: 0.9,
-  },
-  renamePrimaryBtnDisabled: {
-    opacity: 0.45,
-  },
-  renamePrimaryText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
   },
 });

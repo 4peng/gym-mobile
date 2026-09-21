@@ -1,168 +1,108 @@
-import React, { useCallback, useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { useCallback, useMemo } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { copyExercises, normalizeExercises } from "@/shared/programs.js";
 import { generateId } from "@/utils/id";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
 import RoutineEditorScreen, { type RoutineDraft } from "@/components/RoutineEditorScreen";
 import type { ExerciseFormData } from "@/components/ExerciseEditor";
 import type { Program, ProgramExercise } from "@/types";
-
-type ProgramEditorVariant = "create" | "edit";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { UI } from "@/constants/theme";
+import { View } from "react-native";
 
 interface ProgramEditorScreenProps {
-  variant: ProgramEditorVariant;
+  variant: "create" | "edit";
 }
 
-function toProgramUpdates(draft: RoutineDraft): Partial<Program> {
-  return {
-    name: draft.name,
-    exercises: normalizeExercises(draft.exercises) as ProgramExercise[],
-  };
-}
-
-const getProgramName = (program: Program | undefined) => {
-  if (!program?.name) return "this routine";
-  return `"${program.name}"`;
-};
-
+/** Wires the routine form to the program store. `create` may duplicate via `?sourceId=`. */
 export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProps) {
   const { id, sourceId } = useLocalSearchParams<{ id?: string; sourceId?: string | string[] }>();
-  const normalizedSourceId = Array.isArray(sourceId) ? sourceId[0] : sourceId;
-
   const router = useRouter();
-
   const addProgram = useProgramStore((s) => s.addProgram);
   const updateProgram = useProgramStore((s) => s.updateProgram);
   const deleteProgram = useProgramStore((s) => s.deleteProgram);
   const programs = useProgramStore((s) => s.programs);
-
-  const activeSession = useWorkoutSessionStore((s) => s.activeSession);
+  const hasActiveSession = useWorkoutSessionStore((s) => s.activeSession !== null);
   const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
 
   const program = useMemo(
-    () => (variant === "edit" && id ? programs.find((item) => item._id === id) : undefined),
+    () => (variant === "edit" && id ? programs.find((p) => p._id === id) : undefined),
     [id, programs, variant],
   );
+  const source = useMemo(() => {
+    const sid = Array.isArray(sourceId) ? sourceId[0] : sourceId;
+    return variant === "create" && sid ? programs.find((p) => p._id === sid) : undefined;
+  }, [programs, sourceId, variant]);
 
-  const sourceProgram = useMemo(
+  const initialName =
+    variant === "edit" ? (program?.name ?? "") : source ? `${source.name} Copy` : "";
+  const initialExercises = useMemo(
     () =>
-      variant === "create" && normalizedSourceId
-        ? programs.find((item) => item._id === normalizedSourceId)
-        : undefined,
-    [normalizedSourceId, programs, variant],
+      (variant === "edit"
+        ? normalizeExercises(program?.exercises as ProgramExercise[])
+        : copyExercises(source?.exercises as ProgramExercise[], generateId)) as ExerciseFormData[],
+    [program, source, variant],
   );
 
-  const initialName = useMemo(() => {
-    if (variant === "edit") {
-      return program?.name || "";
-    }
-
-    return sourceProgram?.name ? `${sourceProgram.name} Copy` : "";
-  }, [program, sourceProgram, variant]);
-
-  const initialExercises = useMemo(() => {
-    if (variant === "edit") {
-      return normalizeExercises(program?.exercises as ProgramExercise[]) as ExerciseFormData[];
-    }
-
-    return copyExercises(
-      sourceProgram?.exercises as ProgramExercise[],
-      generateId,
-    ) as ExerciseFormData[];
-  }, [program, sourceProgram, variant]);
-
+  /** Writes the draft over the existing program and returns the merged copy. */
   const applyUpdate = useCallback(
     (draft: RoutineDraft): Program | null => {
-      if (variant !== "edit" || !id || !program) return null;
-
-      const updates = toProgramUpdates(draft);
+      if (!id || !program) return null;
+      const updates = {
+        name: draft.name,
+        exercises: normalizeExercises(draft.exercises) as ProgramExercise[],
+      };
       updateProgram(id, updates);
-      return {
-        ...program,
-        ...updates,
-      };
+      return { ...program, ...updates };
     },
-    [id, program, updateProgram, variant],
+    [id, program, updateProgram],
   );
 
-  const handleSave = useCallback(
-    (draft: RoutineDraft) => {
-      if (variant === "edit") {
-        applyUpdate(draft);
-      } else {
-        addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
-      }
-      router.back();
-    },
-    [addProgram, applyUpdate, router, variant],
-  );
+  const handleSave = (draft: RoutineDraft) => {
+    if (variant === "edit") applyUpdate(draft);
+    else addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
+    router.back();
+  };
 
-  const handleSaveAndStart = useCallback(
-    (draft: RoutineDraft) => {
-      const nextProgram = applyUpdate(draft);
-      if (!nextProgram) return;
-
-      const start = () => {
-        startFromProgram(nextProgram);
-        router.replace("/workout");
-      };
-      if (activeSession) {
-        showConfirm(
-          "Active Workout",
-          "You already have a workout in progress. Discard it and start this one?",
-          start,
-        );
-      } else {
-        start();
-      }
-    },
-    [activeSession, applyUpdate, router, startFromProgram],
-  );
-
-  const handleDelete = useCallback(
-    (_draft: RoutineDraft) => {
-      if (variant !== "edit" || !id || !program) return;
-
+  const handleSaveAndStart = (draft: RoutineDraft) => {
+    const next = applyUpdate(draft);
+    if (!next) return;
+    const start = () => {
+      startFromProgram(next);
+      router.replace("/workout");
+    };
+    if (hasActiveSession)
       showConfirm(
-        "Delete Routine",
-        `Are you sure you want to delete ${getProgramName(program)}? This cannot be undone.`,
-        () => {
-          deleteProgram(id);
-          router.push("/programs/");
-        },
+        "Active workout",
+        "You already have a workout in progress. Discard it and start this one?",
+        start,
       );
-    },
-    [deleteProgram, id, program, router, variant],
-  );
+    else start();
+  };
 
-  const handleCancel = useCallback(
-    (_draft: RoutineDraft, hasChanges: boolean) => {
-      if (!hasChanges) {
-        router.back();
-        return;
-      }
+  const handleDelete = () => {
+    if (!id || !program) return;
+    showConfirm("Delete routine", `Delete "${program.name}"? This cannot be undone.`, () => {
+      deleteProgram(id);
+      router.push("/programs/");
+    });
+  };
 
-      showConfirm(
-        "Discard Changes",
-        variant === "edit"
-          ? "Your unsaved edits will be lost. Discard them?"
-          : "Your new routine draft will be lost. Discard it?",
-        () => router.back(),
-      );
-    },
-    [router, variant],
-  );
+  const handleCancel = (_draft: RoutineDraft, hasChanges: boolean) => {
+    if (!hasChanges) return router.back();
+    showConfirm(
+      "Discard changes",
+      variant === "edit" ? "Your unsaved edits will be lost." : "Your new routine will be lost.",
+      () => router.back(),
+    );
+  };
 
   if (variant === "edit" && !program) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.notFoundLabel}>ROUTINE TARGET</Text>
-        <Text style={styles.notFoundText}>NOT FOUND</Text>
+      <View style={[UI.screen, { justifyContent: "center" }]}>
+        <EmptyState title="Routine not found" subtitle="It may have been deleted." />
       </View>
     );
   }
@@ -179,27 +119,3 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
     />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  notFoundLabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 11,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-    marginBottom: 8,
-  },
-  notFoundText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 28,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-  },
-});

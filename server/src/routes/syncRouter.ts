@@ -4,7 +4,7 @@ import { deleteBatchSchema, validateOrError } from "../validation/schemas.js";
 import type { SyncService } from "../services/syncService.js";
 
 // ──────────────────────────────────────────────
-// Sync router: GET / (delta fetch), PUT /batch (upsert), DELETE /batch (soft delete).
+// Backup router: GET / (all, paged), PUT /batch (upsert), DELETE /batch.
 // The mobile client only ever calls these three.
 // ──────────────────────────────────────────────
 
@@ -16,11 +16,11 @@ export function makeSyncRouter<K extends string>(
   const router = Router();
 
   router.get("/", async (req, res) => {
-    const { userId, since, limit, skip } = req.query as Record<string, string | undefined>;
+    const { userId, limit, skip } = req.query as Record<string, string | undefined>;
     if (!userId) return res.status(400).json({ error: "userId is required" });
 
     try {
-      res.json(await service.findAll(userId, { since, limit, skip }));
+      res.json(await service.findAll(userId, { limit, skip }));
     } catch {
       res.status(500).json({ error: `Failed to fetch ${key}` });
     }
@@ -42,13 +42,11 @@ export function makeSyncRouter<K extends string>(
     if (!body.success) return res.status(400).json({ error: body.error });
 
     const userId = req.headers["x-user-id"] ?? req.query.userId;
-    if (typeof userId !== "string" || !userId) {
+    if (typeof userId !== "string" || !userId)
       return res.status(400).json({ error: "userId is required" });
-    }
 
     try {
-      const deleted = await service.softDeleteBatch(body.data.ids, userId);
-      res.json({ ok: true, deleted });
+      res.json({ ok: true, deleted: await service.deleteBatch(body.data.ids, userId) });
     } catch {
       res.status(500).json({ error: `Failed to batch delete ${key}` });
     }

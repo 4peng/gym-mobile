@@ -1,8 +1,6 @@
-import { Pressable, StyleSheet, Text, View, Animated } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { Check } from "lucide-react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import type { ExerciseTrackingMode } from "@/types";
 import { EXERCISE_TRACKING_OPTIONS, getTrackingModeLabel } from "@/utils/exerciseTracking";
 import { useSheet } from "@/hooks/useSheet";
@@ -23,6 +21,7 @@ interface ExerciseTrackingModeSelectorProps {
   anchorLayout?: AnchorLayout;
 }
 
+/** Dropdown anchored to its trigger (the only non-sheet overlay in the app). */
 export default function ExerciseTrackingModeSelector({
   value,
   onChange,
@@ -34,18 +33,18 @@ export default function ExerciseTrackingModeSelector({
   if (!mounted || !anchorLayout) return null;
 
   const menuStyle = {
-    top: anchorLayout.y + anchorLayout.height + 4,
+    top: anchorLayout.y + anchorLayout.height + SPACE.xs,
     left: anchorLayout.x,
     width: Math.max(140, anchorLayout.width * 1.5),
   };
 
   return (
-    <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: progress }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+    <View style={[UI.fill, styles.overlay]} pointerEvents="box-none">
+      <Animated.View style={[UI.fill, styles.backdrop, { opacity: progress }]}>
+        <Pressable style={UI.fill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View style={[styles.menu, menuStyle, { opacity: progress }]}>
+      <Animated.View style={[styles.menu, UI.shadow, menuStyle, { opacity: progress }]}>
         {EXERCISE_TRACKING_OPTIONS.map((option) => {
           const isSelected = option === value;
           return (
@@ -58,11 +57,13 @@ export default function ExerciseTrackingModeSelector({
               style={({ pressed }) => [
                 styles.option,
                 isSelected && styles.optionSelected,
-                pressed && styles.optionPressed,
+                pressed && UI.pressed,
               ]}
             >
-              <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-                {getTrackingModeLabel(option).toUpperCase()}
+              <Text
+                style={[TYPE.label, styles.optionText, isSelected && { color: COLORS.ACCENT_BLUE }]}
+              >
+                {getTrackingModeLabel(option)}
               </Text>
               {isSelected && <Check size={12} color={COLORS.ACCENT_BLUE} strokeWidth={3} />}
             </Pressable>
@@ -74,38 +75,26 @@ export default function ExerciseTrackingModeSelector({
 }
 
 const styles = StyleSheet.create({
-  absoluteOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
+  overlay: { zIndex: 1000 },
+  backdrop: { backgroundColor: SURFACE.backdrop, opacity: 0.6 },
   menu: {
     position: "absolute",
     backgroundColor: COLORS.BG,
-    borderRadius: UI.RADIUS_ITEM,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER_LIGHT,
-    padding: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
+    padding: SPACE.xs,
     zIndex: 1000,
   },
   option: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 6,
-    gap: 8,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm + 2,
+    borderRadius: RADIUS.sm,
+    gap: SPACE.sm,
   },
-  optionSelected: { backgroundColor: "rgba(0, 122, 255, 0.08)" },
-  optionPressed: { backgroundColor: "rgba(255, 255, 255, 0.05)" },
-  optionText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 11,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  optionTextSelected: { color: COLORS.ACCENT_BLUE },
+  optionSelected: { backgroundColor: SURFACE.blueTint },
+  optionText: { color: COLORS.TEXT_SECONDARY, fontSize: 11, letterSpacing: 0.5 },
 });

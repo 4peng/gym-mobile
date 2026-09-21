@@ -1,9 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
-import { Timer, Clock, Check } from "lucide-react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { Animated, StyleSheet, Text, View } from "react-native";
+import { Check, Clock, Timer } from "lucide-react-native";
+import { COLORS, LAYOUT, SPACE, SURFACE, TYPE } from "@/constants/theme";
 import LiveWorkoutTimer from "@/components/LiveWorkoutTimer";
 import LiveRestTimer from "@/components/LiveRestTimer";
 import FloatingRestTimer from "@/components/FloatingRestTimer";
@@ -14,7 +12,7 @@ interface HUDHeaderProps {
   progressData: { progress: number; completed: number; total: number };
 }
 
-/** Scroll offset (px) at which the sticky condensed HUD fades in. */
+/** Scroll offset (px) at which the condensed sticky HUD fades in. */
 const CONDENSE_THRESHOLD = 80;
 
 export const HUDHeader = React.memo(function HUDHeader({
@@ -22,69 +20,65 @@ export const HUDHeader = React.memo(function HUDHeader({
   startedAt,
   progressData,
 }: HUDHeaderProps) {
-  const stickyHudOpacity = scrollY.interpolate({
+  const stickyOpacity = scrollY.interpolate({
     inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
-
-  const stickyHudTranslateY = scrollY.interpolate({
+  const stickyTranslateY = scrollY.interpolate({
     inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
     outputRange: [-20, 0],
     extrapolate: "clamp",
   });
+  const pct = `${progressData.progress * 100}%` as const;
 
   return (
     <>
       <Animated.View
         style={[
-          styles.stickyHud,
-          { opacity: stickyHudOpacity, transform: [{ translateY: stickyHudTranslateY }] },
+          styles.sticky,
+          { opacity: stickyOpacity, transform: [{ translateY: stickyTranslateY }] },
         ]}
       >
-        <View style={styles.stickyHudContent}>
-          <View style={styles.stickyTimer}>
+        <View style={styles.stickyRow}>
+          <View style={styles.stat}>
             <Timer size={14} color={COLORS.ACCENT_GREEN} />
-            {startedAt && (
-              <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.stickyTimerText} />
-            )}
+            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.stickyText} />}
           </View>
-          <View style={styles.stickyTimer}>
+          <View style={styles.stat}>
             <Clock size={14} color={COLORS.TEXT_TERTIARY} />
-            <LiveRestTimer textStyle={styles.stickyTimerText} />
+            <LiveRestTimer textStyle={styles.stickyText} />
           </View>
         </View>
       </Animated.View>
 
       <View style={styles.header}>
-        <View style={styles.headerTopLine}>
-          <View style={styles.timerBlock}>
-            <Text style={styles.timerLabel}>ELAPSED: </Text>
-            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.timerValue} />}
+        <View style={styles.topLine}>
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>ELAPSED</Text>
+            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.statValue} />}
           </View>
-          <View style={styles.timerBlock}>
-            <Text style={styles.timerLabel}>TOTAL REST: </Text>
-            <LiveRestTimer textStyle={styles.timerValue} />
-            <View style={styles.activeRestSlot}>
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>REST</Text>
+            <LiveRestTimer textStyle={styles.statValue} />
+            <View style={styles.restSlot}>
               <FloatingRestTimer />
             </View>
           </View>
         </View>
 
-        <View style={styles.statsLine}>
-          <View style={styles.statsLeft}>
-            <Check size={14} color={COLORS.ACCENT_GREEN} />
-            <Text style={styles.statsValue}>
-              {Math.round(progressData.progress * 100)}% ({progressData.completed}/
-              {progressData.total})
-            </Text>
-          </View>
+        <View style={styles.progressLine}>
+          <Check size={14} color={COLORS.ACCENT_GREEN} />
+          <Text style={TYPE.monoSmall}>
+            {Math.round(progressData.progress * 100)}% ({progressData.completed}/
+            {progressData.total})
+          </Text>
         </View>
 
-        <View style={styles.progressBarWrapper}>
-          <View style={[styles.progressBar, { width: `${progressData.progress * 100}%` }]} />
-          <View style={[styles.progressIndicator, { left: `${progressData.progress * 100}%` }]}>
-            <View style={styles.indicatorCircle} />
+        <View style={styles.track}>
+          <View style={[styles.bar, { width: pct }]} />
+          <View style={[styles.indicator, { left: pct }]}>
+            <View style={styles.indicatorDot} />
           </View>
         </View>
       </View>
@@ -93,66 +87,46 @@ export const HUDHeader = React.memo(function HUDHeader({
 });
 
 const styles = StyleSheet.create({
-  stickyHud: {
+  sticky: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: UI.HEADER_TOP + 20,
-    backgroundColor: "rgba(0,0,0,0.9)",
+    height: LAYOUT.headerTop + 30,
+    backgroundColor: SURFACE.backdrop,
     zIndex: 100,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER,
-    paddingTop: UI.HEADER_TOP - 30,
+    paddingTop: LAYOUT.headerTop - 20,
     justifyContent: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: LAYOUT.gutter + SPACE.xs,
   },
-  stickyHudContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  stickyTimer: { flexDirection: "row", alignItems: "center", gap: 8 },
-  stickyTimerText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 13,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
+  stickyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  stickyText: { fontSize: 13 },
+  header: {
+    paddingTop: LAYOUT.headerTop - 10,
+    paddingHorizontal: LAYOUT.gutter + SPACE.xs,
+    paddingBottom: SPACE.xl,
   },
-  header: { paddingTop: UI.HEADER_TOP - 20, paddingHorizontal: 20, paddingBottom: 20 },
-  headerTopLine: {
+  topLine: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 44,
+    marginBottom: SPACE.xxxl + SPACE.md,
   },
-  timerBlock: { flexDirection: "row", marginTop: 2 },
-  timerLabel: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
+  stat: { flexDirection: "row", alignItems: "center", gap: SPACE.sm },
+  statLabel: { ...TYPE.mono, color: COLORS.TEXT_TERTIARY },
+  statValue: { ...TYPE.mono },
+  restSlot: { position: "absolute", top: 28, right: 0, zIndex: 20 },
+  progressLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACE.sm - 2,
+    marginBottom: SPACE.sm,
   },
-  timerValue: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "700",
-  },
-  activeRestSlot: { position: "absolute", top: 28, right: 0, zIndex: 20 },
-  statsLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
-  statsLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statsValue: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 11,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "600",
-  },
-  progressBarWrapper: {
-    height: 4,
-    backgroundColor: COLORS.PROGRESS_BG,
-    borderRadius: 2,
-    position: "relative",
-    marginTop: 4,
-  },
-  progressBar: { height: "100%", backgroundColor: COLORS.ACCENT_GREEN, borderRadius: 2 },
-  progressIndicator: {
+  track: { height: 4, backgroundColor: SURFACE.greenTint, borderRadius: 2, marginTop: SPACE.xs },
+  bar: { height: "100%", backgroundColor: COLORS.ACCENT_GREEN, borderRadius: 2 },
+  indicator: {
     position: "absolute",
     top: -4,
     width: 12,
@@ -161,7 +135,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  indicatorCircle: {
+  indicatorDot: {
     width: 12,
     height: 12,
     borderRadius: 6,

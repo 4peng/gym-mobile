@@ -1,21 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Animated } from "react-native";
-import { Check, Activity } from "lucide-react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Activity, Check } from "lucide-react-native";
+import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import {
-  expandPrimaryMusclesForDetailedMode,
   collapseDetailedMusclesToPrimary,
   DETAILED_MODE_MUSCLE_GROUPS,
   DETAILED_MUSCLE_GROUPS,
+  expandPrimaryMusclesForDetailedMode,
   MUSCLE_LABELS,
-  PRIMARY_MUSCLE_GROUPS,
   MuscleGroup,
+  PRIMARY_MUSCLE_GROUPS,
 } from "@/constants/muscles";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { HapticFeedback } from "@/utils/haptics";
-import { useDragToClose, useSheet } from "@/hooks/useSheet";
+import { Sheet } from "@/components/ui/Sheet";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface MuscleSelectorProps {
   visible: boolean;
@@ -28,12 +27,13 @@ interface MuscleSelectorProps {
 
 const DETAILED_SET = new Set<MuscleGroup>(DETAILED_MUSCLE_GROUPS);
 
+/** Multi-select muscle picker with a simple/detailed toggle. Applies on close. */
 export default function MuscleSelector({
   visible,
   onClose,
   selectedMuscles,
   onSelect,
-  label = "Targeted Muscles",
+  label = "Targeted muscles",
 }: MuscleSelectorProps) {
   const [draft, setDraft] = useState<MuscleGroup[]>([]);
   const showDetailed = useUiPreferencesStore((s) => s.showDetailedMuscleGroups);
@@ -44,20 +44,15 @@ export default function MuscleSelector({
     [showDetailed, selectedMuscles],
   );
 
-  // In simple mode, keep any already-selected detailed muscles visible so they can be unticked.
-  const availableMuscles: readonly MuscleGroup[] = showDetailed
+  // In simple mode, already-selected detailed muscles stay visible so they can be unticked.
+  const available: readonly MuscleGroup[] = showDetailed
     ? DETAILED_MODE_MUSCLE_GROUPS
     : Array.from(
         new Set([...PRIMARY_MUSCLE_GROUPS, ...selectedMuscles.filter((m) => DETAILED_SET.has(m))]),
       );
 
-  const applyAndClose = () => {
-    onSelect(draft);
-    onClose();
-  };
-
   // Seed the draft only on the closed→open transition so toggling
-  // Simple/Detailed while open doesn't discard in-progress edits.
+  // simple/detailed while open doesn't discard in-progress edits.
   const wasVisible = useRef(false);
   useEffect(() => {
     if (visible && !wasVisible.current) setDraft(normalizedSelected);
@@ -65,14 +60,13 @@ export default function MuscleSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const { mounted, progress } = useSheet(visible);
-  const { dragOffset, panHandlers } = useDragToClose(applyAndClose);
-  if (!mounted) return null;
+  const applyAndClose = () => {
+    onSelect(draft);
+    onClose();
+  };
 
-  const toggleMuscle = (muscle: MuscleGroup) =>
-    setDraft((prev) =>
-      prev.includes(muscle) ? prev.filter((m) => m !== muscle) : [...prev, muscle],
-    );
+  const toggleMuscle = (m: MuscleGroup) =>
+    setDraft((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
 
   const handleToggleDetailed = () => {
     setDraft((prev) =>
@@ -85,127 +79,73 @@ export default function MuscleSelector({
   };
 
   return (
-    <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View
-        style={[
-          styles.backdrop,
-          { opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] }) },
-        ]}
+    <Sheet
+      visible={visible}
+      onClose={applyAndClose}
+      dragToClose
+      title={label}
+      headerRight={
+        <IconButton size="md" tone="success" onPress={applyAndClose}>
+          <Check size={20} color={COLORS.ACCENT_GREEN} />
+        </IconButton>
+      }
+    >
+      <Pressable
+        onPress={handleToggleDetailed}
+        style={({ pressed }) => [styles.modeToggle, pressed && UI.pressed]}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={applyAndClose} />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.container,
-          {
-            transform: [
-              { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) },
-              { translateY: dragOffset },
-            ],
-          },
-        ]}
-        {...panHandlers}
-      >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>{label}</Text>
-            <Pressable onPress={handleToggleDetailed} style={styles.detailedToggle}>
-              <Activity
-                size={12}
-                color={showDetailed ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY}
-              />
-              <Text
-                style={[styles.detailedToggleText, showDetailed && { color: COLORS.ACCENT_BLUE }]}
-              >
-                {showDetailed ? "DETAILED MODE" : "SIMPLE MODE"}
-              </Text>
-            </Pressable>
-          </View>
-          <Pressable onPress={applyAndClose} style={styles.closeBtn}>
-            <Check size={24} color={COLORS.ACCENT_GREEN} />
-          </Pressable>
-        </View>
+        <Activity size={12} color={showDetailed ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY} />
+        <Text style={[TYPE.label, showDetailed && { color: COLORS.ACCENT_BLUE }]}>
+          {showDetailed ? "Detailed mode" : "Simple mode"}
+        </Text>
+      </Pressable>
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {availableMuscles.map((m) => {
-            const isActive = draft.includes(m);
-            return (
-              <Pressable
-                key={m}
-                onPress={() => toggleMuscle(m)}
-                style={[styles.item, isActive && styles.itemActive]}
-              >
-                <Text style={[styles.itemText, isActive && styles.itemTextActive]}>
-                  {MUSCLE_LABELS[m]}
-                </Text>
-                {isActive && <Check size={18} color={COLORS.ACCENT_BLUE} />}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </Animated.View>
-    </View>
+      <ScrollView
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {available.map((m) => {
+          const active = draft.includes(m);
+          return (
+            <Pressable
+              key={m}
+              onPress={() => toggleMuscle(m)}
+              style={({ pressed }) => [
+                UI.inset,
+                styles.item,
+                active && styles.itemActive,
+                pressed && UI.pressed,
+              ]}
+            >
+              <Text style={[TYPE.body, !active && { color: COLORS.TEXT_SECONDARY }]}>
+                {MUSCLE_LABELS[m]}
+              </Text>
+              {active && <Check size={18} color={COLORS.ACCENT_BLUE} />}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  absoluteOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10000, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,1)" },
-  container: {
-    backgroundColor: COLORS.CARD_BG,
-    borderTopLeftRadius: UI.RADIUS_HUD,
-    borderTopRightRadius: UI.RADIUS_HUD,
-    paddingBottom: 40,
-    maxHeight: "80%",
-  },
-  header: {
+  modeToggle: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.05)",
+    gap: SPACE.sm - 2,
+    paddingHorizontal: SPACE.xl,
+    paddingTop: SPACE.md,
   },
-  detailedToggle: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  detailedToggleText: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 10,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-    letterSpacing: 0.5,
-  },
-  title: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 18,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  closeBtn: { padding: 4 },
-  scrollContent: { padding: 16, gap: 8 },
+  list: { padding: SPACE.lg, gap: SPACE.sm },
   item: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: UI.RADIUS_CONTAINER,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
+    paddingVertical: SPACE.lg,
+    paddingHorizontal: SPACE.xl,
+    borderRadius: RADIUS.container,
   },
-  itemActive: {
-    backgroundColor: "rgba(11, 130, 255, 0.08)",
-    borderColor: "rgba(11, 130, 255, 0.2)",
-  },
-  itemText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 16,
-    fontWeight: "700",
-    fontFamily: FONT_FAMILIES.MEDIUM,
-  },
-  itemTextActive: { color: COLORS.TEXT_PRIMARY },
+  itemActive: { backgroundColor: SURFACE.blueTint, borderColor: SURFACE.blueBorder },
 });

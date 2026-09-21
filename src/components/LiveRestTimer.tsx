@@ -1,52 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { Text, StyleSheet, TextStyle } from "react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
+import { useEffect, useState } from "react";
+import { Text, type StyleProp, type TextStyle } from "react-native";
+import { TYPE } from "@/constants/theme";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { formatClock } from "@/utils/conversions";
 
-interface LiveRestTimerProps {
-  textStyle?: TextStyle;
-}
-
-export default function LiveRestTimer({ textStyle }: LiveRestTimerProps) {
-  const [totalRestDisplay, setTotalRestDisplay] = useState("00:00");
-
-  // Use granular selectors to avoid re-rendering on session-wide updates (like typing reps)
+/** Total rest taken this session, including the timer currently running. Ticks once a second. */
+export default function LiveRestTimer({ textStyle }: { textStyle?: StyleProp<TextStyle> }) {
   const baseRestSeconds = useWorkoutSessionStore(
     (s) => s.activeSession?.cumulativeRestSeconds || 0,
   );
-  const activeRestTimer = useWorkoutSessionStore((s) => s.activeRestTimer);
-  const activeSessionId = useWorkoutSessionStore((s) => s.activeSession?._id);
+  const timerStartedAt = useWorkoutSessionStore((s) => s.activeRestTimer?.startTime ?? null);
+  const [display, setDisplay] = useState("00:00");
 
   useEffect(() => {
-    if (!activeSessionId) return;
-
-    const updateTimer = () => {
-      let currentRestContribution = 0;
-      if (activeRestTimer) {
-        currentRestContribution = Math.max(
-          0,
-          Math.floor((Date.now() - activeRestTimer.startTime) / 1000),
-        );
-      }
-
-      setTotalRestDisplay(formatClock(baseRestSeconds + currentRestContribution));
+    const tick = () => {
+      const running = timerStartedAt
+        ? Math.max(0, Math.floor((Date.now() - timerStartedAt) / 1000))
+        : 0;
+      setDisplay(formatClock(baseRestSeconds + running));
     };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [activeRestTimer, baseRestSeconds, activeSessionId]);
+  }, [baseRestSeconds, timerStartedAt]);
 
-  return <Text style={[styles.timer, textStyle]}>{totalRestDisplay}</Text>;
+  return <Text style={[TYPE.mono, textStyle]}>{display}</Text>;
 }
-
-const styles = StyleSheet.create({
-  timer: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 14,
-    fontWeight: "700",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-});

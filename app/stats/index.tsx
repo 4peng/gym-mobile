@@ -1,4 +1,4 @@
-import ExerciseListStatsScreen from "@/src/screens/ExerciseListStatsScreen";
+import ExerciseListStatsScreen from "@/screens/ExerciseListStatsScreen";
 
 export default function StatsIndex() {
   return <ExerciseListStatsScreen />;

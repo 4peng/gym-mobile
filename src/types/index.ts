@@ -1,6 +1,6 @@
 // Client-side types (string IDs, no ObjectId)
 
-import { MuscleGroup } from "@/src/constants/muscles";
+import { MuscleGroup } from "@/constants/muscles";
 
 export type ExerciseTrackingMode = "strength" | "timed" | "cardio";
 
@@ -41,8 +41,7 @@ export interface Program {
   exercises: ProgramExercise[];
   pinned?: boolean;
   createdAt: string; // ISO-8601
-  updatedAt: number; // epoch-ms, required for last-write-wins sync
-  deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
+  updatedAt: number; // epoch-ms, bumped on every local edit
 }
 
 /** A single logged set inside a workout exercise. */
@@ -79,8 +78,7 @@ export interface WorkoutSession {
   programId?: string; // string, not ObjectId
   startedAt: string; // ISO-8601
   completedAt?: string; // ISO-8601
-  updatedAt: number; // epoch-ms, required for last-write-wins sync
-  deletedAt?: number | null; // epoch-ms, presence means the item is a tombstone
+  updatedAt: number; // epoch-ms, bumped on every local edit
   notes: string;
   exercises: WorkoutExercise[];
   cumulativeRestSeconds?: number; // Total seconds spent resting

@@ -1,13 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
-import { COLORS } from "@/constants/colors";
-import { FONT_FAMILIES } from "@/constants/fonts";
-import { UI } from "@/constants/ui";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 
 const SCRUB_ITEM_WIDTH = 64;
-const SCRUB_GAP = 12;
+const SCRUB_GAP = SPACE.md;
+/** Horizontal distance between scrubber items; the screen scrolls the rail by this per index. */
 export const SCRUB_STEP = SCRUB_ITEM_WIDTH + SCRUB_GAP;
-const POPUP_WIDTH = UI.WIDTH - 40;
+const POPUP_WIDTH = LAYOUT.screenWidth - (LAYOUT.gutter + SPACE.xs) * 2;
 const SIDE_SPACER = POPUP_WIDTH / 2 - SCRUB_ITEM_WIDTH / 2;
 
 interface ScrubberRailProps {
@@ -18,8 +17,9 @@ interface ScrubberRailProps {
   scrubberScrollRef: React.RefObject<ScrollView | null>;
 }
 
-const getShorthand = (name: string) => (name || "EXER").substring(0, 4).toUpperCase();
+const shorthand = (name: string) => (name || "EXER").substring(0, 4).toUpperCase();
 
+/** Long-press scrubber that previews every exercise while dragging across the HUD pill. */
 export const ScrubberRail = React.memo(function ScrubberRail({
   exerciseIds,
   exerciseNames,
@@ -28,49 +28,42 @@ export const ScrubberRail = React.memo(function ScrubberRail({
   scrubberScrollRef,
 }: ScrubberRailProps) {
   return (
-    <View style={styles.scrubberPopup}>
+    <View style={[styles.popup, UI.shadow]}>
       <ScrollView
         ref={scrubberScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrubberPopupContent}
+        contentContainerStyle={styles.content}
         scrollEnabled={false}
       >
         <View style={{ width: SIDE_SPACER }} />
         {exerciseIds.map((id, idx) => {
-          const isItemActive = displayIndex === idx;
+          const active = displayIndex === idx;
           const progress = exerciseProgress[idx] || 0;
           return (
-            <View key={id} style={styles.scrubberItemWrapper}>
-              <View style={[styles.scrubberItem, isItemActive && styles.scrubberItemActive]}>
-                <Text
-                  style={[styles.scrubberItemIndex, isItemActive && { color: COLORS.TEXT_PRIMARY }]}
-                >
-                  {(idx + 1).toString().padStart(2, "0")}
+            <View key={id} style={styles.itemWrap}>
+              <View style={[styles.item, active && styles.itemActive]}>
+                <Text style={[styles.index, active && { color: COLORS.TEXT_PRIMARY }]}>
+                  {String(idx + 1).padStart(2, "0")}
                 </Text>
-                <Text
-                  style={[
-                    styles.scrubberItemShorthand,
-                    isItemActive && { color: COLORS.ACCENT_BLUE },
-                  ]}
-                >
-                  {getShorthand(exerciseNames[idx])}
+                <Text style={[styles.shorthand, active && { color: COLORS.ACCENT_BLUE }]}>
+                  {shorthand(exerciseNames[idx])}
                 </Text>
-                <View style={styles.scrubberItemProgressBg}>
+                <View style={styles.progressBg}>
                   <View
                     style={[
-                      styles.scrubberItemProgressFill,
+                      styles.progressFill,
                       { width: `${progress * 100}%` },
                       progress === 1 && { backgroundColor: COLORS.ACCENT_GREEN },
                     ]}
                   />
                 </View>
-                {isItemActive && (
+                {active && (
                   <>
-                    <View style={[styles.bracket, styles.bracketTopLeft]} />
-                    <View style={[styles.bracket, styles.bracketTopRight]} />
-                    <View style={[styles.bracket, styles.bracketBottomLeft]} />
-                    <View style={[styles.bracket, styles.bracketBottomRight]} />
+                    <View style={[styles.bracket, styles.tl]} />
+                    <View style={[styles.bracket, styles.tr]} />
+                    <View style={[styles.bracket, styles.bl]} />
+                    <View style={[styles.bracket, styles.br]} />
                   </>
                 )}
               </View>
@@ -84,69 +77,47 @@ export const ScrubberRail = React.memo(function ScrubberRail({
 });
 
 const styles = StyleSheet.create({
-  scrubberPopup: {
+  popup: {
     position: "absolute",
     bottom: 110,
-    left: 20,
-    right: 20,
+    left: LAYOUT.gutter + SPACE.xs,
+    right: LAYOUT.gutter + SPACE.xs,
     height: 80,
-    backgroundColor: "rgba(18, 18, 18, 0.95)",
-    borderRadius: UI.RADIUS_CONTAINER,
+    backgroundColor: SURFACE.sheet,
+    borderRadius: RADIUS.container,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     justifyContent: "center",
     alignItems: "center",
     overflow: "visible",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
   },
-  scrubberPopupContent: { alignItems: "center", gap: SCRUB_GAP },
-  scrubberItemWrapper: {
-    width: SCRUB_ITEM_WIDTH,
-    height: 54,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scrubberItem: {
+  content: { alignItems: "center", gap: SCRUB_GAP },
+  itemWrap: { width: SCRUB_ITEM_WIDTH, height: 54, justifyContent: "center", alignItems: "center" },
+  item: {
     width: "100%",
     height: "100%",
-    borderRadius: UI.RADIUS_ITEM,
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderRadius: RADIUS.item,
+    backgroundColor: SURFACE.raised,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.05)",
+    borderColor: SURFACE.hairline,
   },
-  scrubberItemActive: { backgroundColor: "transparent", borderColor: "transparent" },
-  scrubberItemIndex: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 16,
-    fontWeight: "900",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  scrubberItemShorthand: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 9,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-    marginTop: 2,
-    letterSpacing: 0.5,
-  },
-  scrubberItemProgressBg: {
+  itemActive: { backgroundColor: "transparent", borderColor: "transparent" },
+  index: { ...TYPE.mono, fontSize: 16, color: COLORS.TEXT_TERTIARY },
+  shorthand: { ...TYPE.label, fontSize: 9, letterSpacing: 0.5, marginTop: 2 },
+  progressBg: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: SURFACE.raisedStrong,
   },
-  scrubberItemProgressFill: { height: "100%", backgroundColor: COLORS.ACCENT_BLUE },
+  progressFill: { height: "100%", backgroundColor: COLORS.ACCENT_BLUE },
   bracket: { position: "absolute", width: 6, height: 6, borderColor: COLORS.ACCENT_BLUE },
-  bracketTopLeft: { top: -2, left: -2, borderTopWidth: 2, borderLeftWidth: 2 },
-  bracketTopRight: { top: -2, right: -2, borderTopWidth: 2, borderRightWidth: 2 },
-  bracketBottomLeft: { bottom: -2, left: -2, borderBottomWidth: 2, borderLeftWidth: 2 },
-  bracketBottomRight: { bottom: -2, right: -2, borderBottomWidth: 2, borderRightWidth: 2 },
+  tl: { top: -2, left: -2, borderTopWidth: 2, borderLeftWidth: 2 },
+  tr: { top: -2, right: -2, borderTopWidth: 2, borderRightWidth: 2 },
+  bl: { bottom: -2, left: -2, borderBottomWidth: 2, borderLeftWidth: 2 },
+  br: { bottom: -2, right: -2, borderBottomWidth: 2, borderRightWidth: 2 },
 });
