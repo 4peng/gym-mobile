@@ -31,7 +31,7 @@ CI runs all of the above on every push. `ios-build.yml` produces an unsigned IPA
 ## Sideloading with the Live Activity
 
 The rest-timer Live Activity is a widget extension (`expo-widgets`). It ships inside the IPA as a
-second bundle id (`com.x4peng.gym-mobile.RestTimerLiveActivity`). When signing the IPA with your
+second bundle id (`com.x4peng.gym-mobile.ExpoWidgetsTarget`). When signing the IPA with your
 sideloading tool, keep app extensions enabled so the extension is signed alongside the app;
 if the tool asks whether to strip extensions, say no. Nothing else is needed: the timer runs on
 `timerInterval`, so no push token or server is involved.
