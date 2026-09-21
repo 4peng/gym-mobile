@@ -4,7 +4,7 @@
 // serializes everything as JSON - actual ObjectId wrapping happens
 // only in the fetch body via `converters.ts`.
 
-export interface ProgramExerciseServer {
+interface ProgramExerciseServer {
   id: string;
   exerciseDefinitionId?: string;
   trackingMode?: string;
@@ -32,7 +32,7 @@ export interface ProgramServer {
   deletedAt?: number | null;
 }
 
-export interface WorkoutSetServer {
+interface WorkoutSetServer {
   id: string;
   weight: number | null;
   reps: number | null;
@@ -42,7 +42,7 @@ export interface WorkoutSetServer {
   completedAt?: string;
 }
 
-export interface WorkoutExerciseServer {
+interface WorkoutExerciseServer {
   id: string;
   exerciseDefinitionId?: string;
   trackingMode?: string;

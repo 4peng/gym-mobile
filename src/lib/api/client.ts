@@ -22,8 +22,8 @@ const getBaseUrl = () => {
   // If we are on a physical device, we must use the machine's local IP
   // instead of "localhost" (which would refer to the phone itself).
   const debuggerHost = Constants.expoConfig?.hostUri;
-  const localhost = debuggerHost ? debuggerHost.split(':')[0] : '192.168.1.104';
-  
+  const localhost = debuggerHost ? debuggerHost.split(":")[0] : "192.168.1.104";
+
   return `http://${localhost}:${LOCAL_PORT}`;
 };
 
@@ -49,7 +49,7 @@ export interface ApiResponse<T> {
  */
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
   const url = `${BASE_URL}${path}`;
 

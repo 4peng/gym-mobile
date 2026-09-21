@@ -34,10 +34,7 @@ async function remove4DaySplit() {
     const regex = new RegExp(`^${SEED_PREFIX}-program-`);
     const query = {
       userId: USER_ID,
-      $or: [
-        { _id: regex },
-        { name: { $in: PROGRAM_NAMES } },
-      ],
+      $or: [{ _id: regex }, { name: { $in: PROGRAM_NAMES } }],
     };
 
     const beforeCount = await Program.countDocuments(query);

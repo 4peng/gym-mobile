@@ -86,13 +86,13 @@ jest.mock("@/stores/workoutSessionStore", () => ({
 
 // API module mocks
 jest.mock("@/lib/api/programs", () => ({
-  deleteRemoteProgram: jest.fn(),
+  batchDeletePrograms: jest.fn(),
   batchUpsertPrograms: jest.fn(),
   fetchPrograms: jest.fn(),
 }));
 
 jest.mock("@/lib/api/workouts", () => ({
-  deleteRemoteWorkout: jest.fn(),
+  batchDeleteWorkouts: jest.fn(),
   batchUpsertWorkouts: jest.fn(),
   fetchWorkouts: jest.fn(),
 }));
@@ -106,12 +106,12 @@ import type { Program, WorkoutSession } from "@/types";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import {
-  deleteRemoteProgram,
+  batchDeletePrograms,
   batchUpsertPrograms,
   fetchPrograms,
 } from "@/lib/api/programs";
 import {
-  deleteRemoteWorkout,
+  batchDeleteWorkouts,
   batchUpsertWorkouts,
   fetchWorkouts,
 } from "@/lib/api/workouts";
@@ -181,21 +181,20 @@ describe("syncPrograms", () => {
     jest.clearAllMocks();
     setupProgramState();
     setupWorkoutState();
-    (deleteRemoteProgram as jest.Mock).mockResolvedValue(true);
+    (batchDeletePrograms as jest.Mock).mockResolvedValue(true);
     (batchUpsertPrograms as jest.Mock).mockImplementation((programs: Program[]) => Promise.resolve(programs));
     (fetchPrograms as jest.Mock).mockResolvedValue([]);
   });
 
-  it("when deletedProgramIds is non-empty, calls deleteRemoteProgram for each ID", async () => {
+  it("when deletedProgramIds is non-empty, batch-deletes them in one call", async () => {
     setupProgramState({
       deletedProgramIds: ["p1", "p2"],
     });
 
     await syncPrograms();
 
-    expect(deleteRemoteProgram).toHaveBeenCalledTimes(2);
-    expect(deleteRemoteProgram).toHaveBeenCalledWith("p1");
-    expect(deleteRemoteProgram).toHaveBeenCalledWith("p2");
+    expect(batchDeletePrograms).toHaveBeenCalledTimes(1);
+    expect(batchDeletePrograms).toHaveBeenCalledWith(["p1", "p2"]);
   });
 
   it("dirty programs with deletedAt are filtered out before push", async () => {
@@ -260,7 +259,7 @@ describe("syncWorkouts", () => {
     jest.clearAllMocks();
     setupProgramState();
     setupWorkoutState();
-    (deleteRemoteWorkout as jest.Mock).mockResolvedValue(true);
+    (batchDeleteWorkouts as jest.Mock).mockResolvedValue(true);
     (batchUpsertWorkouts as jest.Mock).mockImplementation((workouts: WorkoutSession[]) => Promise.resolve(workouts));
     (fetchWorkouts as jest.Mock).mockResolvedValue([]);
   });
@@ -305,14 +304,13 @@ describe("syncWorkouts", () => {
     expect(pushed[0]._id).toBe("w-valid");
   });
 
-  it("handles deletedWorkoutIds by calling deleteRemoteWorkout", async () => {
+  it("handles deletedWorkoutIds with one batch delete", async () => {
     setupWorkoutState({ deletedWorkoutIds: ["w-del-1", "w-del-2"] });
 
     await syncWorkouts();
 
-    expect(deleteRemoteWorkout).toHaveBeenCalledTimes(2);
-    expect(deleteRemoteWorkout).toHaveBeenCalledWith("w-del-1");
-    expect(deleteRemoteWorkout).toHaveBeenCalledWith("w-del-2");
+    expect(batchDeleteWorkouts).toHaveBeenCalledTimes(1);
+    expect(batchDeleteWorkouts).toHaveBeenCalledWith(["w-del-1", "w-del-2"]);
   });
 });
 

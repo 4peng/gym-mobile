@@ -49,8 +49,8 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
       if (typeof e.defaultSets === "number") {
         defaultSets = Array.from({ length: e.defaultSets }, () => ({ type: "working" }));
       } else if (Array.isArray(e.defaultSets)) {
-        defaultSets = e.defaultSets.map(s => ({
-          type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working"
+        defaultSets = e.defaultSets.map((s) => ({
+          type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working",
         }));
       } else {
         defaultSets = [{ type: "working" }, { type: "working" }, { type: "working" }];
@@ -78,9 +78,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
 
 // Workout: Client -> Server
 
-export function mapWorkoutToBackend(
-  session: WorkoutSession
-): WorkoutServer {
+export function mapWorkoutToBackend(session: WorkoutSession): WorkoutServer {
   return {
     _id: session._id,
     userId: session.userId,
@@ -115,9 +113,7 @@ export function mapWorkoutToBackend(
 
 // Workout: Server -> Client
 
-export function mapWorkoutFromBackend(
-  server: WorkoutServer
-): WorkoutSession {
+export function mapWorkoutFromBackend(server: WorkoutServer): WorkoutSession {
   return {
     _id: String(server._id),
     userId: server.userId,
@@ -142,8 +138,7 @@ export function mapWorkoutFromBackend(
         weight: s.weight,
         reps: s.reps,
         type: s.type as "working" | "warmup" | "dropset" | undefined,
-        durationSeconds:
-          typeof s.durationSeconds === "number" ? s.durationSeconds : null,
+        durationSeconds: typeof s.durationSeconds === "number" ? s.durationSeconds : null,
         distance: typeof s.distance === "number" ? s.distance : null,
         completedAt: s.completedAt,
       })),

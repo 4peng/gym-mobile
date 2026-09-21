@@ -11,8 +11,8 @@ import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { workoutStorage } from "@/storage/workoutStorage";
 import type { WorkoutSession } from "@/types";
-import { batchUpsertPrograms, fetchPrograms, deleteRemoteProgram } from "./programs";
-import { batchUpsertWorkouts, fetchWorkouts, deleteRemoteWorkout } from "./workouts";
+import { batchUpsertPrograms, batchDeletePrograms, fetchPrograms } from "./programs";
+import { batchUpsertWorkouts, batchDeleteWorkouts, fetchWorkouts } from "./workouts";
 
 let _syncing = false;
 let _pendingSync = false;
@@ -25,12 +25,8 @@ export async function syncPrograms(): Promise<boolean> {
   const store = useProgramStore.getState();
 
   if (store.deletedProgramIds.length > 0) {
-    const results = await Promise.all(
-      store.deletedProgramIds.map((id) => deleteRemoteProgram(id))
-    );
-    const deletedSuccessfully = store.deletedProgramIds.filter((_, i) => results[i]);
-    if (deletedSuccessfully.length > 0) {
-      useProgramStore.getState().clearDeletedPrograms(deletedSuccessfully);
+    if (await batchDeletePrograms(store.deletedProgramIds)) {
+      useProgramStore.getState().clearDeletedPrograms(store.deletedProgramIds);
     }
   }
 
@@ -39,9 +35,7 @@ export async function syncPrograms(): Promise<boolean> {
   // silently dropped edits made DURING an in-flight sync (their updatedAt lands
   // below the post-sync watermark, so they were never re-detected as dirty).
   const dirtyIdSet = new Set(store.dirtyProgramIds);
-  const dirtyPrograms = store.programs.filter(
-    (p) => dirtyIdSet.has(p._id) && !p.deletedAt
-  );
+  const dirtyPrograms = store.programs.filter((p) => dirtyIdSet.has(p._id) && !p.deletedAt);
 
   // Capture BEFORE the network push: any edit that lands during the await gets
   // updatedAt > pushStartedAt, so clearDirtyPrograms keeps it dirty for the
@@ -52,9 +46,10 @@ export async function syncPrograms(): Promise<boolean> {
     const result = await batchUpsertPrograms(dirtyPrograms);
     if (!result) return false;
     pushedPrograms = result;
-    useProgramStore
-      .getState()
-      .clearDirtyPrograms(dirtyPrograms.map((p) => p._id), pushStartedAt);
+    useProgramStore.getState().clearDirtyPrograms(
+      dirtyPrograms.map((p) => p._id),
+      pushStartedAt,
+    );
   }
 
   // Use Math.max(1, ...) rather than 0 so a computed "since" of 0 is never
@@ -64,12 +59,11 @@ export async function syncPrograms(): Promise<boolean> {
   const remote = await fetchPrograms(since);
   if (!remote) return false;
 
-  const mergedById = new Map([...pushedPrograms, ...remote].map((program) => [program._id, program]));
-  const merged = Array.from(mergedById.values());
-  const syncWatermark = Math.max(
-    Date.now(),
-    ...merged.map((program) => program.updatedAt)
+  const mergedById = new Map(
+    [...pushedPrograms, ...remote].map((program) => [program._id, program]),
   );
+  const merged = Array.from(mergedById.values());
+  const syncWatermark = Math.max(Date.now(), ...merged.map((program) => program.updatedAt));
 
   useProgramStore.getState().applySyncMerge(merged, syncWatermark);
   return true;
@@ -83,12 +77,8 @@ export async function syncWorkouts(): Promise<boolean> {
   const store = useWorkoutSessionStore.getState();
 
   if (store.deletedWorkoutIds.length > 0) {
-    const results = await Promise.all(
-      store.deletedWorkoutIds.map((id) => deleteRemoteWorkout(id))
-    );
-    const deletedSuccessfully = store.deletedWorkoutIds.filter((_, i) => results[i]);
-    if (deletedSuccessfully.length > 0) {
-      useWorkoutSessionStore.getState().clearDeletedWorkouts(deletedSuccessfully);
+    if (await batchDeleteWorkouts(store.deletedWorkoutIds)) {
+      useWorkoutSessionStore.getState().clearDeletedWorkouts(store.deletedWorkoutIds);
     }
   }
 
@@ -133,12 +123,11 @@ export async function syncWorkouts(): Promise<boolean> {
   const remote = await fetchWorkouts(undefined, undefined, since);
   if (!remote) return false;
 
-  const mergedById = new Map([...pushedWorkouts, ...remote].map((workout) => [workout._id, workout]));
-  const merged = Array.from(mergedById.values());
-  const syncWatermark = Math.max(
-    Date.now(),
-    ...merged.map((workout) => workout.updatedAt)
+  const mergedById = new Map(
+    [...pushedWorkouts, ...remote].map((workout) => [workout._id, workout]),
   );
+  const merged = Array.from(mergedById.values());
+  const syncWatermark = Math.max(Date.now(), ...merged.map((workout) => workout.updatedAt));
 
   useWorkoutSessionStore.getState().applySyncMerge(merged, syncWatermark);
   return true;
@@ -165,10 +154,7 @@ export async function runFullSync(): Promise<boolean> {
     try {
       do {
         _pendingSync = false;
-        const [programsOk, workoutsOk] = await Promise.all([
-          syncPrograms(),
-          syncWorkouts(),
-        ]);
+        const [programsOk, workoutsOk] = await Promise.all([syncPrograms(), syncWorkouts()]);
         allSuccessful = allSuccessful && programsOk && workoutsOk;
       } while (_pendingSync);
 
@@ -180,8 +166,4 @@ export async function runFullSync(): Promise<boolean> {
   })();
 
   return _syncPromise;
-}
-
-export function isSyncing(): boolean {
-  return _syncing;
 }

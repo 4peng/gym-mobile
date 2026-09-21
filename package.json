@@ -8,8 +8,8 @@
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit --pretty false --incremental false",
     "lint": "eslint .",
-    "format": "prettier --write \"{src,app,shared}/**/*.{ts,tsx,js}\"",
-    "format:check": "prettier --check \"{src,app,shared}/**/*.{ts,tsx,js}\"",
+    "format": "prettier --write \"{src,app,shared,server/src,server/scripts}/**/*.{ts,tsx,js}\"",
+    "format:check": "prettier --check \"{src,app,shared,server/src,server/scripts}/**/*.{ts,tsx,js}\"",
     "test": "jest"
   },
   "jest": {

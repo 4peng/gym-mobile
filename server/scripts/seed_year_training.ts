@@ -19,9 +19,7 @@ const SEED_DAYS = Math.max(1, Number(process.env.SEED_DAYS ?? "365"));
 const FORCE = process.env.SEED_FORCE === "1";
 const UPDATED_AT_MODE = process.env.SEED_UPDATED_AT_MODE ?? "now";
 if (UPDATED_AT_MODE !== "now" && UPDATED_AT_MODE !== "historical") {
-  throw new Error(
-    `Invalid SEED_UPDATED_AT_MODE: ${UPDATED_AT_MODE}. Use "now" or "historical".`
-  );
+  throw new Error(`Invalid SEED_UPDATED_AT_MODE: ${UPDATED_AT_MODE}. Use "now" or "historical".`);
 }
 
 type ExerciseTemplate = {
@@ -52,11 +50,56 @@ const dayTemplates: DayTemplate[] = [
     startHourUtc: 18,
     durationMin: [50, 75],
     exercises: [
-      { name: "Bench Press", restSeconds: 150, defaultSets: 4, repMin: 5, repMax: 8, baseWeight: 55, weeklyIncrease: 0.35, muscles: ["chest", "arms", "shoulder"] },
-      { name: "Incline Dumbbell Press", restSeconds: 120, defaultSets: 3, repMin: 8, repMax: 12, baseWeight: 20, weeklyIncrease: 0.2, muscles: ["chest", "shoulder", "arms"] },
-      { name: "Overhead Press", restSeconds: 120, defaultSets: 3, repMin: 6, repMax: 10, baseWeight: 35, weeklyIncrease: 0.25, muscles: ["shoulder", "arms"] },
-      { name: "Lateral Raises", restSeconds: 75, defaultSets: 3, repMin: 12, repMax: 18, baseWeight: 8, weeklyIncrease: 0.1, muscles: ["shoulder"] },
-      { name: "Triceps Pushdown", restSeconds: 75, defaultSets: 3, repMin: 10, repMax: 15, baseWeight: 18, weeklyIncrease: 0.15, muscles: ["arms"] },
+      {
+        name: "Bench Press",
+        restSeconds: 150,
+        defaultSets: 4,
+        repMin: 5,
+        repMax: 8,
+        baseWeight: 55,
+        weeklyIncrease: 0.35,
+        muscles: ["chest", "arms", "shoulder"],
+      },
+      {
+        name: "Incline Dumbbell Press",
+        restSeconds: 120,
+        defaultSets: 3,
+        repMin: 8,
+        repMax: 12,
+        baseWeight: 20,
+        weeklyIncrease: 0.2,
+        muscles: ["chest", "shoulder", "arms"],
+      },
+      {
+        name: "Overhead Press",
+        restSeconds: 120,
+        defaultSets: 3,
+        repMin: 6,
+        repMax: 10,
+        baseWeight: 35,
+        weeklyIncrease: 0.25,
+        muscles: ["shoulder", "arms"],
+      },
+      {
+        name: "Lateral Raises",
+        restSeconds: 75,
+        defaultSets: 3,
+        repMin: 12,
+        repMax: 18,
+        baseWeight: 8,
+        weeklyIncrease: 0.1,
+        muscles: ["shoulder"],
+      },
+      {
+        name: "Triceps Pushdown",
+        restSeconds: 75,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 15,
+        baseWeight: 18,
+        weeklyIncrease: 0.15,
+        muscles: ["arms"],
+      },
     ],
   },
   {
@@ -66,11 +109,56 @@ const dayTemplates: DayTemplate[] = [
     startHourUtc: 18,
     durationMin: [50, 75],
     exercises: [
-      { name: "Barbell Row", restSeconds: 150, defaultSets: 4, repMin: 6, repMax: 10, baseWeight: 50, weeklyIncrease: 0.35, muscles: ["back", "arms"] },
-      { name: "Lat Pulldown", restSeconds: 120, defaultSets: 4, repMin: 8, repMax: 12, baseWeight: 45, weeklyIncrease: 0.25, muscles: ["back", "arms"] },
-      { name: "Cable Row", restSeconds: 90, defaultSets: 3, repMin: 10, repMax: 14, baseWeight: 38, weeklyIncrease: 0.2, muscles: ["back"] },
-      { name: "Face Pull", restSeconds: 75, defaultSets: 3, repMin: 12, repMax: 18, baseWeight: 20, weeklyIncrease: 0.15, muscles: ["shoulder", "back"] },
-      { name: "EZ Bar Curl", restSeconds: 75, defaultSets: 3, repMin: 10, repMax: 15, baseWeight: 20, weeklyIncrease: 0.1, muscles: ["arms"] },
+      {
+        name: "Barbell Row",
+        restSeconds: 150,
+        defaultSets: 4,
+        repMin: 6,
+        repMax: 10,
+        baseWeight: 50,
+        weeklyIncrease: 0.35,
+        muscles: ["back", "arms"],
+      },
+      {
+        name: "Lat Pulldown",
+        restSeconds: 120,
+        defaultSets: 4,
+        repMin: 8,
+        repMax: 12,
+        baseWeight: 45,
+        weeklyIncrease: 0.25,
+        muscles: ["back", "arms"],
+      },
+      {
+        name: "Cable Row",
+        restSeconds: 90,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 14,
+        baseWeight: 38,
+        weeklyIncrease: 0.2,
+        muscles: ["back"],
+      },
+      {
+        name: "Face Pull",
+        restSeconds: 75,
+        defaultSets: 3,
+        repMin: 12,
+        repMax: 18,
+        baseWeight: 20,
+        weeklyIncrease: 0.15,
+        muscles: ["shoulder", "back"],
+      },
+      {
+        name: "EZ Bar Curl",
+        restSeconds: 75,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 15,
+        baseWeight: 20,
+        weeklyIncrease: 0.1,
+        muscles: ["arms"],
+      },
     ],
   },
   {
@@ -80,11 +168,56 @@ const dayTemplates: DayTemplate[] = [
     startHourUtc: 18,
     durationMin: [55, 85],
     exercises: [
-      { name: "Back Squat", restSeconds: 180, defaultSets: 4, repMin: 5, repMax: 8, baseWeight: 70, weeklyIncrease: 0.45, muscles: ["quads", "glutes", "core"] },
-      { name: "Romanian Deadlift", restSeconds: 150, defaultSets: 4, repMin: 6, repMax: 10, baseWeight: 65, weeklyIncrease: 0.4, muscles: ["hamstrings", "glutes", "back"] },
-      { name: "Leg Press", restSeconds: 120, defaultSets: 3, repMin: 10, repMax: 15, baseWeight: 120, weeklyIncrease: 0.8, muscles: ["quads", "glutes"] },
-      { name: "Leg Curl", restSeconds: 90, defaultSets: 3, repMin: 10, repMax: 14, baseWeight: 35, weeklyIncrease: 0.25, muscles: ["hamstrings"] },
-      { name: "Standing Calf Raise", restSeconds: 75, defaultSets: 4, repMin: 12, repMax: 20, baseWeight: 40, weeklyIncrease: 0.2, muscles: ["calves"] },
+      {
+        name: "Back Squat",
+        restSeconds: 180,
+        defaultSets: 4,
+        repMin: 5,
+        repMax: 8,
+        baseWeight: 70,
+        weeklyIncrease: 0.45,
+        muscles: ["quads", "glutes", "core"],
+      },
+      {
+        name: "Romanian Deadlift",
+        restSeconds: 150,
+        defaultSets: 4,
+        repMin: 6,
+        repMax: 10,
+        baseWeight: 65,
+        weeklyIncrease: 0.4,
+        muscles: ["hamstrings", "glutes", "back"],
+      },
+      {
+        name: "Leg Press",
+        restSeconds: 120,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 15,
+        baseWeight: 120,
+        weeklyIncrease: 0.8,
+        muscles: ["quads", "glutes"],
+      },
+      {
+        name: "Leg Curl",
+        restSeconds: 90,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 14,
+        baseWeight: 35,
+        weeklyIncrease: 0.25,
+        muscles: ["hamstrings"],
+      },
+      {
+        name: "Standing Calf Raise",
+        restSeconds: 75,
+        defaultSets: 4,
+        repMin: 12,
+        repMax: 20,
+        baseWeight: 40,
+        weeklyIncrease: 0.2,
+        muscles: ["calves"],
+      },
     ],
   },
   {
@@ -94,11 +227,56 @@ const dayTemplates: DayTemplate[] = [
     startHourUtc: 10,
     durationMin: [45, 70],
     exercises: [
-      { name: "Incline Bench Press", restSeconds: 120, defaultSets: 4, repMin: 6, repMax: 10, baseWeight: 50, weeklyIncrease: 0.3, muscles: ["chest", "shoulder", "arms"] },
-      { name: "Seated Row", restSeconds: 120, defaultSets: 4, repMin: 8, repMax: 12, baseWeight: 42, weeklyIncrease: 0.25, muscles: ["back", "arms"] },
-      { name: "Machine Shoulder Press", restSeconds: 90, defaultSets: 3, repMin: 8, repMax: 12, baseWeight: 32, weeklyIncrease: 0.2, muscles: ["shoulder", "arms"] },
-      { name: "Chest Fly", restSeconds: 75, defaultSets: 3, repMin: 10, repMax: 15, baseWeight: 25, weeklyIncrease: 0.15, muscles: ["chest"] },
-      { name: "Hammer Curl", restSeconds: 75, defaultSets: 3, repMin: 10, repMax: 15, baseWeight: 12, weeklyIncrease: 0.1, muscles: ["arms"] },
+      {
+        name: "Incline Bench Press",
+        restSeconds: 120,
+        defaultSets: 4,
+        repMin: 6,
+        repMax: 10,
+        baseWeight: 50,
+        weeklyIncrease: 0.3,
+        muscles: ["chest", "shoulder", "arms"],
+      },
+      {
+        name: "Seated Row",
+        restSeconds: 120,
+        defaultSets: 4,
+        repMin: 8,
+        repMax: 12,
+        baseWeight: 42,
+        weeklyIncrease: 0.25,
+        muscles: ["back", "arms"],
+      },
+      {
+        name: "Machine Shoulder Press",
+        restSeconds: 90,
+        defaultSets: 3,
+        repMin: 8,
+        repMax: 12,
+        baseWeight: 32,
+        weeklyIncrease: 0.2,
+        muscles: ["shoulder", "arms"],
+      },
+      {
+        name: "Chest Fly",
+        restSeconds: 75,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 15,
+        baseWeight: 25,
+        weeklyIncrease: 0.15,
+        muscles: ["chest"],
+      },
+      {
+        name: "Hammer Curl",
+        restSeconds: 75,
+        defaultSets: 3,
+        repMin: 10,
+        repMax: 15,
+        baseWeight: 12,
+        weeklyIncrease: 0.1,
+        muscles: ["arms"],
+      },
     ],
   },
 ];
@@ -171,7 +349,7 @@ async function seedYearTraining() {
     if (!FORCE && (existingWorkouts > 0 || existingPrograms > 0)) {
       console.error(
         `Seed data already exists (${existingPrograms} programs, ${existingWorkouts} workouts). ` +
-          "Run remove script first or set SEED_FORCE=1."
+          "Run remove script first or set SEED_FORCE=1.",
       );
       process.exit(1);
     }
@@ -214,21 +392,25 @@ async function seedYearTraining() {
       const template = dayTemplates.find((d) => d.weekday === date.getUTCDay());
       if (!template) continue;
 
-      const weekIndex = Math.floor((date.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
+      const weekIndex = Math.floor(
+        (date.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000),
+      );
       const seedInt = Number(dayKey(date).slice(-6));
       const rng = createRng(seedInt + weekIndex * 131 + template.weekday * 977);
 
       if (rng() < 0.1) continue;
 
-      const startAt = new Date(Date.UTC(
-        date.getUTCFullYear(),
-        date.getUTCMonth(),
-        date.getUTCDate(),
-        template.startHourUtc,
-        intInRange(rng, 0, 30),
-        0,
-        0
-      ));
+      const startAt = new Date(
+        Date.UTC(
+          date.getUTCFullYear(),
+          date.getUTCMonth(),
+          date.getUTCDate(),
+          template.startHourUtc,
+          intInRange(rng, 0, 30),
+          0,
+          0,
+        ),
+      );
 
       const workoutId = `${SEED_PREFIX}-workout-${dayKey(date)}-${template.code}`;
       const durationMin = intInRange(rng, template.durationMin[0], template.durationMin[1]);
@@ -246,7 +428,9 @@ async function seedYearTraining() {
           const targetReps = intInRange(rng, exercise.repMin, exercise.repMax);
           const fatiguePenalty = Math.min(2, setIndex);
           const reps = Math.max(exercise.repMin - 1, targetReps - fatiguePenalty);
-          const setCompletedAt = new Date(startAt.getTime() + (exerciseOffsetMin + setIndex * 3 + 1) * 60 * 1000);
+          const setCompletedAt = new Date(
+            startAt.getTime() + (exerciseOffsetMin + setIndex * 3 + 1) * 60 * 1000,
+          );
 
           return {
             id: `${workoutId}-e${exerciseIndex + 1}-s${setIndex + 1}`,
@@ -288,7 +472,9 @@ async function seedYearTraining() {
     console.log(`User: ${USER_ID}`);
     console.log(`Prefix: ${SEED_PREFIX}`);
     console.log(`updatedAt mode: ${UPDATED_AT_MODE}`);
-    console.log(`Date range: ${startDate.toISOString().slice(0, 10)} -> ${endDate.toISOString().slice(0, 10)}`);
+    console.log(
+      `Date range: ${startDate.toISOString().slice(0, 10)} -> ${endDate.toISOString().slice(0, 10)}`,
+    );
     console.log(`Programs inserted: ${programDocs.length}`);
     console.log(`Workouts inserted: ${workouts.length}`);
     console.log("Done.");
