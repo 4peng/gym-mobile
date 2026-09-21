@@ -4,7 +4,14 @@
 // Minimal factories that return valid typed objects
 // for use across multiple test files.
 
-import type { WorkoutSession, WorkoutExercise, WorkoutSet, Program, ProgramExercise, ExerciseDefinition } from "@/types";
+import type {
+  WorkoutSession,
+  WorkoutExercise,
+  WorkoutSet,
+  Program,
+  ProgramExercise,
+  ExerciseDefinition,
+} from "@/types";
 
 export function testSession(overrides?: Partial<WorkoutSession>): WorkoutSession {
   return {

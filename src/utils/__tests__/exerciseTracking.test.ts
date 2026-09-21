@@ -58,7 +58,14 @@ describe("normalizeSetForTrackingMode", () => {
 
   it("clears weight/reps/distance for 'timed' mode, keeping a numeric durationSeconds", () => {
     const result = normalizeSetForTrackingMode({ ...baseSet, durationSeconds: 30 }, "timed");
-    expect(result).toEqual({ id: "s1", type: "working", weight: null, reps: null, durationSeconds: 30, distance: null });
+    expect(result).toEqual({
+      id: "s1",
+      type: "working",
+      weight: null,
+      reps: null,
+      durationSeconds: 30,
+      distance: null,
+    });
   });
 
   it("nulls durationSeconds for 'timed' mode when it isn't a number", () => {
@@ -67,13 +74,30 @@ describe("normalizeSetForTrackingMode", () => {
   });
 
   it("clears weight/reps for 'cardio' mode, keeping numeric durationSeconds and distance", () => {
-    const result = normalizeSetForTrackingMode({ ...baseSet, durationSeconds: 600, distance: 5 }, "cardio");
-    expect(result).toEqual({ id: "s1", type: "working", weight: null, reps: null, durationSeconds: 600, distance: 5 });
+    const result = normalizeSetForTrackingMode(
+      { ...baseSet, durationSeconds: 600, distance: 5 },
+      "cardio",
+    );
+    expect(result).toEqual({
+      id: "s1",
+      type: "working",
+      weight: null,
+      reps: null,
+      durationSeconds: 600,
+      distance: 5,
+    });
   });
 
   it("clears durationSeconds/distance for 'strength' mode and keeps numeric weight/reps", () => {
     const result = normalizeSetForTrackingMode(baseSet, "strength");
-    expect(result).toEqual({ id: "s1", type: "working", weight: 40, reps: 8, durationSeconds: null, distance: null });
+    expect(result).toEqual({
+      id: "s1",
+      type: "working",
+      weight: 40,
+      reps: 8,
+      durationSeconds: null,
+      distance: null,
+    });
   });
 
   it("falls back to initialWeight for 'strength' mode when the set's weight isn't a number", () => {
@@ -88,6 +112,13 @@ describe("normalizeSetForTrackingMode", () => {
 
   it("treats an unrecognized trackingMode as 'strength' via normalizeTrackingMode", () => {
     const result = normalizeSetForTrackingMode(baseSet, "bogus" as any);
-    expect(result).toEqual({ id: "s1", type: "working", weight: 40, reps: 8, durationSeconds: null, distance: null });
+    expect(result).toEqual({
+      id: "s1",
+      type: "working",
+      weight: 40,
+      reps: 8,
+      durationSeconds: null,
+      distance: null,
+    });
   });
 });

@@ -37,18 +37,15 @@ function normalizeProgram(raw: unknown): Program {
     _id: String(r?._id ?? generateId()),
     userId: String(r?.userId ?? USER_ID),
     name: typeof r?.name === "string" ? r.name : "Untitled Program",
-    exercises: normalizeExercises(Array.isArray(r?.exercises) ? (r.exercises as any[]) : [], generateId),
+    exercises: normalizeExercises(
+      Array.isArray(r?.exercises) ? (r.exercises as any[]) : [],
+      generateId,
+    ),
     pinned: typeof r?.pinned === "boolean" ? r.pinned : undefined,
-    createdAt:
-      typeof r?.createdAt === "string" ? r.createdAt : new Date().toISOString(),
+    createdAt: typeof r?.createdAt === "string" ? r.createdAt : new Date().toISOString(),
     updatedAt:
-      typeof r?.updatedAt === "number" && Number.isFinite(r.updatedAt)
-        ? r.updatedAt
-        : Date.now(),
-    deletedAt:
-      typeof r?.deletedAt === "number" || r?.deletedAt === null
-        ? r.deletedAt
-        : undefined,
+      typeof r?.updatedAt === "number" && Number.isFinite(r.updatedAt) ? r.updatedAt : Date.now(),
+    deletedAt: typeof r?.deletedAt === "number" || r?.deletedAt === null ? r.deletedAt : undefined,
   };
 }
 
@@ -205,8 +202,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
         set((state) => {
           if (remote.length === 0) {
             state.lastSyncedAt = syncStartTime;
-            state.isDirty =
-              state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
+            state.isDirty = state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
             return;
           }
 
@@ -239,8 +235,7 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           }
 
           state.lastSyncedAt = syncStartTime;
-          state.isDirty =
-            state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
+          state.isDirty = state.dirtyProgramIds.length > 0 || state.deletedProgramIds.length > 0;
         });
       },
     })),
@@ -278,6 +273,6 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           lastSyncedAt,
         } as ProgramState;
       },
-    }
-  )
+    },
+  ),
 );

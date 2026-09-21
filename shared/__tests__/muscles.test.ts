@@ -5,7 +5,6 @@ import {
   DETAILED_TO_PRIMARY_MAP,
   PRIMARY_MUSCLE_GROUPS,
   DETAILED_MODE_MUSCLE_GROUPS,
-   
 } from "../muscles.js";
 
 // Pins down the primary<->detailed muscle expansion/collapse round-trip and
@@ -89,7 +88,7 @@ describe("expand -> collapse round-trip", () => {
   it("round-trips every unmapped primary muscle group as a no-op", () => {
     const unmapped = PRIMARY_MUSCLE_GROUPS.filter((m) => !(m in PRIMARY_TO_DETAILED_MAP));
     expect(collapseDetailedMusclesToPrimary(expandPrimaryMusclesForDetailedMode(unmapped))).toEqual(
-      unmapped
+      unmapped,
     );
   });
 });
@@ -97,7 +96,7 @@ describe("expand -> collapse round-trip", () => {
 describe("DETAILED_MODE_MUSCLE_GROUPS", () => {
   it("is the flat expansion of every primary group in order, mapped ones replaced by their detailed groups", () => {
     expect(DETAILED_MODE_MUSCLE_GROUPS).toEqual(
-      PRIMARY_MUSCLE_GROUPS.flatMap((m) => (PRIMARY_TO_DETAILED_MAP as any)[m] ?? [m])
+      PRIMARY_MUSCLE_GROUPS.flatMap((m) => (PRIMARY_TO_DETAILED_MAP as any)[m] ?? [m]),
     );
   });
 

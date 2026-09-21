@@ -1,6 +1,8 @@
 import type { ProgramExercise, WorkoutExercise } from "@/types";
 
-export function sessionExercisesToProgramExercises(exercises: WorkoutExercise[]): ProgramExercise[] {
+export function sessionExercisesToProgramExercises(
+  exercises: WorkoutExercise[],
+): ProgramExercise[] {
   return exercises.map((ex): ProgramExercise => ({
     id: ex.id,
     exerciseDefinitionId: ex.exerciseDefinitionId || "",

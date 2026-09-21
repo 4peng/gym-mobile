@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import { useSheet } from "@/hooks/useSheet";
 import {
   View,
@@ -10,11 +10,11 @@ import {
   Pressable,
   NativeSyntheticEvent,
   NativeScrollEvent,
-} from 'react-native';
-import { Check, X } from 'lucide-react-native';
-import { COLORS } from '@/src/constants/colors';
-import { FONT_FAMILIES } from '@/src/constants/fonts';
-import { UI } from '@/constants/ui';
+} from "react-native";
+import { Check, X } from "lucide-react-native";
+import { COLORS } from "@/src/constants/colors";
+import { FONT_FAMILIES } from "@/src/constants/fonts";
+import { UI } from "@/constants/ui";
 
 const ITEM_HEIGHT = 60;
 const VISIBLE_ITEMS = 3;
@@ -64,7 +64,8 @@ export default function RestTimerPicker({
   useEffect(() => {
     if (!visible) return;
 
-    const { minuteValue, secondValue, minuteIndex, secondIndex } = getPickerSelection(initialSeconds);
+    const { minuteValue, secondValue, minuteIndex, secondIndex } =
+      getPickerSelection(initialSeconds);
     setSelectedMin(minuteValue);
     setSelectedSec(secondValue);
 
@@ -89,7 +90,7 @@ export default function RestTimerPicker({
       cancelAnimationFrame(frame);
       clearTimeout(doneTimer);
       isInitializingScroll.current = false;
-    }
+    };
   }, [visible, initialSeconds]);
 
   const handleSave = () => {
@@ -127,9 +128,7 @@ export default function RestTimerPicker({
 
   const renderItem: ListRenderItem<number> = ({ item }) => (
     <View style={styles.item}>
-      <Text style={styles.itemText}>
-        {String(item).padStart(2, '0')}
-      </Text>
+      <Text style={styles.itemText}>{String(item).padStart(2, "0")}</Text>
     </View>
   );
 
@@ -139,15 +138,10 @@ export default function RestTimerPicker({
     <View style={styles.overlay} pointerEvents="box-none">
       {/* Sibling backdrop for closing on tap outside */}
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View
-        style={[styles.container, { transform: [{ translateY: slideUp }] }]}
-      >
+      <Animated.View style={[styles.container, { transform: [{ translateY: slideUp }] }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.closeBtn}>
             <X size={24} color={COLORS.DANGER} />
@@ -181,9 +175,11 @@ export default function RestTimerPicker({
                 onMomentumScrollEnd={handleMinScroll}
                 onScrollEndDrag={handleMinScroll}
                 renderItem={renderItem}
-                getItemLayout={(_, index) => (
-                  { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
-                )}
+                getItemLayout={(_, index) => ({
+                  length: ITEM_HEIGHT,
+                  offset: ITEM_HEIGHT * index,
+                  index,
+                })}
                 scrollEventThrottle={16}
               />
             </View>
@@ -208,9 +204,11 @@ export default function RestTimerPicker({
                 onMomentumScrollEnd={handleSecScroll}
                 onScrollEndDrag={handleSecScroll}
                 renderItem={renderItem}
-                getItemLayout={(_, index) => (
-                  { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
-                )}
+                getItemLayout={(_, index) => ({
+                  length: ITEM_HEIGHT,
+                  offset: ITEM_HEIGHT * index,
+                  index,
+                })}
                 scrollEventThrottle={16}
               />
             </View>
@@ -219,7 +217,10 @@ export default function RestTimerPicker({
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Selected: <Text style={{color: COLORS.ACCENT_BLUE}}>{selectedMin}m {selectedSec}s</Text>
+            Selected:{" "}
+            <Text style={{ color: COLORS.ACCENT_BLUE }}>
+              {selectedMin}m {selectedSec}s
+            </Text>
           </Text>
         </View>
       </Animated.View>
@@ -231,11 +232,11 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10000,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,1)',
+    backgroundColor: "rgba(0,0,0,1)",
   },
   container: {
     backgroundColor: COLORS.CARD_BG,
@@ -244,17 +245,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: "rgba(255,255,255,0.05)",
   },
   title: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   closeBtn: {
@@ -265,26 +266,26 @@ const styles = StyleSheet.create({
   },
   pickerWrapper: {
     height: PICKER_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginVertical: 30,
   },
   selectionWindow: {
-    position: 'absolute',
+    position: "absolute",
     height: ITEM_HEIGHT,
     left: 24,
     right: 24,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: "rgba(255,255,255,0.03)",
     borderRadius: UI.RADIUS_CONTAINER,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: "rgba(255,255,255,0.05)",
   },
   pickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     height: PICKER_HEIGHT,
-    width: '100%',
+    width: "100%",
     paddingHorizontal: 24,
   },
   column: {
@@ -293,48 +294,48 @@ const styles = StyleSheet.create({
     maxWidth: 140,
   },
   columnLabel: {
-    position: 'absolute',
+    position: "absolute",
     top: -25,
-    alignSelf: 'center',
+    alignSelf: "center",
     color: COLORS.TEXT_TERTIARY,
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 1.5,
   },
   separator: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: "900",
     marginHorizontal: 15,
     fontFamily: FONT_FAMILIES.MONO,
   },
   list: {
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   listContent: {
     paddingVertical: ITEM_HEIGHT,
   },
   item: {
     height: ITEM_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
   },
   itemText: {
     color: COLORS.TEXT_PRIMARY,
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: "800",
     fontFamily: FONT_FAMILIES.MONO,
   },
   footer: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: 10,
   },
   footerText: {
     color: COLORS.TEXT_SECONDARY,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     fontFamily: FONT_FAMILIES.MEDIUM,
-  }
+  },
 });

@@ -26,10 +26,10 @@ export function initSyncEffect() {
 
   const unsubscribePrograms = useProgramStore.subscribe((state, prevState) => {
     const justBecameDirty = state.isDirty && !prevState.isDirty;
-    const changedWhileDirty = state.isDirty && (
-      state.programs !== prevState.programs ||
-      state.deletedProgramIds !== prevState.deletedProgramIds
-    );
+    const changedWhileDirty =
+      state.isDirty &&
+      (state.programs !== prevState.programs ||
+        state.deletedProgramIds !== prevState.deletedProgramIds);
 
     if (justBecameDirty || changedWhileDirty) {
       scheduleBackgroundSync();
@@ -38,10 +38,10 @@ export function initSyncEffect() {
 
   const unsubscribeWorkouts = useWorkoutSessionStore.subscribe((state, prevState) => {
     const justBecameDirty = state.isDirty && !prevState.isDirty;
-    const changedWhileDirty = state.isDirty && (
-      state.history !== prevState.history ||
-      state.deletedWorkoutIds !== prevState.deletedWorkoutIds
-    );
+    const changedWhileDirty =
+      state.isDirty &&
+      (state.history !== prevState.history ||
+        state.deletedWorkoutIds !== prevState.deletedWorkoutIds);
 
     if (justBecameDirty || changedWhileDirty) {
       scheduleBackgroundSync();

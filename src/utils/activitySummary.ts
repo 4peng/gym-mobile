@@ -90,16 +90,15 @@ function toDurationMinutes(startedAt?: string, completedAt?: string) {
 export function buildActivitySummary(
   history: WorkoutSession[],
   periodMode: ActivityPeriodMode,
-  now: Date
+  now: Date,
 ): ActivitySummary {
-  const rangeStart = periodMode === "week"
-    ? startOfDay(shiftDays(now, -6))
-    : periodMode === "month"
-      ? startOfDay(shiftDays(now, -27))
-      : startOfMonth(new Date(now.getFullYear(), now.getMonth() - 11, 1));
-  const rangeEnd = periodMode === "year"
-    ? endOfMonth(now)
-    : endOfDay(now);
+  const rangeStart =
+    periodMode === "week"
+      ? startOfDay(shiftDays(now, -6))
+      : periodMode === "month"
+        ? startOfDay(shiftDays(now, -27))
+        : startOfMonth(new Date(now.getFullYear(), now.getMonth() - 11, 1));
+  const rangeEnd = periodMode === "year" ? endOfMonth(now) : endOfDay(now);
 
   const sessionsInRange = history.filter((session) => {
     const anchor = session.completedAt || session.startedAt;
@@ -130,9 +129,7 @@ export function buildActivitySummary(
   } else if (periodMode === "month") {
     points = Array.from({ length: 4 }, (_, index) => {
       const bucketStart = startOfDay(shiftDays(rangeStart, index * 7));
-      const bucketEnd = index === 3
-        ? endOfDay(now)
-        : endOfDay(shiftDays(bucketStart, 6));
+      const bucketEnd = index === 3 ? endOfDay(now) : endOfDay(shiftDays(bucketStart, 6));
 
       const minutes = sessionsInRange.reduce((total, session) => {
         const anchor = new Date(session.completedAt || session.startedAt).getTime();

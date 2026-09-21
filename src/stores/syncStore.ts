@@ -6,7 +6,7 @@
 // `runFullSync` action the UI can call directly.
 
 import { create } from "zustand";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { runFullSync as engineRunFullSync } from "@/lib/api/sync";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -51,10 +51,10 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
   runFullSync: async (manual = false) => {
     if (get().isSyncing) return false;
 
-    set({ 
-      isSyncing: true, 
-      isManualSync: manual, 
-      lastSyncAttempt: Date.now() 
+    set({
+      isSyncing: true,
+      isManualSync: manual,
+      lastSyncAttempt: Date.now(),
     });
 
     try {
@@ -118,7 +118,7 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
       // 3. Run sync (it will now be a full sync because local is empty)
       const success = await engineRunFullSync();
       set({ isSyncing: false, isManualSync: false, lastSyncSuccess: success });
-      
+
       return success;
     } catch (err) {
       console.error("Force resync failed:", err);

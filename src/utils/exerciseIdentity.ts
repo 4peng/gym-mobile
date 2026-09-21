@@ -32,11 +32,7 @@ function normalizeExerciseText(value?: string | null): string {
 function toSignature(value?: string | null): string {
   const normalized = normalizeExerciseText(value);
   if (!normalized) return "";
-  return normalized
-    .split(" ")
-    .filter(Boolean)
-    .sort()
-    .join(" ");
+  return normalized.split(" ").filter(Boolean).sort().join(" ");
 }
 
 const exactCatalogIdentityMap = new Map<string, string>();
@@ -90,7 +86,7 @@ export function getExerciseIdentityKey(exercise: ExerciseIdentityLike): string {
 
 export function matchesExerciseSearchQuery(
   exercise: Pick<ExerciseIdentityLike, "name"> & { aliases?: string[] },
-  query: string
+  query: string,
 ): boolean {
   const normalizedQuery = normalizeExerciseText(query);
   if (!normalizedQuery) return true;

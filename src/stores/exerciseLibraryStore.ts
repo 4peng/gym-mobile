@@ -34,27 +34,23 @@ function normalizeCustomExercise(raw: unknown): ExerciseDefinition | null {
 
 export function matchesCustomExerciseNameOrAlias(
   exercise: ExerciseDefinition,
-  normalizedName: string
+  normalizedName: string,
 ) {
   const target = normalizedName.toLowerCase();
   if (exercise.name.trim().toLowerCase() === target) return true;
 
-  return (exercise.aliases || []).some(
-    (alias) => alias.trim().toLowerCase() === target
-  );
+  return (exercise.aliases || []).some((alias) => alias.trim().toLowerCase() === target);
 }
 
-export const useExerciseLibraryStore = create<
-  ExerciseLibraryState & ExerciseLibraryActions
->()(
+export const useExerciseLibraryStore = create<ExerciseLibraryState & ExerciseLibraryActions>()(
   persist(
     (set, get) => ({
       customExercises: [],
 
       addCustomExercise: (name, muscles = []) => {
         const normalizedName = normalizeName(name);
-        const existing = get().customExercises.find(
-          (exercise) => matchesCustomExerciseNameOrAlias(exercise, normalizedName)
+        const existing = get().customExercises.find((exercise) =>
+          matchesCustomExerciseNameOrAlias(exercise, normalizedName),
         );
         if (existing) {
           return existing;
@@ -83,7 +79,8 @@ export const useExerciseLibraryStore = create<
         if (!current) return null;
 
         const conflicting = get().customExercises.find(
-          (exercise) => exercise.id !== id && matchesCustomExerciseNameOrAlias(exercise, normalizedName)
+          (exercise) =>
+            exercise.id !== id && matchesCustomExerciseNameOrAlias(exercise, normalizedName),
         );
         if (conflicting) {
           return null;
@@ -92,9 +89,9 @@ export const useExerciseLibraryStore = create<
         const nextAliases = Array.from(
           new Set(
             [current.name, ...(current.aliases || [])].filter(
-              (alias) => alias.trim().toLowerCase() !== normalizedName.toLowerCase()
-            )
-          )
+              (alias) => alias.trim().toLowerCase() !== normalizedName.toLowerCase(),
+            ),
+          ),
         );
 
         const renamed: ExerciseDefinition = {
@@ -105,7 +102,7 @@ export const useExerciseLibraryStore = create<
 
         set((state) => ({
           customExercises: state.customExercises.map((exercise) =>
-            exercise.id === id ? renamed : exercise
+            exercise.id === id ? renamed : exercise,
           ),
         }));
 
@@ -115,7 +112,7 @@ export const useExerciseLibraryStore = create<
       updateCustomExerciseMuscles: (id, muscles) => {
         set((state) => ({
           customExercises: state.customExercises.map((exercise) =>
-            exercise.id === id ? { ...exercise, muscles: [...muscles] } : exercise
+            exercise.id === id ? { ...exercise, muscles: [...muscles] } : exercise,
           ),
         }));
       },
@@ -140,6 +137,6 @@ export const useExerciseLibraryStore = create<
             : [],
         } as ExerciseLibraryState;
       },
-    }
-  )
+    },
+  ),
 );

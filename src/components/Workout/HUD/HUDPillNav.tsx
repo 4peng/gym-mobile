@@ -36,11 +36,19 @@ export const HUDPillNav = React.memo(function HUDPillNav({
 
       <View style={styles.pillPagination}>
         <Pressable onPress={onPrevPress} disabled={activeIndex <= 0}>
-          <ChevronLeft size={24} color={activeIndex <= 0 ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY} />
+          <ChevronLeft
+            size={24}
+            color={activeIndex <= 0 ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY}
+          />
         </Pressable>
-        <Text style={styles.paginationText}>{activeIndex + 1} / {totalExercises || 1}</Text>
+        <Text style={styles.paginationText}>
+          {activeIndex + 1} / {totalExercises || 1}
+        </Text>
         <Pressable onPress={onNextPress} disabled={activeIndex >= totalExercises - 1}>
-          <ChevronRight size={24} color={(activeIndex >= totalExercises - 1) ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY} />
+          <ChevronRight
+            size={24}
+            color={activeIndex >= totalExercises - 1 ? COLORS.TEXT_TERTIARY : COLORS.TEXT_PRIMARY}
+          />
         </Pressable>
       </View>
 
@@ -52,7 +60,24 @@ export const HUDPillNav = React.memo(function HUDPillNav({
 });
 
 const styles = StyleSheet.create({
-  pillNav: { position: "absolute", bottom: 40, left: 20, right: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 10 },
+  pillNav: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   pillPagination: { flexDirection: "row", alignItems: "center", gap: 12 },
-  paginationText: { color: COLORS.TEXT_PRIMARY, fontSize: 14, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700", minWidth: 50, textAlign: "center" },
+  paginationText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+    minWidth: 50,
+    textAlign: "center",
+  },
 });

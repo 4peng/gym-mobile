@@ -1,21 +1,14 @@
-import React, { useRef, useEffect } from 'react';
-import {
-  Animated,
-  PanResponder,
-  StyleSheet,
-  View,
-  Pressable,
-  Dimensions,
-} from 'react-native';
-import { Trash2, Pin } from 'lucide-react-native';
-import { COLORS } from '@/src/constants/colors';
-import { HapticFeedback } from '@/src/utils/haptics';
-import { UI } from '@/constants/ui';
+import React, { useRef, useEffect } from "react";
+import { Animated, PanResponder, StyleSheet, View, Pressable, Dimensions } from "react-native";
+import { Trash2, Pin } from "lucide-react-native";
+import { COLORS } from "@/src/constants/colors";
+import { HapticFeedback } from "@/src/utils/haptics";
+import { UI } from "@/constants/ui";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BUTTON_WIDTH = 64;
-const REVEAL_THRESHOLD = 25; 
-const INSTANT_DELETE_THRESHOLD = SCREEN_WIDTH * 0.6; 
+const REVEAL_THRESHOLD = 25;
+const INSTANT_DELETE_THRESHOLD = SCREEN_WIDTH * 0.6;
 const SECONDARY_DELETE_THRESHOLD = BUTTON_WIDTH + 80;
 
 interface SwipeableProps {
@@ -27,13 +20,13 @@ interface SwipeableProps {
   marginBottom?: number;
 }
 
-export const Swipeable = ({ 
-  children, 
-  onDelete, 
-  onPin, 
+export const Swipeable = ({
+  children,
+  onDelete,
+  onPin,
   onToggleScroll,
   borderRadius = UI.RADIUS_HUD,
-  marginBottom = 16
+  marginBottom = 16,
 }: SwipeableProps) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const lastOffset = useRef(0);
@@ -53,7 +46,7 @@ export const Swipeable = ({
   useEffect(() => {
     const listenerId = translateX.addListener(({ value }) => {
       lastOffset.current = value;
-      
+
       // Haptic when crossing reveal threshold
       const absValue = Math.abs(value);
       if (absValue > REVEAL_THRESHOLD && !hapticTriggered.current) {
@@ -73,7 +66,9 @@ export const Swipeable = ({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         const { dx, dy } = gestureState;
         const isAlreadyOpen = Math.abs(lastOffset.current) > 5;
-        const isCorrectDirection = isAlreadyOpen ? true : ((!!onDeleteRef.current && dx < -12) || (!!onPinRef.current && dx > 12));
+        const isCorrectDirection = isAlreadyOpen
+          ? true
+          : (!!onDeleteRef.current && dx < -12) || (!!onPinRef.current && dx > 12);
         const isHorizontal = Math.abs(dx) > Math.abs(dy) * 2;
         const reachedThreshold = Math.abs(dx) > 12;
         return isHorizontal && reachedThreshold && isCorrectDirection;
@@ -95,14 +90,14 @@ export const Swipeable = ({
 
         if (rawTotal > 0) {
           if (!onPinRef.current) {
-             const resistance = Math.pow(rawTotal, 0.4);
-             translateX.setValue(resistance - gestureStartOffset.current);
-             return;
+            const resistance = Math.pow(rawTotal, 0.4);
+            translateX.setValue(resistance - gestureStartOffset.current);
+            return;
           }
           let finalValue = rawTotal;
           if (rawTotal > BUTTON_WIDTH) {
             const overflow = rawTotal - BUTTON_WIDTH;
-            finalValue = BUTTON_WIDTH + (overflow * 0.5);
+            finalValue = BUTTON_WIDTH + overflow * 0.5;
           }
           translateX.setValue(finalValue - gestureStartOffset.current);
           return;
@@ -111,7 +106,7 @@ export const Swipeable = ({
         let finalValue = rawTotal;
         if (rawTotal < -BUTTON_WIDTH) {
           const overflow = rawTotal + BUTTON_WIDTH;
-          finalValue = -BUTTON_WIDTH + (overflow * 0.5); 
+          finalValue = -BUTTON_WIDTH + overflow * 0.5;
         }
         translateX.setValue(finalValue - gestureStartOffset.current);
       },
@@ -123,21 +118,40 @@ export const Swipeable = ({
         const finalValue = lastOffset.current;
 
         if (finalValue > 5 && onPinRef.current) {
-           const isFlickRight = vx > 0.3;
-           const isFlickLeft = vx < -0.3;
-           const isPastReveal = finalValue > REVEAL_THRESHOLD;
-           if (isFlickRight || (isPastReveal && !isFlickLeft)) {
-              Animated.spring(translateX, { toValue: BUTTON_WIDTH, useNativeDriver: true, velocity: vx, tension: 50, friction: 12 }).start();
-           } else {
-              Animated.spring(translateX, { toValue: 0, useNativeDriver: true, velocity: vx, tension: 50, friction: 12 }).start();
-           }
-           return;
+          const isFlickRight = vx > 0.3;
+          const isFlickLeft = vx < -0.3;
+          const isPastReveal = finalValue > REVEAL_THRESHOLD;
+          if (isFlickRight || (isPastReveal && !isFlickLeft)) {
+            Animated.spring(translateX, {
+              toValue: BUTTON_WIDTH,
+              useNativeDriver: true,
+              velocity: vx,
+              tension: 50,
+              friction: 12,
+            }).start();
+          } else {
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              velocity: vx,
+              tension: 50,
+              friction: 12,
+            }).start();
+          }
+          return;
         }
 
-        const threshold = wasOpenAtStart.current && lastOffset.current < 0 ? SECONDARY_DELETE_THRESHOLD : INSTANT_DELETE_THRESHOLD;
+        const threshold =
+          wasOpenAtStart.current && lastOffset.current < 0
+            ? SECONDARY_DELETE_THRESHOLD
+            : INSTANT_DELETE_THRESHOLD;
         if (finalValue < -threshold) {
           HapticFeedback.heavy();
-          Animated.timing(translateX, { toValue: -SCREEN_WIDTH, duration: 200, useNativeDriver: true }).start(() => {
+          Animated.timing(translateX, {
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
             onDeleteRef.current?.();
             translateX.setValue(0);
           });
@@ -148,9 +162,25 @@ export const Swipeable = ({
         const isFlickRight = vx > 0.3;
         const isPastReveal = finalValue < -REVEAL_THRESHOLD;
         if (isFlickLeft || (isPastReveal && !isFlickRight)) {
-          Animated.spring(translateX, { toValue: -BUTTON_WIDTH, useNativeDriver: true, velocity: vx, tension: 50, friction: 12, restSpeedThreshold: 0.1, restDisplacementThreshold: 0.1 }).start();
+          Animated.spring(translateX, {
+            toValue: -BUTTON_WIDTH,
+            useNativeDriver: true,
+            velocity: vx,
+            tension: 50,
+            friction: 12,
+            restSpeedThreshold: 0.1,
+            restDisplacementThreshold: 0.1,
+          }).start();
         } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, velocity: vx, tension: 50, friction: 12, restSpeedThreshold: 0.1, restDisplacementThreshold: 0.1 }).start();
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            velocity: vx,
+            tension: 50,
+            friction: 12,
+            restSpeedThreshold: 0.1,
+            restDisplacementThreshold: 0.1,
+          }).start();
         }
       },
 
@@ -160,8 +190,13 @@ export const Swipeable = ({
         const finalValue = lastOffset.current;
         const shouldBeOpenLeft = finalValue < -REVEAL_THRESHOLD;
         const shouldBeOpenRight = finalValue > REVEAL_THRESHOLD;
-        const toValue = shouldBeOpenLeft ? -BUTTON_WIDTH : (shouldBeOpenRight ? BUTTON_WIDTH : 0);
-        Animated.spring(translateX, { toValue, useNativeDriver: true, tension: 50, friction: 12 }).start();
+        const toValue = shouldBeOpenLeft ? -BUTTON_WIDTH : shouldBeOpenRight ? BUTTON_WIDTH : 0;
+        Animated.spring(translateX, {
+          toValue,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 12,
+        }).start();
       },
       onShouldBlockNativeResponder: () => true,
     });
@@ -185,25 +220,45 @@ export const Swipeable = ({
   const pinOpacity = translateX.interpolate({
     inputRange: [0, BUTTON_WIDTH],
     outputRange: [0, 1],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   const deleteOpacity = translateX.interpolate({
     inputRange: [-BUTTON_WIDTH, 0],
     outputRange: [1, 0],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   return (
     <View style={[styles.container, { borderRadius, marginBottom }]}>
       <View style={[styles.backgroundContainer, { borderRadius }]}>
-        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.ACCENT_BLUE, opacity: pinOpacity, justifyContent: 'flex-start', borderRadius }]}>
+        <Animated.View
+          style={[
+            styles.actionBackground,
+            {
+              backgroundColor: COLORS.ACCENT_BLUE,
+              opacity: pinOpacity,
+              justifyContent: "flex-start",
+              borderRadius,
+            },
+          ]}
+        >
           <Pressable style={styles.actionButton} onPress={handlePinAction}>
             <Pin size={22} color={COLORS.TEXT_PRIMARY} />
           </Pressable>
         </Animated.View>
 
-        <Animated.View style={[styles.actionBackground, { backgroundColor: COLORS.DANGER, opacity: deleteOpacity, justifyContent: 'flex-end', borderRadius }]}>
+        <Animated.View
+          style={[
+            styles.actionBackground,
+            {
+              backgroundColor: COLORS.DANGER,
+              opacity: deleteOpacity,
+              justifyContent: "flex-end",
+              borderRadius,
+            },
+          ]}
+        >
           <Pressable style={styles.actionButton} onPress={handleDelete}>
             <Trash2 size={22} color={COLORS.TEXT_PRIMARY} />
           </Pressable>
@@ -222,27 +277,27 @@ export const Swipeable = ({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
+    position: "relative",
+    backgroundColor: "transparent",
+    overflow: "hidden",
   },
   backgroundContainer: {
     ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   actionBackground: {
     ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   actionButton: {
     width: BUTTON_WIDTH,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
   content: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 0,
   },
 });

@@ -1,18 +1,17 @@
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
-import { useFonts } from 'expo-font';
-import { View, ActivityIndicator, AppState } from 'react-native';
-import { COLORS } from '@/constants/colors';
-import { FONT_ASSETS } from '@/constants/fonts';
-import { startNetworkSyncListener } from '@/lib/api/networkListener';
-import { initSyncEffect } from '@/stores/syncEffect';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useEffect } from "react";
+import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
+import { View, ActivityIndicator, AppState } from "react-native";
+import { COLORS } from "@/constants/colors";
+import { FONT_ASSETS } from "@/constants/fonts";
+import { startNetworkSyncListener } from "@/lib/api/networkListener";
+import { initSyncEffect } from "@/stores/syncEffect";
 import {
   clearAppNotifications,
   configureNotificationHandler,
   requestNotificationPermissions,
-} from '@/utils/notifications';
-
+} from "@/utils/notifications";
 
 export default function RootLayout() {
   // Pulling configuration directly from fonts.ts
@@ -23,8 +22,8 @@ export default function RootLayout() {
     void clearAppNotifications();
     void requestNotificationPermissions();
 
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
         void clearAppNotifications();
       }
     });
@@ -46,7 +45,14 @@ export default function RootLayout() {
   if (!loaded && !error) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: COLORS.BG, justifyContent: 'center', alignItems: 'center' }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: COLORS.BG,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
           <ActivityIndicator size="large" color={COLORS.ACCENT_BLUE} />
         </View>
       </GestureHandlerRootView>
@@ -59,12 +65,12 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: COLORS.BG },
-          animation: 'fade_from_bottom',
+          animation: "fade_from_bottom",
         }}
       >
         <Stack.Screen
           name="exercises/[name]/volume"
-          options={{ animation: 'slide_from_bottom', gestureEnabled: true }}
+          options={{ animation: "slide_from_bottom", gestureEnabled: true }}
         />
       </Stack>
     </GestureHandlerRootView>

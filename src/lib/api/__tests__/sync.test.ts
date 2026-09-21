@@ -14,16 +14,8 @@ import { syncPrograms, syncWorkouts, runFullSync } from "@/lib/api/sync";
 import type { Program, WorkoutSession } from "@/types";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import {
-  batchDeletePrograms,
-  batchUpsertPrograms,
-  fetchPrograms,
-} from "@/lib/api/programs";
-import {
-  batchDeleteWorkouts,
-  batchUpsertWorkouts,
-  fetchWorkouts,
-} from "@/lib/api/workouts";
+import { batchDeletePrograms, batchUpsertPrograms, fetchPrograms } from "@/lib/api/programs";
+import { batchDeleteWorkouts, batchUpsertWorkouts, fetchWorkouts } from "@/lib/api/workouts";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   setItem: jest.fn(() => Promise.resolve()),
@@ -128,7 +120,11 @@ function makeProgram(id: string, updatedAt: number, overrides: Partial<Program> 
   };
 }
 
-function makeWorkoutSession(id: string, updatedAt: number, overrides: Partial<WorkoutSession> = {}): WorkoutSession {
+function makeWorkoutSession(
+  id: string,
+  updatedAt: number,
+  overrides: Partial<WorkoutSession> = {},
+): WorkoutSession {
   return {
     _id: id,
     userId: "test-user",
@@ -182,7 +178,9 @@ describe("syncPrograms", () => {
     setupProgramState();
     setupWorkoutState();
     (batchDeletePrograms as jest.Mock).mockResolvedValue(true);
-    (batchUpsertPrograms as jest.Mock).mockImplementation((programs: Program[]) => Promise.resolve(programs));
+    (batchUpsertPrograms as jest.Mock).mockImplementation((programs: Program[]) =>
+      Promise.resolve(programs),
+    );
     (fetchPrograms as jest.Mock).mockResolvedValue([]);
   });
 
@@ -260,7 +258,9 @@ describe("syncWorkouts", () => {
     setupProgramState();
     setupWorkoutState();
     (batchDeleteWorkouts as jest.Mock).mockResolvedValue(true);
-    (batchUpsertWorkouts as jest.Mock).mockImplementation((workouts: WorkoutSession[]) => Promise.resolve(workouts));
+    (batchUpsertWorkouts as jest.Mock).mockImplementation((workouts: WorkoutSession[]) =>
+      Promise.resolve(workouts),
+    );
     (fetchWorkouts as jest.Mock).mockResolvedValue([]);
   });
 
@@ -321,8 +321,12 @@ describe("runFullSync", () => {
     setupWorkoutState();
     (fetchPrograms as jest.Mock).mockResolvedValue([]);
     (fetchWorkouts as jest.Mock).mockResolvedValue([]);
-    (batchUpsertPrograms as jest.Mock).mockImplementation((programs: Program[]) => Promise.resolve(programs));
-    (batchUpsertWorkouts as jest.Mock).mockImplementation((workouts: WorkoutSession[]) => Promise.resolve(workouts));
+    (batchUpsertPrograms as jest.Mock).mockImplementation((programs: Program[]) =>
+      Promise.resolve(programs),
+    );
+    (batchUpsertWorkouts as jest.Mock).mockImplementation((workouts: WorkoutSession[]) =>
+      Promise.resolve(workouts),
+    );
   });
 
   it("calls both syncPrograms and syncWorkouts", async () => {
@@ -344,10 +348,7 @@ describe("runFullSync", () => {
   });
 
   it("handles concurrent calls via _syncing guard (no crash)", async () => {
-    const [r1, r2] = await Promise.all([
-      runFullSync(),
-      runFullSync(),
-    ]);
+    const [r1, r2] = await Promise.all([runFullSync(), runFullSync()]);
     expect(r1).toBe(true);
     expect(r2).toBe(true);
   });

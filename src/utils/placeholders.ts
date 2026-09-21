@@ -25,7 +25,7 @@ export function resolveExercisePlaceholders(
   exerciseIdentityKey: string,
   currentSets: WorkoutSet[],
   history: WorkoutSession[],
-  targetUnit: "kg" | "lbs" = "kg"
+  targetUnit: "kg" | "lbs" = "kg",
 ): SetPlaceholder[] {
   const previousMatch = findMostRecentExercise(exerciseIdentityKey, history);
   const previousSets = previousMatch?.sets || null;
@@ -35,8 +35,9 @@ export function resolveExercisePlaceholders(
   // 1. Initial pass: use history
   const placeholders: SetPlaceholder[] = Array.from({ length: currentSetCount }, (_, i) => {
     if (!previousSets || previousSets.length === 0) return { weight: null, reps: null };
-    const source = i < previousSets.length ? previousSets[i] : previousSets[previousSets.length - 1];
-    
+    const source =
+      i < previousSets.length ? previousSets[i] : previousSets[previousSets.length - 1];
+
     return {
       weight: convertWeight(source.weight, previousUnit, targetUnit),
       reps: source.reps,
@@ -49,7 +50,7 @@ export function resolveExercisePlaceholders(
 
   for (let i = 0; i < currentSetCount; i++) {
     const current = currentSets[i];
-    
+
     // If this set has a value, it becomes the new "fill-forward" value for the next sets.
     if (current.weight !== null) {
       lastWeight = current.weight;
@@ -75,7 +76,7 @@ export function resolveExercisePlaceholders(
  */
 export function resolveSetOnComplete(
   currentSet: WorkoutSet,
-  placeholder: SetPlaceholder
+  placeholder: SetPlaceholder,
 ): { weight: number; reps: number } {
   return {
     weight: currentSet.weight ?? placeholder.weight ?? 0,
@@ -93,14 +94,12 @@ export function resolveSetOnComplete(
  */
 function findMostRecentExercise(
   exerciseIdentityKey: string,
-  history: WorkoutSession[]
+  history: WorkoutSession[],
 ): WorkoutExercise | null {
   const normalizedTargetKey = normalizeExerciseIdentityKey(exerciseIdentityKey);
   for (const session of history) {
     if (!session.completedAt) continue; // skip incomplete
-    const match = session.exercises.find(
-      (e) => getExerciseIdentityKey(e) === normalizedTargetKey
-    );
+    const match = session.exercises.find((e) => getExerciseIdentityKey(e) === normalizedTargetKey);
     if (match) return match;
   }
   return null;

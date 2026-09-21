@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Text, StyleSheet, TextStyle } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
+import { formatClock } from "@/utils/conversions";
 
 interface LiveWorkoutTimerProps {
   startedAt: string;
@@ -16,18 +17,7 @@ export default function LiveWorkoutTimer({ startedAt, textStyle }: LiveWorkoutTi
 
     const updateTimer = () => {
       const now = Date.now();
-      const diff = Math.max(0, Math.floor((now - start) / 1000));
-      
-      const hrs = Math.floor(diff / 3600);
-      const mins = Math.floor((diff % 3600) / 60);
-      const secs = diff % 60;
-
-      const parts = [];
-      if (hrs > 0) parts.push(String(hrs).padStart(2, "0"));
-      parts.push(String(mins).padStart(2, "0"));
-      parts.push(String(secs).padStart(2, "0"));
-      
-      setElapsed(parts.join(":"));
+      setElapsed(formatClock(Math.max(0, Math.floor((now - start) / 1000))));
     };
 
     updateTimer();

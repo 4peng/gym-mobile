@@ -8,19 +8,16 @@ import {
   ActivityIndicator,
   Alert,
   LayoutAnimation,
-  TextInput,
   KeyboardAvoidingView,
   RefreshControl,
 } from "react-native";
-import { 
-  ChevronLeft, 
-  Calendar, 
-  Clock, 
-  ChevronDown, 
-  Dumbbell, 
+import {
+  ChevronLeft,
+  Calendar,
+  Clock,
+  ChevronDown,
+  Dumbbell,
   ChevronUp,
-  Check,
-  X 
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -32,7 +29,10 @@ import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/src/components/Swipeable";
-import type { WorkoutSession, WorkoutSet } from "@/types";
+import type { WorkoutSession } from "@/types";
+import { EditableSetTag } from "@/components/Workout/EditableSetTag";
+import { promptForDate } from "@/utils/alerts";
+import { withDatePart } from "@/utils/timestamps";
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -50,10 +50,10 @@ const formatDuration = (start?: string, end?: string) => {
 
 const formatDate = (dateStr: string) => {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('default', { 
-    weekday: 'short', 
-    month: 'short', 
-    day: 'numeric' 
+  return d.toLocaleDateString("default", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
   });
 };
 
@@ -68,99 +68,64 @@ interface WorkoutSessionCardProps {
   onToggleScroll: (enabled: boolean) => void;
 }
 
-const WorkoutSessionCard = React.memo(function WorkoutSessionCard({ session, programName, onDelete, onToggleScroll }: WorkoutSessionCardProps) {
+const WorkoutSessionCard = React.memo(function WorkoutSessionCard({
+  session,
+  programName,
+  onDelete,
+  onToggleScroll,
+}: WorkoutSessionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
   const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
-  const decimalKeyboardType = "decimal-pad";
-  
-  const [editingSet, setEditingSet] = useState<{
-    exerciseId: string;
-    setId: string;
-    weight: string;
-    reps: string;
-  } | null>(null);
-
   const toggleExpand = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsExpanded(!isExpanded);
   };
 
   const handleEditDate = () => {
-    const currentFullDate = session.completedAt || session.startedAt;
-    const currentDate = new Date(currentFullDate).toISOString().split('T')[0];
-    
-    Alert.prompt(
-      "Edit Date",
-      "Enter new date (YYYY-MM-DD):",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Save", 
-          onPress: (newDate?: string) => {
-            if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-              // Keep the time part if possible
-              const oldTime = currentFullDate.split('T')[1] || "12:00:00.000Z";
-              const updatedIso = `${newDate}T${oldTime}`;
-              updateSessionDate(session._id, updatedIso);
-            } else if (newDate) {
-              Alert.alert("Invalid format", "Please use YYYY-MM-DD");
-            }
-          } 
-        }
-      ],
-      "plain-text",
-      currentDate
+    const currentIso = session.completedAt || session.startedAt;
+    promptForDate(currentIso, (newDate) =>
+      updateSessionDate(session._id, withDatePart(currentIso, newDate)),
     );
   };
 
-  const handleStartEdit = (exerciseId: string, set: WorkoutSet) => {
-    setEditingSet({
-      exerciseId,
-      setId: set.id,
-      weight: (set.weight ?? 0).toString(),
-      reps: (set.reps ?? 0).toString(),
-    });
-  };
-
-  const handleSaveEdit = () => {
-    if (!editingSet) return;
-    const w = Number(editingSet.weight.trim().replace(",", "."));
-    const r = Number(editingSet.reps.trim());
-    if (Number.isFinite(w) && Number.isFinite(r)) {
-      updateHistorySet(session._id, editingSet.exerciseId, editingSet.setId, "weight", w);
-      updateHistorySet(session._id, editingSet.exerciseId, editingSet.setId, "reps", r);
-    }
-    setEditingSet(null);
-  };
-
-  const exerciseSummary = useMemo(() => session.exercises
-    .map(e => `${e.sets.length} × ${toTitleCase(e.name)}`)
-    .join(", "), [session.exercises]);
+  const exerciseSummary = useMemo(
+    () => session.exercises.map((e) => `${e.sets.length} × ${toTitleCase(e.name)}`).join(", "),
+    [session.exercises],
+  );
 
   return (
     <Swipeable onDelete={() => onDelete(session._id)} onToggleScroll={onToggleScroll}>
       <View style={[UI.SHARED.card, { marginBottom: 0, borderRadius: 0 }]}>
         <View style={{ padding: 12 }}>
           <View style={styles.cardHeader}>
-            <Pressable onPress={handleEditDate} style={({ pressed }) => [styles.dateInfo, pressed && { opacity: 0.6 }]}>
+            <Pressable
+              onPress={handleEditDate}
+              style={({ pressed }) => [styles.dateInfo, pressed && { opacity: 0.6 }]}
+            >
               <Calendar size={14} color={COLORS.ACCENT_BLUE} />
-              <Text style={styles.dateText}>{formatDate(session.completedAt || session.startedAt)}</Text>
+              <Text style={styles.dateText}>
+                {formatDate(session.completedAt || session.startedAt)}
+              </Text>
             </Pressable>
             <Pressable onPress={toggleExpand} style={styles.headerRight}>
-              {isExpanded ? <ChevronUp size={20} color={COLORS.TEXT_TERTIARY} /> : <ChevronDown size={20} color={COLORS.TEXT_TERTIARY} />}
+              {isExpanded ? (
+                <ChevronUp size={20} color={COLORS.TEXT_TERTIARY} />
+              ) : (
+                <ChevronDown size={20} color={COLORS.TEXT_TERTIARY} />
+              )}
             </Pressable>
           </View>
 
           <Pressable onPress={toggleExpand}>
-            <Text style={styles.sessionTitle}>
-              {programName || "Quick Session"}
-            </Text>
+            <Text style={styles.sessionTitle}>{programName || "Quick Session"}</Text>
 
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
                 <Clock size={12} color={COLORS.ACCENT_YELLOW} />
-                <Text style={styles.metaText}>{formatDuration(session.startedAt, session.completedAt)}</Text>
+                <Text style={styles.metaText}>
+                  {formatDuration(session.startedAt, session.completedAt)}
+                </Text>
               </View>
               <View style={styles.metaItem}>
                 <Dumbbell size={12} color={COLORS.ACCENT_GREEN} />
@@ -189,48 +154,17 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({ session, pro
               <View key={ex.id} style={styles.exerciseDetailItem}>
                 <Text style={styles.exerciseDetailName}>{toTitleCase(ex.name)}</Text>
                 <View style={styles.setsList}>
-                  {ex.sets.map((s, sIdx) => {
-                    const isEditing = editingSet?.setId === s.id;
-                    
-                    if (isEditing) {
-                      return (
-                        <View key={s.id} style={styles.editRow}>
-                          <TextInput
-                            style={styles.editInput}
-                            value={editingSet.weight}
-                            onChangeText={(v) => setEditingSet({ ...editingSet, weight: v })}
-                            keyboardType={decimalKeyboardType}
-                            autoFocus
-                          />
-                          <Text style={styles.setTagX}>×</Text>
-                          <TextInput
-                            style={styles.editInput}
-                            value={editingSet.reps}
-                            onChangeText={(v) => setEditingSet({ ...editingSet, reps: v })}
-                            keyboardType="numeric"
-                          />
-                          <Pressable onPress={handleSaveEdit} style={styles.editIcon}>
-                            <Check size={14} color={COLORS.ACCENT_GREEN} />
-                          </Pressable>
-                          <Pressable onPress={() => setEditingSet(null)} style={styles.editIcon}>
-                            <X size={14} color={COLORS.DANGER} />
-                          </Pressable>
-                        </View>
-                      );
-                    }
-
-                    return (
-                      <Pressable 
-                        key={s.id} 
-                        style={styles.setTag}
-                        onPress={() => handleStartEdit(ex.id, s)}
-                      >
-                        <Text style={styles.setTagText}>
-                          {s.weight}<Text style={styles.setTagX}>×</Text>{s.reps}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  {ex.sets.map((s) => (
+                    <EditableSetTag
+                      key={s.id}
+                      weight={s.weight}
+                      reps={s.reps}
+                      onSave={(w, r) => {
+                        updateHistorySet(session._id, ex.id, s.id, "weight", w);
+                        updateHistorySet(session._id, ex.id, s.id, "reps", r);
+                      }}
+                    />
+                  ))}
                 </View>
               </View>
             ))}
@@ -241,7 +175,6 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({ session, pro
   );
 });
 
-
 // ──────────────────────────────────────────────
 // WorkoutHistoryScreen
 // ──────────────────────────────────────────────
@@ -251,13 +184,10 @@ export default function WorkoutHistoryScreen() {
   const allHistory = useWorkoutSessionStore(useShallow((s) => s.history));
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const runFullSync = useSyncStore((s) => s.runFullSync);
-  
+
   const [scrollEnabled, setScrollEnabled] = useState(true);
-  
-  const history = useMemo(() => 
-    allHistory.filter(s => !s.deletedAt), 
-    [allHistory]
-  );
+
+  const history = useMemo(() => allHistory.filter((s) => !s.deletedAt), [allHistory]);
 
   const hasMoreHistoryOnServer = useWorkoutSessionStore((s) => s.hasMoreHistory);
   const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);
@@ -275,29 +205,32 @@ export default function WorkoutHistoryScreen() {
   const [displayLimit, setDisplayLimit] = useState(10);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const handleDelete = useCallback((id: string) => {
-    Alert.alert(
-      "Delete Workout",
-      "Are you sure you want to remove this session from your history?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            deleteHistorySession(id);
-          }
-        }
-      ]
-    );
-  }, [deleteHistorySession]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      Alert.alert(
+        "Delete Workout",
+        "Are you sure you want to remove this session from your history?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              deleteHistorySession(id);
+            },
+          },
+        ],
+      );
+    },
+    [deleteHistorySession],
+  );
 
   const handleLoadMore = async () => {
     if (loadingMore) return;
 
     if (history.length > displayLimit) {
-      setDisplayLimit(prev => prev + 10);
+      setDisplayLimit((prev) => prev + 10);
       return;
     }
 
@@ -305,7 +238,7 @@ export default function WorkoutHistoryScreen() {
       setLoadingMore(true);
       try {
         await fetchMoreHistory();
-        setDisplayLimit(prev => prev + 10);
+        setDisplayLimit((prev) => prev + 10);
       } catch (err) {
         console.error("Failed to load more history:", err);
       } finally {
@@ -314,21 +247,20 @@ export default function WorkoutHistoryScreen() {
     }
   };
 
-  const renderItem = useCallback(({ item }: { item: WorkoutSession }) => (
-    <WorkoutSessionCard
-      session={item}
-      programName={item.programId ? programsById.get(item.programId)?.name : undefined}
-      onDelete={handleDelete}
-      onToggleScroll={setScrollEnabled}
-    />
-  ), [programsById, handleDelete]);
+  const renderItem = useCallback(
+    ({ item }: { item: WorkoutSession }) => (
+      <WorkoutSessionCard
+        session={item}
+        programName={item.programId ? programsById.get(item.programId)?.name : undefined}
+        onDelete={handleDelete}
+        onToggleScroll={setScrollEnabled}
+      />
+    ),
+    [programsById, handleDelete],
+  );
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={0}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={UI.SHARED.iconBtn}>
@@ -368,7 +300,9 @@ export default function WorkoutHistoryScreen() {
               <View style={styles.footerLoader}>
                 <ActivityIndicator size="small" color={COLORS.ACCENT_BLUE} />
               </View>
-            ) : <View style={{ height: 100 }} />
+            ) : (
+              <View style={{ height: 100 }} />
+            )
           }
         />
       </View>
@@ -496,53 +430,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
-  setTag: {
-    backgroundColor: "rgba(11, 130, 255, 0.05)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: UI.RADIUS_ITEM,
-    borderWidth: 1,
-    borderColor: "rgba(11, 130, 255, 0.1)",
-  },
-  setTagText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 12,
-    fontWeight: "800",
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  setTagX: {
-    color: COLORS.TEXT_TERTIARY,
-    fontSize: 10,
-    marginHorizontal: 2,
-    fontFamily: FONT_FAMILIES.MONO,
-  },
-  editRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: COLORS.ACCENT_BLUE,
-  },
-  editInput: {
-    color: COLORS.TEXT_PRIMARY,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontSize: 12,
-    fontWeight: "800",
-    textAlign: "center",
-    padding: 0,
-    width: 35, // Fixed width prevents disappearing text
-  },
-  editIcon: {
-    marginLeft: 4,
-    padding: 2,
-  },
   footerLoader: {
     paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyContainer: {
     alignItems: "center",

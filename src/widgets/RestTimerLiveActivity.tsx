@@ -36,7 +36,12 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
 
   const RestBlock = (
     <VStack alignment="leading" spacing={2}>
-      <Text modifiers={[foregroundStyle(yellow), font({ size: 11, weight: "bold", design: "monospaced" })]}>
+      <Text
+        modifiers={[
+          foregroundStyle(yellow),
+          font({ size: 11, weight: "bold", design: "monospaced" }),
+        ]}
+      >
         REST
       </Text>
       <Text
@@ -53,7 +58,12 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
 
   const SetsBlock = (
     <VStack alignment="trailing" spacing={2}>
-      <Text modifiers={[foregroundStyle(blue), font({ size: 11, weight: "bold", design: "monospaced" })]}>
+      <Text
+        modifiers={[
+          foregroundStyle(blue),
+          font({ size: 11, weight: "bold", design: "monospaced" }),
+        ]}
+      >
         SETS
       </Text>
       <Text
@@ -119,10 +129,20 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
 
       <HStack alignment="center" spacing={10}>
         <VStack alignment="leading" spacing={1}>
-          <Text modifiers={[foregroundStyle(secondary), font({ size: 12, weight: "medium", design: "monospaced" })]}>
+          <Text
+            modifiers={[
+              foregroundStyle(secondary),
+              font({ size: 12, weight: "medium", design: "monospaced" }),
+            ]}
+          >
             Started
           </Text>
-          <Text modifiers={[foregroundStyle(secondary), font({ size: 12, weight: "medium", design: "monospaced" })]}>
+          <Text
+            modifiers={[
+              foregroundStyle(secondary),
+              font({ size: 12, weight: "medium", design: "monospaced" }),
+            ]}
+          >
             Elapsed
           </Text>
         </VStack>
@@ -131,7 +151,10 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
           <Text
             date={new Date(props.workoutStartedAt)}
             dateStyle="time"
-            modifiers={[foregroundStyle(secondary), font({ size: 12, weight: "medium", design: "monospaced" })]}
+            modifiers={[
+              foregroundStyle(secondary),
+              font({ size: 12, weight: "medium", design: "monospaced" }),
+            ]}
           />
           <Text
             timerInterval={elapsedInterval}
@@ -154,11 +177,21 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
       <Text
         timerInterval={timerInterval}
         countsDown
-        modifiers={[foregroundStyle(yellow), font({ size: 15, weight: "bold", design: "monospaced" }), monospacedDigit()]}
+        modifiers={[
+          foregroundStyle(yellow),
+          font({ size: 15, weight: "bold", design: "monospaced" }),
+          monospacedDigit(),
+        ]}
       />
     ),
     compactTrailing: (
-      <Text modifiers={[foregroundStyle(text), font({ size: 15, weight: "bold", design: "monospaced" }), monospacedDigit()]}>
+      <Text
+        modifiers={[
+          foregroundStyle(text),
+          font({ size: 15, weight: "bold", design: "monospaced" }),
+          monospacedDigit(),
+        ]}
+      >
         {setsText}
       </Text>
     ),
@@ -166,13 +199,23 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
       <Text
         timerInterval={timerInterval}
         countsDown
-        modifiers={[foregroundStyle(yellow), font({ size: 11, weight: "bold", design: "monospaced" }), monospacedDigit()]}
+        modifiers={[
+          foregroundStyle(yellow),
+          font({ size: 11, weight: "bold", design: "monospaced" }),
+          monospacedDigit(),
+        ]}
       />
     ),
     expandedLeading: RestBlock,
     expandedTrailing: SetsBlock,
     expandedCenter: (
-      <Text modifiers={[foregroundStyle(secondary), font({ size: 12, weight: "semibold", design: "monospaced" }), lineLimit(1)]}>
+      <Text
+        modifiers={[
+          foregroundStyle(secondary),
+          font({ size: 12, weight: "semibold", design: "monospaced" }),
+          lineLimit(1),
+        ]}
+      >
         ONGOING
       </Text>
     ),
@@ -180,7 +223,12 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
       <ProgressView
         timerInterval={timerInterval}
         countsDown={false}
-        modifiers={[progressViewStyle("linear"), tint(blue), frame({ height: 8 }), clipShape("roundedRectangle", 4)]}
+        modifiers={[
+          progressViewStyle("linear"),
+          tint(blue),
+          frame({ height: 8 }),
+          clipShape("roundedRectangle", 4),
+        ]}
       />
     ),
   };
@@ -188,7 +236,7 @@ const RestTimerLayout: LiveActivityComponent<RestTimerLiveActivityProps> = (prop
 
 const RestTimerLiveActivity = createLiveActivity<RestTimerLiveActivityProps>(
   "RestTimerLiveActivity",
-  RestTimerLayout
+  RestTimerLayout,
 );
 
 export default RestTimerLiveActivity;

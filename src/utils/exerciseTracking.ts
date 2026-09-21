@@ -1,11 +1,7 @@
 import type { ExerciseDefinition, ExerciseTrackingMode, WorkoutSet } from "@/types";
 import { normalizeTrackingMode } from "@/shared/programs.js";
 
-export const EXERCISE_TRACKING_OPTIONS: ExerciseTrackingMode[] = [
-  "strength",
-  "timed",
-  "cardio",
-];
+export const EXERCISE_TRACKING_OPTIONS: ExerciseTrackingMode[] = ["strength", "timed", "cardio"];
 
 const TRACKING_MODE_LABELS: Record<ExerciseTrackingMode, string> = {
   strength: "Strength",
@@ -45,7 +41,7 @@ export function getTrackingModeLabel(mode: ExerciseTrackingMode): string {
 }
 
 export function inferTrackingModeFromExerciseDefinition(
-  definition?: Pick<ExerciseDefinition, "id"> | null
+  definition?: Pick<ExerciseDefinition, "id"> | null,
 ): ExerciseTrackingMode {
   const id = typeof definition?.id === "string" ? definition.id.trim() : "";
   if (!id) return "strength";
@@ -57,7 +53,7 @@ export function inferTrackingModeFromExerciseDefinition(
 export function normalizeSetForTrackingMode(
   set: WorkoutSet,
   trackingMode: ExerciseTrackingMode,
-  initialWeight: number | null = null
+  initialWeight: number | null = null,
 ): WorkoutSet {
   const nextMode = normalizeTrackingMode(trackingMode);
 
@@ -89,4 +85,3 @@ export function normalizeSetForTrackingMode(
     distance: null,
   };
 }
-

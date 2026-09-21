@@ -29,45 +29,7 @@ import {
   MuscleGroup,
 } from "@/constants/muscles";
 import { getExerciseIdentityKey } from "@/utils/exerciseIdentity";
-import { isBodyweightStrengthExercise, type WeightUnit } from "@/utils/bodyweightAnalytics";
-import { convertWeight } from "@/utils/conversions";
-
-// Mirrors resolveEffectiveStrengthLoad from utils/bodyweightAnalytics, but takes the
-// bodyweight-exercise flag as a precomputed input instead of resolving exercise
-// identity on every call, since that resolution only depends on the exercise (not
-// the individual set) and previously ran once per set in a per-exercise loop.
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function resolveEffectiveLoadForKnownBodyweight(
-  isBodyweightExercise: boolean,
-  loggedWeight: number | null,
-  loggedWeightUnit: WeightUnit,
-  targetUnit: WeightUnit,
-  analyticsBodyweight: number | null,
-  analyticsBodyweightUnit: WeightUnit
-): number | null {
-  if (!isBodyweightExercise) {
-    return isFiniteNumber(loggedWeight)
-      ? convertWeight(loggedWeight, loggedWeightUnit, targetUnit)
-      : loggedWeight;
-  }
-
-  const extraLoad = isFiniteNumber(loggedWeight)
-    ? convertWeight(loggedWeight, loggedWeightUnit, targetUnit) ?? loggedWeight
-    : 0;
-
-  if (!isFiniteNumber(analyticsBodyweight)) {
-    return extraLoad;
-  }
-
-  const convertedBodyweight =
-    convertWeight(analyticsBodyweight, analyticsBodyweightUnit, targetUnit) ??
-    analyticsBodyweight;
-
-  return convertedBodyweight + extraLoad;
-}
+import { makeLoadResolver } from "@/utils/bodyweightAnalytics";
 
 // ──────────────────────────────────────────────
 // Mini Chart Component
@@ -112,14 +74,9 @@ export default function ExerciseListStatsScreen() {
   const rawHistory = useWorkoutSessionStore(useShallow((s) => s.history));
   const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
   const pinnedExerciseNamesRaw = useWorkoutSessionStore(useShallow((s) => s.pinnedExerciseNames));
-  const pinnedExerciseNames = useMemo(
-    () => pinnedExerciseNamesRaw || [],
-    [pinnedExerciseNamesRaw]
-  );
+  const pinnedExerciseNames = useMemo(() => pinnedExerciseNamesRaw || [], [pinnedExerciseNamesRaw]);
   const togglePinExercise = useWorkoutSessionStore((s) => s.togglePinExercise);
-  const showDetailedMuscleGroups = useUiPreferencesStore(
-    (s) => s.showDetailedMuscleGroups
-  );
+  const showDetailedMuscleGroups = useUiPreferencesStore((s) => s.showDetailedMuscleGroups);
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
   const [search, setSearch] = React.useState("");
@@ -159,7 +116,7 @@ export default function ExerciseListStatsScreen() {
       try {
         const cachedIds = new Set(rawHistory.map((s) => s._id));
         const missingIds = historyIndex.filter(
-          (id) => !cachedIds.has(id) && !hydratedShardsRef.current.has(id)
+          (id) => !cachedIds.has(id) && !hydratedShardsRef.current.has(id),
         );
         if (missingIds.length > 0) {
           const shards = await workoutStorage.getBatch(missingIds);
@@ -174,7 +131,9 @@ export default function ExerciseListStatsScreen() {
     };
 
     loadShards();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyIndex]);
 
@@ -184,16 +143,11 @@ export default function ExerciseListStatsScreen() {
     // eviction publishes.
     const validIds = new Set(historyIndex);
     const cachedIds = new Set(rawHistory.map((s) => s._id));
-    const extraShards = diskShards.filter(
-      (s) => validIds.has(s._id) && !cachedIds.has(s._id)
-    );
+    const extraShards = diskShards.filter((s) => validIds.has(s._id) && !cachedIds.has(s._id));
     return [...rawHistory, ...extraShards];
   }, [rawHistory, diskShards, historyIndex]);
 
-  const history = useMemo(
-    () => fullHistory.filter((session) => !session.deletedAt),
-    [fullHistory]
-  );
+  const history = useMemo(() => fullHistory.filter((session) => !session.deletedAt), [fullHistory]);
 
   useEffect(() => {
     const allowed = new Set(selectableMuscles);
@@ -207,9 +161,7 @@ export default function ExerciseListStatsScreen() {
       return;
     }
     setSelectedMuscles((prev) =>
-      prev.includes(muscle)
-        ? prev.filter((m) => m !== muscle)
-        : [...prev, muscle]
+      prev.includes(muscle) ? prev.filter((m) => m !== muscle) : [...prev, muscle],
     );
   }, []);
 
@@ -217,9 +169,9 @@ export default function ExerciseListStatsScreen() {
     const exerciseMap = new Map<string, number[]>();
     const originalNameMap = new Map<string, string>();
     const musclesMap = new Map<string, MuscleGroup[]>();
-    
-    history.forEach(session => {
-      session.exercises.forEach(ex => {
+
+    history.forEach((session) => {
+      session.exercises.forEach((ex) => {
         const identityKey = getExerciseIdentityKey(ex);
         if (!exerciseMap.has(identityKey)) {
           exerciseMap.set(identityKey, []);
@@ -228,30 +180,25 @@ export default function ExerciseListStatsScreen() {
             identityKey,
             showDetailedMuscleGroups
               ? expandPrimaryMusclesForDetailedMode(ex.muscles || [])
-              : ex.muscles || []
+              : ex.muscles || [],
           );
         }
-        
-        // Resolved once per exercise (not per set) since it only depends on
-        // the exercise's identity, not on any individual set's data.
-        const exWeightUnit = ex.weightUnit || "kg";
-        const exIsBodyweight = isBodyweightStrengthExercise(ex);
+
+        const resolveLoad = makeLoadResolver(
+          ex,
+          ex.weightUnit || "kg",
+          analyticsBodyweight,
+          analyticsBodyweightUnit,
+        );
 
         let vol = 0;
-        ex.sets.forEach(s => {
+        ex.sets.forEach((s) => {
           if (!s.completedAt || s.reps === null || !Number.isFinite(s.reps)) return;
-          const effectiveLoad = resolveEffectiveLoadForKnownBodyweight(
-            exIsBodyweight,
-            s.weight,
-            exWeightUnit,
-            exWeightUnit,
-            analyticsBodyweight,
-            analyticsBodyweightUnit
-          );
+          const effectiveLoad = resolveLoad(s.weight);
           if (effectiveLoad === null || !Number.isFinite(effectiveLoad)) return;
           vol += effectiveLoad * s.reps;
         });
-        
+
         const currentData = exerciseMap.get(identityKey)!;
         if (currentData.length < 10) {
           currentData.unshift(vol);
@@ -281,7 +228,7 @@ export default function ExerciseListStatsScreen() {
         name: originalNameMap.get(identityKey) || identityKey,
         isPinned: pinnedExerciseNames.includes(identityKey),
         recentVolume: exerciseMap.get(identityKey) || [],
-        muscles: musclesMap.get(identityKey) || []
+        muscles: musclesMap.get(identityKey) || [],
       }));
   }, [
     analyticsBodyweight,
@@ -293,10 +240,13 @@ export default function ExerciseListStatsScreen() {
     showDetailedMuscleGroups,
   ]);
 
-  const handlePin = useCallback((identityKey: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    togglePinExercise(identityKey);
-  }, [togglePinExercise]);
+  const handlePin = useCallback(
+    (identityKey: string) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      togglePinExercise(identityKey);
+    },
+    [togglePinExercise],
+  );
 
   const renderMuscleFilterItem = useCallback(
     ({ item }: { item: string }) => {
@@ -307,39 +257,36 @@ export default function ExerciseListStatsScreen() {
       return (
         <Pressable
           onPress={() => toggleMuscleFilter(item as MuscleGroup | "all")}
-          style={[
-            styles.filterPill,
-            isActive && styles.filterPillActive
-          ]}
+          style={[styles.filterPill, isActive && styles.filterPillActive]}
         >
-          <Text style={[
-            styles.filterText,
-            isActive && styles.filterTextActive
-          ]}>
+          <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
             {isAllChip ? "All" : MUSCLE_LABELS[item as MuscleGroup]}
           </Text>
         </Pressable>
       );
     },
-    [selectedMuscles, toggleMuscleFilter]
+    [selectedMuscles, toggleMuscleFilter],
   );
 
   const renderExerciseItem = useCallback(
     ({ item }: { item: (typeof exerciseStats)[number] }) => (
-      <Swipeable
-        onPin={() => handlePin(item.key)}
-        onToggleScroll={setScrollEnabled}
-      >
+      <Swipeable onPin={() => handlePin(item.key)} onToggleScroll={setScrollEnabled}>
         <Pressable
           style={({ pressed }) => [
             UI.SHARED.card,
-            { padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 0, borderRadius: 0 },
-            pressed && { backgroundColor: COLORS.CARD_HOVER }
+            {
+              padding: 20,
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 0,
+              borderRadius: 0,
+            },
+            pressed && { backgroundColor: COLORS.CARD_HOVER },
           ]}
           onPress={() => router.push(`/exercises/${encodeURIComponent(item.key)}/volume`)}
         >
           <View style={styles.itemInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={styles.itemName}>{toTitleCase(item.name)}</Text>
               {item.isPinned && (
                 <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
@@ -349,7 +296,8 @@ export default function ExerciseListStatsScreen() {
               {item.muscles.length > 0 ? (
                 item.muscles.map((m, i) => (
                   <Text key={m} style={styles.muscleLabel}>
-                    {MUSCLE_LABELS[m]}{i < item.muscles.length - 1 ? " • " : ""}
+                    {MUSCLE_LABELS[m]}
+                    {i < item.muscles.length - 1 ? " • " : ""}
                   </Text>
                 ))
               ) : (
@@ -364,7 +312,7 @@ export default function ExerciseListStatsScreen() {
         </Pressable>
       </Swipeable>
     ),
-    [handlePin, router, setScrollEnabled]
+    [handlePin, router, setScrollEnabled],
   );
 
   return (
@@ -411,7 +359,9 @@ export default function ExerciseListStatsScreen() {
           <View style={styles.emptyContainer}>
             <BarChart2 size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />
             <Text style={styles.emptyText}>
-              {search || selectedMuscles.length > 0 ? "No matches found" : "Complete a workout first to see stats"}
+              {search || selectedMuscles.length > 0
+                ? "No matches found"
+                : "Complete a workout first to see stats"}
             </Text>
           </View>
         }
@@ -458,7 +408,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontFamily: FONT_FAMILIES.MEDIUM,
     includeFontPadding: false,
-    textAlignVertical: 'center',
+    textAlignVertical: "center",
   },
   filterWrapper: {
     marginBottom: 20,
@@ -471,18 +421,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: UI.RADIUS_ITEM,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: "rgba(255,255,255,0.03)",
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: "rgba(255,255,255,0.05)",
   },
   filterPillActive: {
-    backgroundColor: 'rgba(11, 130, 255, 0.15)',
-    borderColor: 'rgba(11, 130, 255, 0.3)',
+    backgroundColor: "rgba(11, 130, 255, 0.15)",
+    borderColor: "rgba(11, 130, 255, 0.3)",
   },
   filterText: {
     color: COLORS.TEXT_TERTIARY,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "800",
     fontFamily: FONT_FAMILIES.MEDIUM,
   },
   filterTextActive: {
@@ -508,8 +458,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   muscleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   muscleLabel: {
     color: COLORS.ACCENT_BLUE,

@@ -1,23 +1,23 @@
-import { StyleSheet, Dimensions } from 'react-native';
-import { COLORS } from './colors';
-import { FONT_FAMILIES } from './fonts';
+import { StyleSheet, Dimensions } from "react-native";
+import { COLORS } from "./colors";
+import { FONT_FAMILIES } from "./fonts";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export const UI = {
   // ─── Dimensions ─────────────────────────────
   WIDTH: width,
-  
+
   // ─── Spacing ────────────────────────────────
   LAYOUT_PADDING: 20,
   HEADER_TOP: 70,
   GAP: 12,
-  
+
   // ─── Radius (Noir Standards) ────────────────
   RADIUS_CONTAINER: 16,
   RADIUS_ITEM: 12,
   RADIUS_INPUT: 16,
-  RADIUS_HUD: 32, 
+  RADIUS_HUD: 32,
 
   // ─── Shared Styles ──────────────────────────
   SHARED: StyleSheet.create({
@@ -91,6 +91,6 @@ export const UI = {
       fontFamily: FONT_FAMILIES.MONO,
       fontSize: 14,
       fontWeight: "700",
-    }
-  })
+    },
+  }),
 };

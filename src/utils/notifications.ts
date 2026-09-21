@@ -62,7 +62,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
  */
 export async function scheduleRestCompleteNotification(
   exerciseName: string,
-  seconds: number
+  seconds: number,
 ): Promise<string> {
   const id = await Notifications.scheduleNotificationAsync({
     content: {
@@ -83,9 +83,7 @@ export async function scheduleRestCompleteNotification(
  * Cancel a previously scheduled notification by its identifier.
  * Silently no-ops if the notification was already delivered or invalid.
  */
-export async function cancelScheduledNotification(
-  notificationId: string
-): Promise<void> {
+export async function cancelScheduledNotification(notificationId: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
   } catch (err) {

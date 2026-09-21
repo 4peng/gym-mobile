@@ -21,10 +21,12 @@ interface ProgramTileProps {
 const formatLastUsed = (lastUsedAt?: number) => {
   if (!lastUsedAt) return "NEVER";
 
-  return new Date(lastUsedAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  }).toUpperCase();
+  return new Date(lastUsedAt)
+    .toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    })
+    .toUpperCase();
 };
 
 export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
@@ -43,9 +45,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
   const handleOptions = useCallback(() => onOptions(program), [onOptions, program]);
 
   const exerciseCount = program.exercises?.length || 0;
-  const title = typeof program.name === "string"
-    ? program.name
-    : (program.name as { name?: string } | undefined)?.name || "Untitled Routine";
+  const title = program.name || "Untitled Routine";
 
   const lastUsedLabel = useMemo(() => formatLastUsed(lastUsedAt), [lastUsedAt]);
 
@@ -70,10 +70,14 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
             <Text style={styles.tag}>{exerciseCount.toString().padStart(2, "0")} EX</Text>
           </View>
 
-          {program.pinned ? <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} /> : null}
+          {program.pinned ? (
+            <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+          ) : null}
         </View>
 
-        <Text style={styles.programName} numberOfLines={2}>{title}</Text>
+        <Text style={styles.programName} numberOfLines={2}>
+          {title}
+        </Text>
 
         <View style={styles.metaGrid}>
           <View style={styles.metaCell}>

@@ -1,21 +1,16 @@
 import React, { useCallback, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  LayoutAnimation,
-} from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, LayoutAnimation } from "react-native";
 import { X, Hash, Clock, Dumbbell, StickyNote, Plus, Minus } from "lucide-react-native";
-import { COLORS, withAlpha } from "@/constants/colors";
+import { COLORS, SET_TYPE_COLORS, withAlpha } from "@/constants/colors";
+import { SetTypeLegend } from "@/components/Workout/SetTypeLegend";
+import { NEXT_SET_TYPE } from "@/shared/programs.js";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import { formatSecondsToMMSS } from "@/utils/conversions";
 import RestTimerPicker from "./RestTimerPicker";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
 import MuscleSelector from "@/src/components/MuscleSelector";
-import { MuscleGroup, MUSCLE_LABELS } from "@/src/constants/muscles";
+import { type MuscleGroup, formatMuscleLabels } from "@/src/constants/muscles";
 import type { ExerciseDefinition, ExerciseTrackingMode } from "@/types";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { HapticFeedback } from "@/utils/haptics";
@@ -52,9 +47,9 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
   const [pickerVisible, setPickerVisible] = useState(false);
   const [musclePickerVisible, setMusclePickerVisible] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
-  
+
   const updateCustomExerciseMuscles = useExerciseLibraryStore(
-    (state) => state.updateCustomExerciseMuscles
+    (state) => state.updateCustomExerciseMuscles,
   );
 
   const handleExerciseSelect = useCallback(
@@ -67,17 +62,18 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
       });
       setExercisePickerVisible(false);
     },
-    [exercise.id, onUpdate]
+    [exercise.id, onUpdate],
   );
 
-  const toggleSetType = useCallback((setIndex: number) => {
-    HapticFeedback.selection();
-    const nextSets = [...exercise.defaultSets];
-    const current = nextSets[setIndex].type;
-    const nextType = current === "working" ? "warmup" : current === "warmup" ? "dropset" : "working";
-    nextSets[setIndex] = { type: nextType };
-    onUpdate(exercise.id, { defaultSets: nextSets });
-  }, [exercise.defaultSets, exercise.id, onUpdate]);
+  const toggleSetType = useCallback(
+    (setIndex: number) => {
+      HapticFeedback.selection();
+      const nextSets = [...exercise.defaultSets];
+      nextSets[setIndex] = { type: NEXT_SET_TYPE[nextSets[setIndex].type] };
+      onUpdate(exercise.id, { defaultSets: nextSets });
+    },
+    [exercise.defaultSets, exercise.id, onUpdate],
+  );
 
   const handleLongPress = useCallback(() => {
     HapticFeedback.selection();
@@ -91,7 +87,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
   const addSet = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onUpdate(exercise.id, {
-      defaultSets: [...exercise.defaultSets, { type: "working" }]
+      defaultSets: [...exercise.defaultSets, { type: "working" }],
     });
   }, [exercise.defaultSets, exercise.id, onUpdate]);
 
@@ -99,7 +95,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     if (exercise.defaultSets.length <= 1) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onUpdate(exercise.id, {
-      defaultSets: exercise.defaultSets.slice(0, -1)
+      defaultSets: exercise.defaultSets.slice(0, -1),
     });
   }, [exercise.defaultSets, exercise.id, onUpdate]);
 
@@ -107,7 +103,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     (seconds: number) => {
       onUpdate(exercise.id, { restSeconds: seconds });
     },
-    [exercise.id, onUpdate]
+    [exercise.id, onUpdate],
   );
 
   const handleToggleUnit = useCallback(() => {
@@ -121,7 +117,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
 
   const handleNotesChange = useCallback(
     (text: string) => onUpdate(exercise.id, { notes: text }),
-    [exercise.id, onUpdate]
+    [exercise.id, onUpdate],
   );
 
   const handleMusclesChange = useCallback(
@@ -134,7 +130,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
         updateCustomExerciseMuscles(exercise.exerciseDefinitionId, muscles);
       }
     },
-    [exercise.exerciseDefinitionId, exercise.id, onUpdate, updateCustomExerciseMuscles]
+    [exercise.exerciseDefinitionId, exercise.id, onUpdate, updateCustomExerciseMuscles],
   );
 
   const handleRemove = useCallback(() => {
@@ -142,9 +138,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     onRemove(exercise.id);
   }, [exercise.id, onRemove]);
 
-  const muscleString = (exercise.muscles && exercise.muscles.length > 0
-    ? exercise.muscles.map(m => MUSCLE_LABELS[m as MuscleGroup] || m).join(" • ")
-    : "General").toUpperCase();
+  const muscleString = formatMuscleLabels(exercise.muscles).toUpperCase();
 
   return (
     <View style={styles.shell}>
@@ -157,7 +151,9 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
             <Text style={styles.exerciseNameText}>{exercise.name || "Select Exercise"}</Text>
           </Pressable>
           <Pressable onPress={() => setMusclePickerVisible(true)}>
-            <Text style={styles.muscleText} numberOfLines={1}>{muscleString}</Text>
+            <Text style={styles.muscleText} numberOfLines={1}>
+              {muscleString}
+            </Text>
           </Pressable>
         </View>
         <Pressable onPress={handleRemove} style={styles.removeBtn} hitSlop={12}>
@@ -183,15 +179,12 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
               </Pressable>
             </View>
           </View>
-          
+
           <View style={styles.setStrip}>
             {exercise.defaultSets.map((set, i) => {
-              const isWarmup = set.type === "warmup";
-              const isDropset = set.type === "dropset";
-              const color = isWarmup ? COLORS.ACCENT_YELLOW : isDropset ? COLORS.ACCENT_GREEN : COLORS.ACCENT_BLUE;
-              // U = Warm-up, W = Working, D = Dropset
-              const initial = isWarmup ? "U" : isDropset ? "D" : "W";
-              
+              const color = SET_TYPE_COLORS[set.type];
+              const initial = { warmup: "U", working: "W", dropset: "D" }[set.type];
+
               return (
                 <Pressable
                   key={i}
@@ -199,20 +192,17 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
                   onLongPress={handleLongPress}
                   onPressOut={handlePressOut}
                   delayLongPress={300}
-                  style={[styles.setNode, { backgroundColor: withAlpha(color, 0.1), borderColor: withAlpha(color, 0.4) }]}
+                  style={[
+                    styles.setNode,
+                    { backgroundColor: withAlpha(color, 0.1), borderColor: withAlpha(color, 0.4) },
+                  ]}
                 >
                   <Text style={[styles.setNodeText, { color }]}>{initial}</Text>
                 </Pressable>
               );
             })}
 
-            {showLegend && (
-              <View style={styles.legendPopup}>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_YELLOW }]} /><Text style={styles.legendText}>WARMUP</Text></View>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_BLUE }]} /><Text style={styles.legendText}>WORKING</Text></View>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_GREEN }]} /><Text style={styles.legendText}>DROPSET</Text></View>
-              </View>
-            )}
+            {showLegend && <SetTypeLegend style={styles.legendPopup} />}
           </View>
         </View>
 
@@ -230,7 +220,12 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
             <View style={styles.labelGroup}>
               <Text style={styles.sectionLabel}>BW</Text>
             </View>
-            <Text style={[styles.cellValue, { color: exercise.isBodyweight ? COLORS.ACCENT_GREEN : COLORS.TEXT_TERTIARY }]}>
+            <Text
+              style={[
+                styles.cellValue,
+                { color: exercise.isBodyweight ? COLORS.ACCENT_GREEN : COLORS.TEXT_TERTIARY },
+              ]}
+            >
               {exercise.isBodyweight ? "ON" : "OFF"}
             </Text>
           </Pressable>
@@ -241,7 +236,9 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
                 <Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />
                 <Text style={styles.sectionLabel}>UNIT</Text>
               </View>
-              <Text style={[styles.cellValue, { color: COLORS.ACCENT_BLUE }]}>{exercise.weightUnit || "kg"}</Text>
+              <Text style={[styles.cellValue, { color: COLORS.ACCENT_BLUE }]}>
+                {exercise.weightUnit || "kg"}
+              </Text>
             </Pressable>
           )}
         </View>
@@ -402,36 +399,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MONO,
     fontWeight: "900",
   },
-  legendPopup: {
-    position: "absolute",
-    left: 0,
-    top: -44,
-    backgroundColor: "rgba(18, 18, 18, 0.98)",
-    padding: 10,
-    borderRadius: UI.RADIUS_ITEM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    zIndex: 1000,
-    gap: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 9,
-    fontFamily: FONT_FAMILIES.MONO,
-    fontWeight: "900",
-  },
+  legendPopup: { position: "absolute", left: 0, top: -44 },
   gridRow: {
     flexDirection: "row",
     gap: 12,

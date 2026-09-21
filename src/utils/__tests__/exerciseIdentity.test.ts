@@ -60,13 +60,19 @@ describe("normalizeExerciseIdentityKey", () => {
 describe("getExerciseIdentityKey", () => {
   it("prefers exerciseDefinitionId over name when both are present", () => {
     expect(
-      getExerciseIdentityKey({ exerciseDefinitionId: "custom-xyz", name: "My Custom Move" })
+      getExerciseIdentityKey({ exerciseDefinitionId: "custom-xyz", name: "My Custom Move" }),
     ).toBe("custom xyz");
   });
 
   it("gives two entries with the same custom exerciseDefinitionId the same identity, regardless of name", () => {
-    const a = getExerciseIdentityKey({ exerciseDefinitionId: "custom-xyz", name: "My Custom Move" });
-    const b = getExerciseIdentityKey({ exerciseDefinitionId: "custom-xyz", name: "Different Name" });
+    const a = getExerciseIdentityKey({
+      exerciseDefinitionId: "custom-xyz",
+      name: "My Custom Move",
+    });
+    const b = getExerciseIdentityKey({
+      exerciseDefinitionId: "custom-xyz",
+      name: "Different Name",
+    });
     expect(a).toBe(b);
   });
 
@@ -76,13 +82,13 @@ describe("getExerciseIdentityKey", () => {
 
   it("falls back to name when exerciseDefinitionId is an empty string", () => {
     expect(getExerciseIdentityKey({ exerciseDefinitionId: "", name: "Bench Press" } as any)).toBe(
-      "barbell-bench-press"
+      "barbell-bench-press",
     );
   });
 
   it("falls back to name when exerciseDefinitionId is null", () => {
     expect(getExerciseIdentityKey({ exerciseDefinitionId: null, name: "Push-Up" } as any)).toBe(
-      "push-up"
+      "push-up",
     );
   });
 });
@@ -90,7 +96,10 @@ describe("getExerciseIdentityKey", () => {
 describe("matchesExerciseSearchQuery", () => {
   it("matches a substring of the normalized name", () => {
     expect(
-      matchesExerciseSearchQuery({ name: "Barbell Bench Press", aliases: ["bench press"] }, "bench")
+      matchesExerciseSearchQuery(
+        { name: "Barbell Bench Press", aliases: ["bench press"] },
+        "bench",
+      ),
     ).toBe(true);
   });
 

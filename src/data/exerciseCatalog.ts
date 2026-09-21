@@ -1,11 +1,33 @@
 import type { ExerciseDefinition } from "@/types";
 
 export const EXERCISE_CATALOG: ExerciseDefinition[] = [
-  { id: "barbell-bench-press", name: "Barbell Bench Press", muscles: ["chest", "arms", "shoulder"], aliases: ["bench press"] },
-  { id: "incline-barbell-bench-press", name: "Incline Barbell Bench Press", muscles: ["chest", "shoulder", "arms"], aliases: ["incline bench"] },
-  { id: "decline-barbell-bench-press", name: "Decline Barbell Bench Press", muscles: ["chest", "arms"] },
-  { id: "dumbbell-bench-press", name: "Dumbbell Bench Press", muscles: ["chest", "arms", "shoulder"] },
-  { id: "incline-dumbbell-press", name: "Incline Dumbbell Press", muscles: ["chest", "shoulder", "arms"] },
+  {
+    id: "barbell-bench-press",
+    name: "Barbell Bench Press",
+    muscles: ["chest", "arms", "shoulder"],
+    aliases: ["bench press"],
+  },
+  {
+    id: "incline-barbell-bench-press",
+    name: "Incline Barbell Bench Press",
+    muscles: ["chest", "shoulder", "arms"],
+    aliases: ["incline bench"],
+  },
+  {
+    id: "decline-barbell-bench-press",
+    name: "Decline Barbell Bench Press",
+    muscles: ["chest", "arms"],
+  },
+  {
+    id: "dumbbell-bench-press",
+    name: "Dumbbell Bench Press",
+    muscles: ["chest", "arms", "shoulder"],
+  },
+  {
+    id: "incline-dumbbell-press",
+    name: "Incline Dumbbell Press",
+    muscles: ["chest", "shoulder", "arms"],
+  },
   { id: "decline-dumbbell-press", name: "Decline Dumbbell Press", muscles: ["chest", "arms"] },
   { id: "push-up", name: "Push-Up", muscles: ["chest", "arms", "core"] },
   { id: "weighted-push-up", name: "Weighted Push-Up", muscles: ["chest", "arms", "core"] },
@@ -17,8 +39,17 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   { id: "push-up-plus", name: "Push-Up Plus", muscles: ["chest", "shoulder", "core"] },
   { id: "landmine-press", name: "Landmine Press", muscles: ["shoulder", "chest", "arms", "core"] },
 
-  { id: "overhead-press", name: "Overhead Press", muscles: ["shoulder", "arms", "core"], aliases: ["shoulder press"] },
-  { id: "seated-dumbbell-shoulder-press", name: "Seated Dumbbell Shoulder Press", muscles: ["shoulder", "arms"] },
+  {
+    id: "overhead-press",
+    name: "Overhead Press",
+    muscles: ["shoulder", "arms", "core"],
+    aliases: ["shoulder press"],
+  },
+  {
+    id: "seated-dumbbell-shoulder-press",
+    name: "Seated Dumbbell Shoulder Press",
+    muscles: ["shoulder", "arms"],
+  },
   { id: "arnold-press", name: "Arnold Press", muscles: ["shoulder", "arms"] },
   { id: "machine-shoulder-press", name: "Machine Shoulder Press", muscles: ["shoulder", "arms"] },
   { id: "lateral-raise", name: "Lateral Raise", muscles: ["shoulder"] },
@@ -36,14 +67,26 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   { id: "pendlay-row", name: "Pendlay Row", muscles: ["back", "lats", "arms", "lower_back"] },
   { id: "t-bar-row", name: "T-Bar Row", muscles: ["back", "lats", "arms"] },
   { id: "seated-cable-row", name: "Seated Cable Row", muscles: ["back", "lats", "arms"] },
-  { id: "single-arm-dumbbell-row", name: "Single-Arm Dumbbell Row", muscles: ["lats", "back", "arms"] },
-  { id: "chest-supported-row", name: "Chest-Supported Row", muscles: ["upper_back", "lats", "arms"] },
+  {
+    id: "single-arm-dumbbell-row",
+    name: "Single-Arm Dumbbell Row",
+    muscles: ["lats", "back", "arms"],
+  },
+  {
+    id: "chest-supported-row",
+    name: "Chest-Supported Row",
+    muscles: ["upper_back", "lats", "arms"],
+  },
   { id: "machine-row", name: "Machine Row", muscles: ["back", "arms"] },
   { id: "straight-arm-pulldown", name: "Straight-Arm Pulldown", muscles: ["lats"] },
   { id: "shrug", name: "Shrug", muscles: ["upper_back"] },
   { id: "farmer-carry", name: "Farmer Carry", muscles: ["forearms", "upper_back", "core"] },
   { id: "deadlift", name: "Deadlift", muscles: ["back", "glutes", "hamstrings", "lower_back"] },
-  { id: "romanian-deadlift", name: "Romanian Deadlift", muscles: ["hamstrings", "glutes", "lower_back"] },
+  {
+    id: "romanian-deadlift",
+    name: "Romanian Deadlift",
+    muscles: ["hamstrings", "glutes", "lower_back"],
+  },
   { id: "rack-pull", name: "Rack Pull", muscles: ["back", "glutes", "lower_back"] },
   { id: "good-morning", name: "Good Morning", muscles: ["hamstrings", "glutes", "lower_back"] },
 
@@ -73,9 +116,17 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   { id: "incline-dumbbell-curl", name: "Incline Dumbbell Curl", muscles: ["biceps", "arms"] },
   { id: "cable-curl", name: "Cable Curl", muscles: ["biceps", "arms"] },
   { id: "triceps-pushdown", name: "Triceps Pushdown", muscles: ["triceps", "arms"] },
-  { id: "overhead-triceps-extension", name: "Overhead Triceps Extension", muscles: ["triceps", "arms"] },
+  {
+    id: "overhead-triceps-extension",
+    name: "Overhead Triceps Extension",
+    muscles: ["triceps", "arms"],
+  },
   { id: "skull-crusher", name: "Skull Crusher", muscles: ["triceps", "arms"] },
-  { id: "close-grip-bench-press", name: "Close-Grip Bench Press", muscles: ["triceps", "chest", "arms"] },
+  {
+    id: "close-grip-bench-press",
+    name: "Close-Grip Bench Press",
+    muscles: ["triceps", "chest", "arms"],
+  },
   { id: "bench-dip", name: "Bench Dip", muscles: ["triceps", "arms"] },
   { id: "wrist-curl", name: "Wrist Curl", muscles: ["forearms", "arms"] },
   { id: "reverse-wrist-curl", name: "Reverse Wrist Curl", muscles: ["forearms", "arms"] },
@@ -94,9 +145,17 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
 
   { id: "dead-hang", name: "Dead Hang", muscles: ["mobility", "forearms", "back"] },
   { id: "scapular-pull-up", name: "Scapular Pull-Up", muscles: ["mobility", "back", "shoulder"] },
-  { id: "band-pull-apart", name: "Band Pull-Apart", muscles: ["shoulder", "upper_back", "mobility"] },
+  {
+    id: "band-pull-apart",
+    name: "Band Pull-Apart",
+    muscles: ["shoulder", "upper_back", "mobility"],
+  },
   { id: "thoracic-rotation", name: "Thoracic Rotation", muscles: ["mobility", "core"] },
-  { id: "worlds-greatest-stretch", name: "World's Greatest Stretch", muscles: ["mobility", "glutes", "hamstrings"] },
+  {
+    id: "worlds-greatest-stretch",
+    name: "World's Greatest Stretch",
+    muscles: ["mobility", "glutes", "hamstrings"],
+  },
   { id: "90-90-hip-stretch", name: "90/90 Hip Stretch", muscles: ["mobility", "glutes"] },
   { id: "couch-stretch", name: "Couch Stretch", muscles: ["mobility", "quads"] },
   { id: "shoulder-dislocates", name: "Shoulder Dislocates", muscles: ["mobility", "shoulder"] },
@@ -115,6 +174,11 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   { id: "jump-rope", name: "Jump Rope", muscles: ["calves", "shoulder", "core"] },
   { id: "swim", name: "Swim", muscles: ["back", "shoulder", "core"] },
 
-  { id: "timed-exercise", name: "Timed Exercise", muscles: ["mobility"], aliases: ["time based exercise", "time based"] },
+  {
+    id: "timed-exercise",
+    name: "Timed Exercise",
+    muscles: ["mobility"],
+    aliases: ["time based exercise", "time based"],
+  },
   { id: "cardio", name: "Cardio", muscles: ["core"], aliases: ["conditioning"] },
 ];

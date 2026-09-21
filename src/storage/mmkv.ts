@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, type AppStateStatus } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState, type AppStateStatus } from "react-native";
 import type { StateStorage } from "zustand/middleware";
 
 /**
@@ -61,8 +61,8 @@ function flushAllPendingWrites(): void {
 // Backgrounding/inactivating the app must not lose in-flight edits: flush
 // every pending debounced write right away so it lands on disk before the
 // app is suspended.
-AppState.addEventListener('change', (nextState: AppStateStatus) => {
-  if (nextState === 'inactive' || nextState === 'background') {
+AppState.addEventListener("change", (nextState: AppStateStatus) => {
+  if (nextState === "inactive" || nextState === "background") {
     flushAllPendingWrites();
   }
 });

@@ -46,16 +46,15 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
 
   const program = useMemo(
     () => (variant === "edit" && id ? programs.find((item) => item._id === id) : undefined),
-    [id, programs, variant]
+    [id, programs, variant],
   );
 
   const sourceProgram = useMemo(
-    () => (
+    () =>
       variant === "create" && normalizedSourceId
         ? programs.find((item) => item._id === normalizedSourceId)
-        : undefined
-    ),
-    [normalizedSourceId, programs, variant]
+        : undefined,
+    [normalizedSourceId, programs, variant],
   );
 
   const initialName = useMemo(() => {
@@ -71,71 +70,93 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
       return normalizeExercises(program?.exercises as ProgramExercise[]) as ExerciseFormData[];
     }
 
-    return copyExercises(sourceProgram?.exercises as ProgramExercise[], generateId) as ExerciseFormData[];
+    return copyExercises(
+      sourceProgram?.exercises as ProgramExercise[],
+      generateId,
+    ) as ExerciseFormData[];
   }, [program, sourceProgram, variant]);
 
-  const applyUpdate = useCallback((draft: RoutineDraft): Program | null => {
-    if (variant !== "edit" || !id || !program) return null;
+  const applyUpdate = useCallback(
+    (draft: RoutineDraft): Program | null => {
+      if (variant !== "edit" || !id || !program) return null;
 
-    const updates = toProgramUpdates(draft);
-    updateProgram(id, updates);
-    return {
-      ...program,
-      ...updates,
-    };
-  }, [id, program, updateProgram, variant]);
+      const updates = toProgramUpdates(draft);
+      updateProgram(id, updates);
+      return {
+        ...program,
+        ...updates,
+      };
+    },
+    [id, program, updateProgram, variant],
+  );
 
-  const handleSave = useCallback((draft: RoutineDraft) => {
-    if (variant === "edit") {
-      applyUpdate(draft);
-    } else {
-      addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
-    }
-    router.back();
-  }, [addProgram, applyUpdate, router, variant]);
-
-  const handleSaveAndStart = useCallback((draft: RoutineDraft) => {
-    const nextProgram = applyUpdate(draft);
-    if (!nextProgram) return;
-
-    const start = () => {
-      startFromProgram(nextProgram);
-      router.replace("/workout");
-    };
-    if (activeSession) {
-      showConfirm("Active Workout", "You already have a workout in progress. Discard it and start this one?", start);
-    } else {
-      start();
-    }
-  }, [activeSession, applyUpdate, router, startFromProgram]);
-
-  const handleDelete = useCallback((_draft: RoutineDraft) => {
-    if (variant !== "edit" || !id || !program) return;
-
-    showConfirm(
-      "Delete Routine",
-      `Are you sure you want to delete ${getProgramName(program)}? This cannot be undone.`,
-      () => {
-        deleteProgram(id);
-        router.push("/programs/");
+  const handleSave = useCallback(
+    (draft: RoutineDraft) => {
+      if (variant === "edit") {
+        applyUpdate(draft);
+      } else {
+        addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
       }
-    );
-  }, [deleteProgram, id, program, router, variant]);
-
-  const handleCancel = useCallback((_draft: RoutineDraft, hasChanges: boolean) => {
-    if (!hasChanges) {
       router.back();
-      return;
-    }
+    },
+    [addProgram, applyUpdate, router, variant],
+  );
 
-    showConfirm(
-      "Discard Changes",
-      variant === "edit"
-        ? "Your unsaved edits will be lost. Discard them?"
-        : "Your new routine draft will be lost. Discard it?",
-      () => router.back()
-    );
-  }, [router, variant]);
+  const handleSaveAndStart = useCallback(
+    (draft: RoutineDraft) => {
+      const nextProgram = applyUpdate(draft);
+      if (!nextProgram) return;
+
+      const start = () => {
+        startFromProgram(nextProgram);
+        router.replace("/workout");
+      };
+      if (activeSession) {
+        showConfirm(
+          "Active Workout",
+          "You already have a workout in progress. Discard it and start this one?",
+          start,
+        );
+      } else {
+        start();
+      }
+    },
+    [activeSession, applyUpdate, router, startFromProgram],
+  );
+
+  const handleDelete = useCallback(
+    (_draft: RoutineDraft) => {
+      if (variant !== "edit" || !id || !program) return;
+
+      showConfirm(
+        "Delete Routine",
+        `Are you sure you want to delete ${getProgramName(program)}? This cannot be undone.`,
+        () => {
+          deleteProgram(id);
+          router.push("/programs/");
+        },
+      );
+    },
+    [deleteProgram, id, program, router, variant],
+  );
+
+  const handleCancel = useCallback(
+    (_draft: RoutineDraft, hasChanges: boolean) => {
+      if (!hasChanges) {
+        router.back();
+        return;
+      }
+
+      showConfirm(
+        "Discard Changes",
+        variant === "edit"
+          ? "Your unsaved edits will be lost. Discard them?"
+          : "Your new routine draft will be lost. Discard it?",
+        () => router.back(),
+      );
+    },
+    [router, variant],
+  );
 
   if (variant === "edit" && !program) {
     return (

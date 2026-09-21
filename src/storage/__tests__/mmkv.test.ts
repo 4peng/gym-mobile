@@ -28,7 +28,7 @@ jest.mock("react-native", () => {
       }),
       currentState: "active",
     },
-     
+
     _appStateHandlers: handlers,
   };
 });

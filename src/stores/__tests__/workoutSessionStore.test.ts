@@ -99,11 +99,7 @@ function makeProgram(overrides: Partial<Program> = {}): Program {
         exerciseDefinitionId: "barbell-bench-press",
         trackingMode: "strength",
         name: "Barbell Bench Press",
-        defaultSets: [
-          { type: "warmup" },
-          { type: "working" },
-          { type: "working" },
-        ],
+        defaultSets: [{ type: "warmup" }, { type: "working" }, { type: "working" }],
         restSeconds: 90,
         notes: "",
         muscles: ["chest"],
@@ -382,7 +378,9 @@ describe("workoutSessionStore", () => {
       });
 
       useWorkoutSessionStore.getState().applySyncMerge([remote], 300);
-      const merged = useWorkoutSessionStore.getState().history.find((w: any) => w._id === "merge-1");
+      const merged = useWorkoutSessionStore
+        .getState()
+        .history.find((w: any) => w._id === "merge-1");
       expect(merged).toBeDefined();
       expect(merged!.notes).toBe("remote version"); // remote won
       expect(merged!.exercises[0].id).toBe("ex-remote");
@@ -415,7 +413,9 @@ describe("workoutSessionStore", () => {
       });
 
       useWorkoutSessionStore.getState().applySyncMerge([remote], 300);
-      const merged = useWorkoutSessionStore.getState().history.find((w: any) => w._id === "merge-2");
+      const merged = useWorkoutSessionStore
+        .getState()
+        .history.find((w: any) => w._id === "merge-2");
       expect(merged).toBeDefined();
       expect(merged!.notes).toBe("local version");
     });
@@ -545,7 +545,9 @@ describe("workoutSessionStore", () => {
         isDirty: false,
       });
 
-      useWorkoutSessionStore.getState().renameExerciseDefinitionReferences("custom-pushup", "Push-Up (Custom)");
+      useWorkoutSessionStore
+        .getState()
+        .renameExerciseDefinitionReferences("custom-pushup", "Push-Up (Custom)");
 
       const state = useWorkoutSessionStore.getState();
       const renamedEx = state.history[0].exercises.find((e: any) => e.id === "ex-a1");
@@ -592,7 +594,9 @@ describe("workoutSessionStore", () => {
         isDirty: false,
       });
 
-      useWorkoutSessionStore.getState().renameExerciseDefinitionReferences("custom-legraise", "Leg Raise (Custom)");
+      useWorkoutSessionStore
+        .getState()
+        .renameExerciseDefinitionReferences("custom-legraise", "Leg Raise (Custom)");
 
       // Flush microtasks so the async shard-rewrite IIFE completes
       // (getBatch then saveBatch are each one await)
@@ -642,7 +646,9 @@ describe("workoutSessionStore", () => {
         },
       });
 
-      useWorkoutSessionStore.getState().renameExerciseDefinitionReferences("custom-plank", "Plank (Custom)");
+      useWorkoutSessionStore
+        .getState()
+        .renameExerciseDefinitionReferences("custom-plank", "Plank (Custom)");
 
       const timer = useWorkoutSessionStore.getState().activeRestTimer;
       expect(timer).not.toBeNull();
@@ -684,7 +690,9 @@ describe("workoutSessionStore", () => {
         isDirty: false,
       });
 
-      useWorkoutSessionStore.getState().updateMusclesInHistory("bench-press", ["chest", "shoulder"]);
+      useWorkoutSessionStore
+        .getState()
+        .updateMusclesInHistory("bench-press", ["chest", "shoulder"]);
 
       const state = useWorkoutSessionStore.getState();
       const updated = state.history[0].exercises[0];

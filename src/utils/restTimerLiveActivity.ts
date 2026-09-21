@@ -28,7 +28,7 @@ function getSetProgress(session: WorkoutSession | null) {
       progress.setsCompleted += exercise.sets.filter((set) => !!set.completedAt).length;
       return progress;
     },
-    { setsCompleted: 0, setsTotal: 0 }
+    { setsCompleted: 0, setsTotal: 0 },
   );
 }
 
@@ -37,7 +37,7 @@ export function buildRestTimerLiveActivityProps(
   exerciseName: string,
   restStartedAt: number,
   restEndsAt: number,
-  restDurationSeconds: number
+  restDurationSeconds: number,
 ): RestTimerLiveActivityProps | null {
   if (!session) return null;
 
@@ -56,7 +56,7 @@ export function buildRestTimerLiveActivityProps(
 
 export function buildActiveRestTimerLiveActivityProps(
   session: WorkoutSession | null,
-  timer: RestTimerSnapshot | null
+  timer: RestTimerSnapshot | null,
 ) {
   if (!timer) return null;
 
@@ -65,7 +65,7 @@ export function buildActiveRestTimerLiveActivityProps(
     timer.exerciseName,
     timer.startTime,
     timer.endTime,
-    Math.round((timer.endTime - timer.startTime) / 1000)
+    Math.round((timer.endTime - timer.startTime) / 1000),
   );
 }
 
@@ -81,9 +81,7 @@ async function getRestTimerActivity() {
   }
 }
 
-export async function startRestTimerLiveActivity(
-  props: RestTimerLiveActivityProps | null
-) {
+export async function startRestTimerLiveActivity(props: RestTimerLiveActivityProps | null) {
   if (!props) return;
 
   const activity = await getRestTimerActivity();
@@ -99,9 +97,7 @@ export async function startRestTimerLiveActivity(
   }
 }
 
-export async function updateRestTimerLiveActivity(
-  props: RestTimerLiveActivityProps | null
-) {
+export async function updateRestTimerLiveActivity(props: RestTimerLiveActivityProps | null) {
   if (!props) return;
 
   const activity = await getRestTimerActivity();
@@ -117,9 +113,7 @@ export async function updateRestTimerLiveActivity(
   }
 }
 
-export async function endRestTimerLiveActivity(
-  props?: RestTimerLiveActivityProps | null
-) {
+export async function endRestTimerLiveActivity(props?: RestTimerLiveActivityProps | null) {
   const activity = await getRestTimerActivity();
   if (!activity) return;
 

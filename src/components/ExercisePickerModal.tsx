@@ -16,7 +16,10 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 import type { ExerciseDefinition } from "@/types";
-import { matchesCustomExerciseNameOrAlias, useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
+import {
+  matchesCustomExerciseNameOrAlias,
+  useExerciseLibraryStore,
+} from "@/stores/exerciseLibraryStore";
 import { MUSCLE_LABELS, type MuscleGroup } from "@/constants/muscles";
 import {
   matchesExerciseSearchQuery,
@@ -59,16 +62,16 @@ export default function ExercisePickerModal({
   const renameCustomExercise = useExerciseLibraryStore((state) => state.renameCustomExercise);
   const removeCustomExercise = useExerciseLibraryStore((state) => state.removeCustomExercise);
   const renameExerciseDefinitionReferencesInPrograms = useProgramStore(
-    (state) => state.renameExerciseDefinitionReferences
+    (state) => state.renameExerciseDefinitionReferences,
   );
   const removeExerciseDefinitionReferencesInPrograms = useProgramStore(
-    (state) => state.removeExerciseDefinitionReferences
+    (state) => state.removeExerciseDefinitionReferences,
   );
   const renameExerciseDefinitionReferencesInWorkouts = useWorkoutSessionStore(
-    (state) => state.renameExerciseDefinitionReferences
+    (state) => state.renameExerciseDefinitionReferences,
   );
   const removeExerciseDefinitionReferencesInHistory = useWorkoutSessionStore(
-    (state) => state.removeExerciseDefinitionReferences
+    (state) => state.removeExerciseDefinitionReferences,
   );
 
   const handleDeleteCustomExercise = (id: string) => {
@@ -98,14 +101,11 @@ export default function ExercisePickerModal({
     return () => clearTimeout(timeout);
   }, [renameTarget?.id]);
 
-  const allExercises = useMemo(
-    () => [...customExercises, ...EXERCISE_CATALOG],
-    [customExercises]
-  );
+  const allExercises = useMemo(() => [...customExercises, ...EXERCISE_CATALOG], [customExercises]);
 
   const filteredExercises = useMemo(
     () => allExercises.filter((exercise) => matchesExerciseSearchQuery(exercise, search)),
-    [allExercises, search]
+    [allExercises, search],
   );
 
   const normalizedSearch = normalizeExerciseDisplayName(search);
@@ -118,7 +118,7 @@ export default function ExercisePickerModal({
       normalizedSearchIdentityKey
         ? EXERCISE_CATALOG.find((exercise) => exercise.id === normalizedSearchIdentityKey)
         : undefined,
-    [normalizedSearchIdentityKey]
+    [normalizedSearchIdentityKey],
   );
 
   const conflictingRenameCatalogExercise = useMemo(
@@ -126,7 +126,7 @@ export default function ExercisePickerModal({
       normalizedRenameDraftIdentityKey
         ? EXERCISE_CATALOG.find((exercise) => exercise.id === normalizedRenameDraftIdentityKey)
         : undefined,
-    [normalizedRenameDraftIdentityKey]
+    [normalizedRenameDraftIdentityKey],
   );
 
   const conflictingRenameCustomExercise = useMemo(
@@ -135,10 +135,10 @@ export default function ExercisePickerModal({
         ? customExercises.find(
             (exercise) =>
               exercise.id !== renameTarget?.id &&
-              matchesCustomExerciseNameOrAlias(exercise, normalizedRenameDraft)
+              matchesCustomExerciseNameOrAlias(exercise, normalizedRenameDraft),
           )
         : undefined,
-    [customExercises, normalizedRenameDraft, renameTarget?.id]
+    [customExercises, normalizedRenameDraft, renameTarget?.id],
   );
 
   const canAddCustomExercise =
@@ -191,7 +191,7 @@ export default function ExercisePickerModal({
     if (conflictingRenameCatalogExercise) {
       showAlert(
         "Built-In Exercise Exists",
-        `Use ${conflictingRenameCatalogExercise.name} from the library instead of renaming this custom exercise to match it.`
+        `Use ${conflictingRenameCatalogExercise.name} from the library instead of renaming this custom exercise to match it.`,
       );
       return;
     }
@@ -199,7 +199,7 @@ export default function ExercisePickerModal({
     if (conflictingRenameCustomExercise) {
       showAlert(
         "Custom Exercise Exists",
-        `A custom exercise named ${conflictingRenameCustomExercise.name} already exists.`
+        `A custom exercise named ${conflictingRenameCustomExercise.name} already exists.`,
       );
       return;
     }
@@ -223,70 +223,57 @@ export default function ExercisePickerModal({
   };
 
   const renderExerciseItem = ({ item }: { item: ExerciseDefinition }) => {
-      const isSelected = item.id === selectedDefinitionId;
-      const subtitleText =
-        (item.muscles || []).length > 0
-          ? item.muscles
-              .map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle)
-              .join(" - ")
-          : item.isCustom
-            ? "Custom exercise"
-            : "Uncategorized";
+    const isSelected = item.id === selectedDefinitionId;
+    const subtitleText =
+      (item.muscles || []).length > 0
+        ? item.muscles.map((muscle) => MUSCLE_LABELS[muscle as MuscleGroup] || muscle).join(" - ")
+        : item.isCustom
+          ? "Custom exercise"
+          : "Uncategorized";
 
-      const content = (
-        <View
-          style={[
-            styles.item,
-            item.isCustom && styles.itemCustom,
-            isSelected && styles.itemSelected,
-          ]}
-        >
-          <Pressable
-            onPress={() => handleSelect(item)}
-            style={styles.itemMain}
-          >
-            <View style={styles.itemCopy}>
-              <Text style={styles.itemTitle}>{item.name}</Text>
-              <Text style={styles.itemSubtitle}>{subtitleText}</Text>
-            </View>
-            {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
-          </Pressable>
-
-          {item.isCustom ? (
-            <Pressable
-              onPress={() => startRenameCustomExercise(item)}
-              hitSlop={16}
-              style={({ pressed }) => [
-                styles.customBadge,
-                pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
-              ]}
-            >
-              <Pencil size={14} color={COLORS.ACCENT_GREEN} />
-            </Pressable>
-          ) : null}
-        </View>
-      );
-
-      if (item.isCustom) {
-        return (
-          <View style={styles.swipeWrapper}>
-            <Swipeable
-              onDelete={() => handleDeleteCustomExercise(item.id)}
-              onToggleScroll={setScrollEnabled}
-              borderRadius={UI.RADIUS_INPUT}
-              marginBottom={0}
-            >
-              {content}
-            </Swipeable>
+    const content = (
+      <View
+        style={[styles.item, item.isCustom && styles.itemCustom, isSelected && styles.itemSelected]}
+      >
+        <Pressable onPress={() => handleSelect(item)} style={styles.itemMain}>
+          <View style={styles.itemCopy}>
+            <Text style={styles.itemTitle}>{item.name}</Text>
+            <Text style={styles.itemSubtitle}>{subtitleText}</Text>
           </View>
-        );
-      }
+          {isSelected ? <Check size={18} color={COLORS.ACCENT_BLUE} /> : null}
+        </Pressable>
 
+        {item.isCustom ? (
+          <Pressable
+            onPress={() => startRenameCustomExercise(item)}
+            hitSlop={16}
+            style={({ pressed }) => [
+              styles.customBadge,
+              pressed && { opacity: 0.7, backgroundColor: "rgba(16, 217, 75, 0.15)" },
+            ]}
+          >
+            <Pencil size={14} color={COLORS.ACCENT_GREEN} />
+          </Pressable>
+        ) : null}
+      </View>
+    );
+
+    if (item.isCustom) {
       return (
-        <View style={{ marginHorizontal: 16 }}>
-          {content}
+        <View style={styles.swipeWrapper}>
+          <Swipeable
+            onDelete={() => handleDeleteCustomExercise(item.id)}
+            onToggleScroll={setScrollEnabled}
+            borderRadius={UI.RADIUS_INPUT}
+            marginBottom={0}
+          >
+            {content}
+          </Swipeable>
         </View>
       );
+    }
+
+    return <View style={{ marginHorizontal: 16 }}>{content}</View>;
   };
 
   if (!mounted) return null;
@@ -296,7 +283,7 @@ export default function ExercisePickerModal({
       <Animated.View style={[styles.backdrop, { opacity: progress }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
-      
+
       <Animated.View
         style={[
           styles.container,
@@ -305,12 +292,12 @@ export default function ExercisePickerModal({
               {
                 translateY: progress.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [600, 0]
-                })
+                  outputRange: [600, 0],
+                }),
               },
-              { translateY: dragOffset }
-            ]
-          }
+              { translateY: dragOffset },
+            ],
+          },
         ]}
         {...panHandlers}
       >
@@ -338,10 +325,7 @@ export default function ExercisePickerModal({
 
         {canAddCustomExercise ? (
           <Pressable
-            style={({ pressed }) => [
-              styles.customAddBtn,
-              pressed && styles.customAddBtnPressed,
-            ]}
+            style={({ pressed }) => [styles.customAddBtn, pressed && styles.customAddBtnPressed]}
             onPress={handleAddCustomExercise}
           >
             <Text style={styles.customAddLabel}>Add Custom Exercise</Text>
@@ -374,15 +358,22 @@ export default function ExercisePickerModal({
               keyboardVerticalOffset={0}
             >
               <Pressable style={StyleSheet.absoluteFill} onPress={cancelRenameCustomExercise} />
-              
-              <Animated.View style={[styles.renameSheet, {
-                transform: [{
-                  scale: renameProgress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.95, 1]
-                  })
-                }]
-              }]}>
+
+              <Animated.View
+                style={[
+                  styles.renameSheet,
+                  {
+                    transform: [
+                      {
+                        scale: renameProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.95, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
                 <Text style={styles.customRenameLabel}>Rename Custom Exercise</Text>
                 <Text style={styles.renameSheetTitle}>{renameTarget?.name}</Text>
                 <TextInput
@@ -450,7 +441,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    maxHeight: '80%',
+    maxHeight: "80%",
     backgroundColor: COLORS.CARD_BG,
     borderTopLeftRadius: UI.RADIUS_HUD,
     borderTopRightRadius: UI.RADIUS_HUD,
@@ -535,8 +526,8 @@ const styles = StyleSheet.create({
   swipeWrapper: {
     marginHorizontal: 16,
     borderRadius: UI.RADIUS_INPUT,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
+    overflow: "hidden",
+    backgroundColor: "transparent",
   },
   item: {
     flexDirection: "row",

@@ -47,7 +47,9 @@ export default function MuscleSelector({
   // In simple mode, keep any already-selected detailed muscles visible so they can be unticked.
   const availableMuscles: readonly MuscleGroup[] = showDetailed
     ? DETAILED_MODE_MUSCLE_GROUPS
-    : Array.from(new Set([...PRIMARY_MUSCLE_GROUPS, ...selectedMuscles.filter((m) => DETAILED_SET.has(m))]));
+    : Array.from(
+        new Set([...PRIMARY_MUSCLE_GROUPS, ...selectedMuscles.filter((m) => DETAILED_SET.has(m))]),
+      );
 
   const applyAndClose = () => {
     onSelect(draft);
@@ -68,17 +70,28 @@ export default function MuscleSelector({
   if (!mounted) return null;
 
   const toggleMuscle = (muscle: MuscleGroup) =>
-    setDraft((prev) => (prev.includes(muscle) ? prev.filter((m) => m !== muscle) : [...prev, muscle]));
+    setDraft((prev) =>
+      prev.includes(muscle) ? prev.filter((m) => m !== muscle) : [...prev, muscle],
+    );
 
   const handleToggleDetailed = () => {
-    setDraft((prev) => (showDetailed ? collapseDetailedMusclesToPrimary(prev) : expandPrimaryMusclesForDetailedMode(prev)));
+    setDraft((prev) =>
+      showDetailed
+        ? collapseDetailedMusclesToPrimary(prev)
+        : expandPrimaryMusclesForDetailedMode(prev),
+    );
     toggleDetailed();
     HapticFeedback.selection();
   };
 
   return (
     <View style={styles.absoluteOverlay} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] }) }]}>
+      <Animated.View
+        style={[
+          styles.backdrop,
+          { opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] }) },
+        ]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={applyAndClose} />
       </Animated.View>
       <Animated.View
@@ -97,8 +110,13 @@ export default function MuscleSelector({
           <View>
             <Text style={styles.title}>{label}</Text>
             <Pressable onPress={handleToggleDetailed} style={styles.detailedToggle}>
-              <Activity size={12} color={showDetailed ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY} />
-              <Text style={[styles.detailedToggleText, showDetailed && { color: COLORS.ACCENT_BLUE }]}>
+              <Activity
+                size={12}
+                color={showDetailed ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY}
+              />
+              <Text
+                style={[styles.detailedToggleText, showDetailed && { color: COLORS.ACCENT_BLUE }]}
+              >
                 {showDetailed ? "DETAILED MODE" : "SIMPLE MODE"}
               </Text>
             </Pressable>
@@ -108,12 +126,22 @@ export default function MuscleSelector({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {availableMuscles.map((m) => {
             const isActive = draft.includes(m);
             return (
-              <Pressable key={m} onPress={() => toggleMuscle(m)} style={[styles.item, isActive && styles.itemActive]}>
-                <Text style={[styles.itemText, isActive && styles.itemTextActive]}>{MUSCLE_LABELS[m]}</Text>
+              <Pressable
+                key={m}
+                onPress={() => toggleMuscle(m)}
+                style={[styles.item, isActive && styles.itemActive]}
+              >
+                <Text style={[styles.itemText, isActive && styles.itemTextActive]}>
+                  {MUSCLE_LABELS[m]}
+                </Text>
                 {isActive && <Check size={18} color={COLORS.ACCENT_BLUE} />}
               </Pressable>
             );
@@ -150,7 +178,12 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILIES.MONO,
     letterSpacing: 0.5,
   },
-  title: { color: COLORS.TEXT_PRIMARY, fontSize: 18, fontWeight: "800", fontFamily: FONT_FAMILIES.MEDIUM },
+  title: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 18,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
   closeBtn: { padding: 4 },
   scrollContent: { padding: 16, gap: 8 },
   item: {
@@ -164,7 +197,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.03)",
   },
-  itemActive: { backgroundColor: "rgba(11, 130, 255, 0.08)", borderColor: "rgba(11, 130, 255, 0.2)" },
-  itemText: { color: COLORS.TEXT_SECONDARY, fontSize: 16, fontWeight: "700", fontFamily: FONT_FAMILIES.MEDIUM },
+  itemActive: {
+    backgroundColor: "rgba(11, 130, 255, 0.08)",
+    borderColor: "rgba(11, 130, 255, 0.2)",
+  },
+  itemText: {
+    color: COLORS.TEXT_SECONDARY,
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: FONT_FAMILIES.MEDIUM,
+  },
   itemTextActive: { color: COLORS.TEXT_PRIMARY },
 });

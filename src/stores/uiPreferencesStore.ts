@@ -17,9 +17,7 @@ interface UiPreferencesActions {
   setPreferredWeightUnit: (unit: "kg" | "lbs") => void;
 }
 
-export const useUiPreferencesStore = create<
-  UiPreferencesState & UiPreferencesActions
->()(
+export const useUiPreferencesStore = create<UiPreferencesState & UiPreferencesActions>()(
   persist(
     (set, get) => ({
       showDetailedMuscleGroups: false,
@@ -30,8 +28,7 @@ export const useUiPreferencesStore = create<
         set((state) => ({
           showDetailedMuscleGroups: !state.showDetailedMuscleGroups,
         })),
-      setAnalyticsBodyweight: (analyticsBodyweight) =>
-        set({ analyticsBodyweight }),
+      setAnalyticsBodyweight: (analyticsBodyweight) => set({ analyticsBodyweight }),
       toggleAnalyticsBodyweightUnit: () => {
         const { analyticsBodyweight, analyticsBodyweightUnit } = get();
         const nextUnit = analyticsBodyweightUnit === "lbs" ? "kg" : "lbs";
@@ -43,8 +40,7 @@ export const useUiPreferencesStore = create<
               : convertWeight(analyticsBodyweight, analyticsBodyweightUnit, nextUnit),
         });
       },
-      setPreferredWeightUnit: (preferredWeightUnit) =>
-        set({ preferredWeightUnit }),
+      setPreferredWeightUnit: (preferredWeightUnit) => set({ preferredWeightUnit }),
     }),
     {
       name: "ui-preferences-store",
@@ -69,6 +65,6 @@ export const useUiPreferencesStore = create<
         analyticsBodyweightUnit: state.analyticsBodyweightUnit,
         preferredWeightUnit: state.preferredWeightUnit,
       }),
-    }
-  )
+    },
+  ),
 );

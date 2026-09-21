@@ -4,11 +4,11 @@ import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
 
-const SCRUB_ITEM_WIDTH = 64; 
+const SCRUB_ITEM_WIDTH = 64;
 const SCRUB_GAP = 12;
 export const SCRUB_STEP = SCRUB_ITEM_WIDTH + SCRUB_GAP;
 const POPUP_WIDTH = UI.WIDTH - 40;
-const SIDE_SPACER = (POPUP_WIDTH / 2) - (SCRUB_ITEM_WIDTH / 2);
+const SIDE_SPACER = POPUP_WIDTH / 2 - SCRUB_ITEM_WIDTH / 2;
 
 interface ScrubberRailProps {
   exerciseIds: string[];
@@ -29,11 +29,11 @@ export const ScrubberRail = React.memo(function ScrubberRail({
 }: ScrubberRailProps) {
   return (
     <View style={styles.scrubberPopup}>
-      <ScrollView 
-        ref={scrubberScrollRef} 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        contentContainerStyle={styles.scrubberPopupContent} 
+      <ScrollView
+        ref={scrubberScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrubberPopupContent}
         scrollEnabled={false}
       >
         <View style={{ width: SIDE_SPACER }} />
@@ -43,14 +43,27 @@ export const ScrubberRail = React.memo(function ScrubberRail({
           return (
             <View key={id} style={styles.scrubberItemWrapper}>
               <View style={[styles.scrubberItem, isItemActive && styles.scrubberItemActive]}>
-                <Text style={[styles.scrubberItemIndex, isItemActive && { color: COLORS.TEXT_PRIMARY }]}>
-                    {(idx + 1).toString().padStart(2, '0')}
+                <Text
+                  style={[styles.scrubberItemIndex, isItemActive && { color: COLORS.TEXT_PRIMARY }]}
+                >
+                  {(idx + 1).toString().padStart(2, "0")}
                 </Text>
-                <Text style={[styles.scrubberItemShorthand, isItemActive && { color: COLORS.ACCENT_BLUE }]}>
-                    {getShorthand(exerciseNames[idx])}
+                <Text
+                  style={[
+                    styles.scrubberItemShorthand,
+                    isItemActive && { color: COLORS.ACCENT_BLUE },
+                  ]}
+                >
+                  {getShorthand(exerciseNames[idx])}
                 </Text>
                 <View style={styles.scrubberItemProgressBg}>
-                  <View style={[styles.scrubberItemProgressFill, { width: `${progress * 100}%` }, progress === 1 && { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                  <View
+                    style={[
+                      styles.scrubberItemProgressFill,
+                      { width: `${progress * 100}%` },
+                      progress === 1 && { backgroundColor: COLORS.ACCENT_GREEN },
+                    ]}
+                  />
                 </View>
                 {isItemActive && (
                   <>
@@ -71,14 +84,65 @@ export const ScrubberRail = React.memo(function ScrubberRail({
 });
 
 const styles = StyleSheet.create({
-  scrubberPopup: { position: "absolute", bottom: 110, left: 20, right: 20, height: 80, backgroundColor: "rgba(18, 18, 18, 0.95)", borderRadius: UI.RADIUS_CONTAINER, borderWidth: 1, borderColor: COLORS.BORDER, justifyContent: "center", alignItems: "center", overflow: "visible", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 10 },
+  scrubberPopup: {
+    position: "absolute",
+    bottom: 110,
+    left: 20,
+    right: 20,
+    height: 80,
+    backgroundColor: "rgba(18, 18, 18, 0.95)",
+    borderRadius: UI.RADIUS_CONTAINER,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "visible",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
   scrubberPopupContent: { alignItems: "center", gap: SCRUB_GAP },
-  scrubberItemWrapper: { width: SCRUB_ITEM_WIDTH, height: 54, justifyContent: "center", alignItems: "center" },
-  scrubberItem: { width: "100%", height: "100%", borderRadius: UI.RADIUS_ITEM, backgroundColor: "rgba(255, 255, 255, 0.02)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.05)" },
+  scrubberItemWrapper: {
+    width: SCRUB_ITEM_WIDTH,
+    height: 54,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrubberItem: {
+    width: "100%",
+    height: "100%",
+    borderRadius: UI.RADIUS_ITEM,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.05)",
+  },
   scrubberItemActive: { backgroundColor: "transparent", borderColor: "transparent" },
-  scrubberItemIndex: { color: COLORS.TEXT_TERTIARY, fontSize: 16, fontWeight: "900", fontFamily: FONT_FAMILIES.MONO },
-  scrubberItemShorthand: { color: COLORS.TEXT_TERTIARY, fontSize: 9, fontWeight: "800", fontFamily: FONT_FAMILIES.MONO, marginTop: 2, letterSpacing: 0.5 },
-  scrubberItemProgressBg: { position: "absolute", bottom: 0, left: 0, right: 0, height: 2, backgroundColor: "rgba(255,255,255,0.05)" },
+  scrubberItemIndex: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: FONT_FAMILIES.MONO,
+  },
+  scrubberItemShorthand: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 9,
+    fontWeight: "800",
+    fontFamily: FONT_FAMILIES.MONO,
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  scrubberItemProgressBg: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
   scrubberItemProgressFill: { height: "100%", backgroundColor: COLORS.ACCENT_BLUE },
   bracket: { position: "absolute", width: 6, height: 6, borderColor: COLORS.ACCENT_BLUE },
   bracketTopLeft: { top: -2, left: -2, borderTopWidth: 2, borderLeftWidth: 2 },

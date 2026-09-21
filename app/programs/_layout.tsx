@@ -7,7 +7,7 @@ export default function ProgramsLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: COLORS.BG },
-        animation: 'slide_from_right',
+        animation: "slide_from_right",
       }}
     />
   );

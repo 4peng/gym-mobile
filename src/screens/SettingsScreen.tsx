@@ -10,7 +10,15 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { ChevronLeft, Database, Download, ShieldAlert, Share2, RefreshCw, Tags } from "lucide-react-native";
+import {
+  ChevronLeft,
+  Database,
+  Download,
+  ShieldAlert,
+  Share2,
+  RefreshCw,
+  Tags,
+} from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -31,30 +39,24 @@ export default function SettingsScreen() {
   const programs = useProgramStore(useShallow((s) => s.programs));
   const history = useWorkoutSessionStore(useShallow((s) => s.history));
   const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
-  const showDetailedMuscleGroups = useUiPreferencesStore(
-    (s) => s.showDetailedMuscleGroups
-  );
-  const toggleDetailedMuscleGroups = useUiPreferencesStore(
-    (s) => s.toggleDetailedMuscleGroups
-  );
+  const showDetailedMuscleGroups = useUiPreferencesStore((s) => s.showDetailedMuscleGroups);
+  const toggleDetailedMuscleGroups = useUiPreferencesStore((s) => s.toggleDetailedMuscleGroups);
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
   const setAnalyticsBodyweight = useUiPreferencesStore((s) => s.setAnalyticsBodyweight);
   const toggleAnalyticsBodyweightUnit = useUiPreferencesStore(
-    (s) => s.toggleAnalyticsBodyweightUnit
+    (s) => s.toggleAnalyticsBodyweightUnit,
   );
   const preferredWeightUnit = useUiPreferencesStore((s) => s.preferredWeightUnit);
   const setPreferredWeightUnit = useUiPreferencesStore((s) => s.setPreferredWeightUnit);
   const [analyticsBodyweightText, setAnalyticsBodyweightText] = useState(
-    analyticsBodyweight !== null ? String(analyticsBodyweight) : ""
+    analyticsBodyweight !== null ? String(analyticsBodyweight) : "",
   );
 
   const spinValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    setAnalyticsBodyweightText(
-      analyticsBodyweight !== null ? String(analyticsBodyweight) : ""
-    );
+    setAnalyticsBodyweightText(analyticsBodyweight !== null ? String(analyticsBodyweight) : "");
   }, [analyticsBodyweight]);
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function SettingsScreen() {
           duration: 1000,
           easing: Easing.linear,
           useNativeDriver: true,
-        })
+        }),
       ).start();
     } else {
       spinValue.setValue(0);
@@ -74,7 +76,7 @@ export default function SettingsScreen() {
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ["0deg", "360deg"],
   });
 
   const handleSync = useCallback(() => {
@@ -133,7 +135,7 @@ export default function SettingsScreen() {
       () => {
         forceResync();
         router.push("/programs/");
-      }
+      },
     );
   };
 
@@ -149,12 +151,12 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionLabel}>Synchronization</Text>
         <View style={[UI.SHARED.card, { padding: 0, marginBottom: 24 }]}>
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [styles.option, (pressed || isSyncing) && styles.pressed]}
             onPress={handleSync}
             disabled={isSyncing}
           >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
+            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
               <Animated.View style={{ transform: [{ rotate: spin }] }}>
                 <RefreshCw size={20} color={COLORS.ACCENT_BLUE} />
               </Animated.View>
@@ -172,7 +174,7 @@ export default function SettingsScreen() {
             style={({ pressed }) => [styles.option, pressed && styles.pressed]}
             onPress={toggleDetailedMuscleGroups}
           >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
+            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
               <Tags size={20} color={COLORS.ACCENT_BLUE} />
             </View>
             <View style={styles.optionText}>
@@ -180,7 +182,9 @@ export default function SettingsScreen() {
               <Text style={styles.optionDesc}>Show advanced tags in muscle picker</Text>
             </View>
             <View style={[styles.togglePill, showDetailedMuscleGroups && styles.togglePillActive]}>
-              <Text style={[styles.toggleText, showDetailedMuscleGroups && styles.toggleTextActive]}>
+              <Text
+                style={[styles.toggleText, showDetailedMuscleGroups && styles.toggleTextActive]}
+              >
                 {showDetailedMuscleGroups ? "ON" : "OFF"}
               </Text>
             </View>
@@ -189,7 +193,7 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
 
           <View style={styles.option}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
+            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
               <RefreshCw size={20} color={COLORS.ACCENT_BLUE} />
             </View>
             <View style={styles.optionText}>
@@ -199,10 +203,7 @@ export default function SettingsScreen() {
             <View style={styles.unitToggleGroup}>
               <Pressable
                 onPress={() => setPreferredWeightUnit("kg")}
-                style={[
-                  styles.unitBtn,
-                  preferredWeightUnit === "kg" && styles.unitBtnActive,
-                ]}
+                style={[styles.unitBtn, preferredWeightUnit === "kg" && styles.unitBtnActive]}
               >
                 <Text
                   style={[
@@ -215,10 +216,7 @@ export default function SettingsScreen() {
               </Pressable>
               <Pressable
                 onPress={() => setPreferredWeightUnit("lbs")}
-                style={[
-                  styles.unitBtn,
-                  preferredWeightUnit === "lbs" && styles.unitBtnActive,
-                ]}
+                style={[styles.unitBtn, preferredWeightUnit === "lbs" && styles.unitBtnActive]}
               >
                 <Text
                   style={[
@@ -266,11 +264,11 @@ export default function SettingsScreen() {
 
         <Text style={styles.sectionLabel}>Data Management</Text>
         <View style={[UI.SHARED.card, { padding: 0 }]}>
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [styles.option, pressed && styles.pressed]}
             onPress={handleExport}
           >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(11, 130, 255, 0.1)' }]}>
+            <View style={[styles.iconBox, { backgroundColor: "rgba(11, 130, 255, 0.1)" }]}>
               <Download size={20} color={COLORS.ACCENT_BLUE} />
             </View>
             <View style={styles.optionText}>
@@ -282,11 +280,11 @@ export default function SettingsScreen() {
 
           <View style={styles.divider} />
 
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [styles.option, pressed && styles.pressed]}
             onPress={handleHardReset}
           >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+            <View style={[styles.iconBox, { backgroundColor: "rgba(239, 68, 68, 0.1)" }]}>
               <ShieldAlert size={20} color={COLORS.DANGER} />
             </View>
             <View style={styles.optionText}>
@@ -481,5 +479,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 40,
     lineHeight: 18,
-  }
+  },
 });

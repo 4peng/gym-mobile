@@ -4,7 +4,7 @@ import { normalizeSetForTrackingMode, normalizeTrackingMode } from "@/utils/exer
 import { generateId } from "@/utils/id";
 import { USER_ID } from "@/constants/user";
 
-const WORKOUT_PREFIX = 'workout_';
+const WORKOUT_PREFIX = "workout_";
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
@@ -55,7 +55,8 @@ export function normalizePersistedWorkoutSession(raw: any): WorkoutSession | nul
     startedAt: str(raw.startedAt) ?? new Date().toISOString(),
     completedAt: str(raw.completedAt),
     updatedAt: num(raw.updatedAt) ?? Date.now(),
-    deletedAt: typeof raw.deletedAt === "number" || raw.deletedAt === null ? raw.deletedAt : undefined,
+    deletedAt:
+      typeof raw.deletedAt === "number" || raw.deletedAt === null ? raw.deletedAt : undefined,
     notes: str(raw.notes) ?? "",
     exercises,
     cumulativeRestSeconds: num(raw.cumulativeRestSeconds) ?? 0,
@@ -73,20 +74,20 @@ export const workoutStorage = {
       const key = `${WORKOUT_PREFIX}${workout._id}`;
       await AsyncStorage.setItem(key, JSON.stringify(workout));
     } catch (err) {
-      console.error('Failed to shard workout:', err);
+      console.error("Failed to shard workout:", err);
     }
   },
 
   /** Batch save multiple workouts */
   saveBatch: async (workouts: WorkoutSession[]): Promise<void> => {
     try {
-      const pairs: [string, string][] = workouts.map(w => [
+      const pairs: [string, string][] = workouts.map((w) => [
         `${WORKOUT_PREFIX}${w._id}`,
-        JSON.stringify(w)
+        JSON.stringify(w),
       ]);
       await AsyncStorage.multiSet(pairs);
     } catch (err) {
-      console.error('Failed to batch shard workouts:', err);
+      console.error("Failed to batch shard workouts:", err);
     }
   },
 
@@ -104,13 +105,13 @@ export const workoutStorage = {
   /** Batch load multiple workouts */
   getBatch: async (ids: string[]): Promise<WorkoutSession[]> => {
     try {
-      const keys = ids.map(id => `${WORKOUT_PREFIX}${id}`);
+      const keys = ids.map((id) => `${WORKOUT_PREFIX}${id}`);
       const results = await AsyncStorage.multiGet(keys);
       return results
         .map(([_, value]) => normalizePersistedWorkoutSession(value ? JSON.parse(value) : null))
         .filter((v): v is WorkoutSession => v !== null);
     } catch (err) {
-      console.error('Failed to batch load shards:', err);
+      console.error("Failed to batch load shards:", err);
       return [];
     }
   },
@@ -127,10 +128,10 @@ export const workoutStorage = {
   /** Batch remove workout shards */
   removeBatch: async (ids: string[]): Promise<void> => {
     try {
-      const keys = ids.map(id => `${WORKOUT_PREFIX}${id}`);
+      const keys = ids.map((id) => `${WORKOUT_PREFIX}${id}`);
       await AsyncStorage.multiRemove(keys);
     } catch (err) {
-      console.error('Failed to batch remove shards:', err);
+      console.error("Failed to batch remove shards:", err);
     }
-  }
+  },
 };

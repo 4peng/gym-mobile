@@ -80,7 +80,7 @@ export default function RoutineEditorScreen({
 
   const initialSnapshot = useMemo(
     () => createRoutineSnapshot(initialName, initialExercises),
-    [initialExercises, initialName]
+    [initialExercises, initialName],
   );
   const currentSnapshot = useMemo(() => createRoutineSnapshot(name, exercises), [exercises, name]);
   const hasChanges = currentSnapshot !== initialSnapshot;
@@ -88,7 +88,7 @@ export default function RoutineEditorScreen({
   const exerciseCount = exercises.length;
   const totalPlannedSets = useMemo(
     () => exercises.reduce((total, exercise) => total + (exercise.defaultSets?.length || 0), 0),
-    [exercises]
+    [exercises],
   );
 
   const openOptions = useCallback(() => setOptionsVisible(true), []);
@@ -96,9 +96,11 @@ export default function RoutineEditorScreen({
 
   const handleUpdateExercise = useCallback(
     (id: string, updates: Partial<Omit<ExerciseFormData, "id">>) => {
-      setExercises((prev) => prev.map((exercise) => (exercise.id === id ? { ...exercise, ...updates } : exercise)));
+      setExercises((prev) =>
+        prev.map((exercise) => (exercise.id === id ? { ...exercise, ...updates } : exercise)),
+      );
     },
-    []
+    [],
   );
 
   const handleRemoveExercise = useCallback((id: string) => {
@@ -117,7 +119,7 @@ export default function RoutineEditorScreen({
 
   const reorderItems = useMemo(
     () => exercises.map((exercise) => ({ id: exercise.id, name: exercise.name })),
-    [exercises]
+    [exercises],
   );
 
   const handleReorderSave = useCallback((exerciseIds: string[]) => {
@@ -180,22 +182,29 @@ export default function RoutineEditorScreen({
   });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior="padding"
-    >
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View style={styles.topBar}>
-          <Pressable onPress={handleCancel} style={({ pressed }) => [UI.SHARED.dangerBtn, pressed && styles.hudPressed]}>
+          <Pressable
+            onPress={handleCancel}
+            style={({ pressed }) => [UI.SHARED.dangerBtn, pressed && styles.hudPressed]}
+          >
             <X size={20} color={COLORS.DANGER} strokeWidth={2.8} />
           </Pressable>
 
           <View style={styles.hudReadout}>
-            <Text style={styles.hudReadoutTitle}>{isCreateLike ? "New Routine" : "Edit Routine"}</Text>
-            <Text style={styles.hudReadoutMeta}>{hasChanges ? "Unsaved changes" : "All changes saved"}</Text>
+            <Text style={styles.hudReadoutTitle}>
+              {isCreateLike ? "New Routine" : "Edit Routine"}
+            </Text>
+            <Text style={styles.hudReadoutMeta}>
+              {hasChanges ? "Unsaved changes" : "All changes saved"}
+            </Text>
           </View>
 
-          <Pressable onPress={handlePrimaryAction} style={({ pressed }) => [UI.SHARED.actionBtn, pressed && styles.hudPressed]}>
+          <Pressable
+            onPress={handlePrimaryAction}
+            style={({ pressed }) => [UI.SHARED.actionBtn, pressed && styles.hudPressed]}
+          >
             <Check size={20} color={COLORS.ACCENT_GREEN} strokeWidth={2.8} />
           </Pressable>
         </View>
@@ -297,7 +306,10 @@ export default function RoutineEditorScreen({
               icon={<Save size={20} color={COLORS.ACCENT_BLUE} />}
               title="Save Changes"
               subtitle="Update template and return to list"
-              onPress={() => { closeOptions(); doSave(); }}
+              onPress={() => {
+                closeOptions();
+                doSave();
+              }}
             />
 
             {onSaveAndStart ? (
@@ -305,7 +317,10 @@ export default function RoutineEditorScreen({
                 icon={<Play size={20} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />}
                 title="Save and Start"
                 subtitle="Launch this routine immediately"
-                onPress={() => { closeOptions(); doSaveAndStart(); }}
+                onPress={() => {
+                  closeOptions();
+                  doSaveAndStart();
+                }}
               />
             ) : null}
 
@@ -315,7 +330,10 @@ export default function RoutineEditorScreen({
                 title="Delete Routine"
                 subtitle="Permanently remove this program"
                 danger
-                onPress={() => { closeOptions(); doDelete(); }}
+                onPress={() => {
+                  closeOptions();
+                  doDelete();
+                }}
               />
             ) : null}
           </Animated.View>
@@ -354,9 +372,7 @@ function OptionItem({ icon, title, subtitle, onPress, danger }: OptionItemProps)
       onPress={onPress}
       style={({ pressed }) => [styles.optionItem, pressed && styles.pressed]}
     >
-      <View style={[styles.optionIcon, danger && styles.optionIconDanger]}>
-        {icon}
-      </View>
+      <View style={[styles.optionIcon, danger && styles.optionIconDanger]}>{icon}</View>
       <View style={styles.optionCopy}>
         <Text style={[styles.optionTitle, danger && { color: COLORS.DANGER }]}>{title}</Text>
         <Text style={styles.optionSubtitle}>{subtitle}</Text>

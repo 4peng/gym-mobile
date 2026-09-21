@@ -9,9 +9,7 @@ let mockRunFullSync = jest.fn(() => Promise.resolve(true));
 
 jest.mock("@react-native-community/netinfo", () => ({
   addEventListener: jest.fn(() => jest.fn()),
-  fetch: jest.fn(() =>
-    Promise.resolve({ isConnected: false, isInternetReachable: false })
-  ),
+  fetch: jest.fn(() => Promise.resolve({ isConnected: false, isInternetReachable: false })),
 }));
 
 jest.mock("@/stores/syncStore", () => ({
@@ -37,7 +35,8 @@ const mockedNetInfo = jest.mocked(NetInfo);
 
 /** The connectivity handler registered by the most recently required listener module. */
 const getHandler = () =>
-  (jest.requireMock("@react-native-community/netinfo").addEventListener as jest.Mock).mock.calls[0][0];
+  (jest.requireMock("@react-native-community/netinfo").addEventListener as jest.Mock).mock
+    .calls[0][0];
 
 /** Returns a minimal NetInfoState-like object. */
 function netState(connected: boolean): any {

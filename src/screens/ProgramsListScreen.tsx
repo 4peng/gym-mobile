@@ -1,12 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  RefreshControl,
-  ScrollView,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, RefreshControl, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   BarChart2,
@@ -53,13 +46,10 @@ export default function ProgramsListScreen() {
   const [periodMode, setPeriodMode] = useState<ActivityPeriodMode>("week");
   const [scrollEnabled, setScrollEnabled] = useState(true);
 
-  const history = useMemo(
-    () => allHistory.filter((session) => !session.deletedAt),
-    [allHistory]
-  );
+  const history = useMemo(() => allHistory.filter((session) => !session.deletedAt), [allHistory]);
   const summary = useMemo(
     () => buildActivitySummary(history, periodMode, new Date()),
-    [history, periodMode]
+    [history, periodMode],
   );
 
   const lastUsedByProgramId = useMemo(() => {
@@ -110,10 +100,7 @@ export default function ProgramsListScreen() {
     router.push("/programs/create");
   }, [router]);
 
-  const handleProgramPress = useCallback(
-    (id: string) => router.push(`/programs/${id}`),
-    [router]
-  );
+  const handleProgramPress = useCallback((id: string) => router.push(`/programs/${id}`), [router]);
 
   const handleStartProgram = useCallback(
     (program: Program) => {
@@ -124,14 +111,14 @@ export default function ProgramsListScreen() {
           () => {
             startFromProgram(program);
             router.replace("/workout");
-          }
+          },
         );
       } else {
         startFromProgram(program);
         router.replace("/workout");
       }
     },
-    [activeSession, startFromProgram, router]
+    [activeSession, startFromProgram, router],
   );
 
   const handleDeleteProgram = useCallback(
@@ -139,20 +126,17 @@ export default function ProgramsListScreen() {
       showConfirm(
         "Delete Program",
         `Are you sure you want to delete "${name}"? This cannot be undone.`,
-        () => deleteProgram(id)
+        () => deleteProgram(id),
       );
     },
-    [deleteProgram]
+    [deleteProgram],
   );
 
-  const handlePinProgram = useCallback(
-    (id: string) => togglePin(id),
-    [togglePin]
-  );
+  const handlePinProgram = useCallback((id: string) => togglePin(id), [togglePin]);
 
   const handleOptionsProgram = useCallback(
     (program: Program) => router.push(`/programs/${program._id}`),
-    [router]
+    [router],
   );
 
   return (
@@ -222,9 +206,7 @@ export default function ProgramsListScreen() {
               </Text>
             </View>
 
-            <Text style={styles.summaryValue}>
-              {formatDurationMinutes(summary.totalMinutes)}
-            </Text>
+            <Text style={styles.summaryValue}>{formatDurationMinutes(summary.totalMinutes)}</Text>
 
             <ActivityComboChart points={summary.points} width={UI.WIDTH - 68} />
           </View>

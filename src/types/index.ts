@@ -13,7 +13,7 @@ export interface ExerciseDefinition {
 }
 
 /** A template for a set inside a Program exercise. */
-export interface ProgramSetTemplate {
+interface ProgramSetTemplate {
   type: "working" | "warmup" | "dropset";
 }
 

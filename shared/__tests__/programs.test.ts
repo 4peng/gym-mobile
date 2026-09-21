@@ -138,11 +138,7 @@ describe("normalizeSets", () => {
 
   it("preserves an array of valid set types", () => {
     const result = normalizeSets([{ type: "warmup" }, { type: "dropset" }, { type: "working" }]);
-    expect(result).toEqual([
-      { type: "warmup" },
-      { type: "dropset" },
-      { type: "working" },
-    ]);
+    expect(result).toEqual([{ type: "warmup" }, { type: "dropset" }, { type: "working" }]);
   });
 
   it("defaults invalid set types to 'working'", () => {
@@ -183,10 +179,7 @@ describe("validateRoutineDraft", () => {
   });
 
   it("returns error when second exercise has no name", () => {
-    const error = validateRoutineDraft("Push Day", [
-      { name: "Bench Press" },
-      { name: "" },
-    ] as any);
+    const error = validateRoutineDraft("Push Day", [{ name: "Bench Press" }, { name: "" }] as any);
     expect(error).toBe("Exercise 2 needs a name.");
   });
 

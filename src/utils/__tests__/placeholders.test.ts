@@ -44,7 +44,12 @@ describe("resolveExercisePlaceholders", () => {
       { id: "c4", weight: null, reps: null }, // beyond history length -> pads with last set
     ];
 
-    const result = resolveExercisePlaceholders("barbell-bench-press", currentSets, [historySession()], "kg");
+    const result = resolveExercisePlaceholders(
+      "barbell-bench-press",
+      currentSets,
+      [historySession()],
+      "kg",
+    );
 
     expect(result).toEqual([
       { weight: 100, reps: 10 },
@@ -62,7 +67,12 @@ describe("resolveExercisePlaceholders", () => {
       { id: "c4", weight: null, reps: null },
     ];
 
-    const result = resolveExercisePlaceholders("barbell-bench-press", currentSets, [historySession()], "kg");
+    const result = resolveExercisePlaceholders(
+      "barbell-bench-press",
+      currentSets,
+      [historySession()],
+      "kg",
+    );
 
     expect(result).toEqual([
       { weight: 100, reps: 10 },
@@ -74,7 +84,12 @@ describe("resolveExercisePlaceholders", () => {
 
   it("converts weight units when target unit differs from the historical entry's unit", () => {
     const currentSets: WorkoutSet[] = [{ id: "c1", weight: null, reps: null }];
-    const result = resolveExercisePlaceholders("barbell-bench-press", currentSets, [historySession()], "lbs");
+    const result = resolveExercisePlaceholders(
+      "barbell-bench-press",
+      currentSets,
+      [historySession()],
+      "lbs",
+    );
     // 100kg -> lbs: 100*2.20462=220.462 -> round to nearest 0.5 -> 220.5
     expect(result).toEqual([{ weight: 220.5, reps: 10 }]);
   });
@@ -84,7 +99,12 @@ describe("resolveExercisePlaceholders", () => {
       { id: "c1", weight: null, reps: null },
       { id: "c2", weight: 50, reps: null },
     ];
-    const result = resolveExercisePlaceholders("some-unknown-exercise", currentSets, [historySession()], "kg");
+    const result = resolveExercisePlaceholders(
+      "some-unknown-exercise",
+      currentSets,
+      [historySession()],
+      "kg",
+    );
     expect(result).toEqual([
       { weight: null, reps: null },
       { weight: null, reps: null },
@@ -94,7 +114,12 @@ describe("resolveExercisePlaceholders", () => {
   it("ignores sessions without a completedAt (in-progress/abandoned)", () => {
     const inProgress: WorkoutSession = { ...historySession(), _id: "s2", completedAt: undefined };
     const currentSets: WorkoutSet[] = [{ id: "c1", weight: null, reps: null }];
-    const result = resolveExercisePlaceholders("barbell-bench-press", currentSets, [inProgress], "kg");
+    const result = resolveExercisePlaceholders(
+      "barbell-bench-press",
+      currentSets,
+      [inProgress],
+      "kg",
+    );
     expect(result).toEqual([{ weight: null, reps: null }]);
   });
 
@@ -106,7 +131,12 @@ describe("resolveExercisePlaceholders", () => {
 
 describe("resolveSetOnComplete", () => {
   it("prefers the current set's own value over the placeholder", () => {
-    expect(resolveSetOnComplete({ id: "c1", weight: 50, reps: 5 } as WorkoutSet, { weight: 100, reps: 10 })).toEqual({
+    expect(
+      resolveSetOnComplete({ id: "c1", weight: 50, reps: 5 } as WorkoutSet, {
+        weight: 100,
+        reps: 10,
+      }),
+    ).toEqual({
       weight: 50,
       reps: 5,
     });
@@ -114,13 +144,19 @@ describe("resolveSetOnComplete", () => {
 
   it("falls back to the placeholder when the current set is untouched", () => {
     expect(
-      resolveSetOnComplete({ id: "c1", weight: null, reps: null } as WorkoutSet, { weight: 100, reps: 10 })
+      resolveSetOnComplete({ id: "c1", weight: null, reps: null } as WorkoutSet, {
+        weight: 100,
+        reps: 10,
+      }),
     ).toEqual({ weight: 100, reps: 10 });
   });
 
   it("falls back to 0 when both the current set and the placeholder are null", () => {
     expect(
-      resolveSetOnComplete({ id: "c1", weight: null, reps: null } as WorkoutSet, { weight: null, reps: null })
+      resolveSetOnComplete({ id: "c1", weight: null, reps: null } as WorkoutSet, {
+        weight: null,
+        reps: null,
+      }),
     ).toEqual({ weight: 0, reps: 0 });
   });
 });

@@ -59,9 +59,7 @@ jest.mock("@/utils/restTimerLiveActivity", () => ({
 jest.mock("@/stores/exerciseLibraryStore", () => ({
   useExerciseLibraryStore: {
     getState: jest.fn(() => ({
-      customExercises: [
-        { id: "custom-ex-1", name: "My Custom Exercise", muscles: ["chest"] },
-      ],
+      customExercises: [{ id: "custom-ex-1", name: "My Custom Exercise", muscles: ["chest"] }],
       updateCustomExerciseMuscles: jest.fn(),
     })),
     setState: jest.fn(),
@@ -235,7 +233,7 @@ describe("forceResync", () => {
 
     // workoutSessionStore setState should have been called with reset values
     const setStateCall = workoutSetState.mock.calls.find(
-      (call: any) => call[0].activeSession === null
+      (call: any) => call[0].activeSession === null,
     );
     expect(setStateCall).toBeDefined();
     expect(setStateCall![0]).toMatchObject({
@@ -250,7 +248,10 @@ describe("forceResync", () => {
       lastSyncedAt: null,
     });
     // pinnedExerciseNames preserved
-    expect((setStateCall![0] as { pinnedExerciseNames?: string[] }).pinnedExerciseNames).toEqual(["push-up", "pull-up"]);
+    expect((setStateCall![0] as { pinnedExerciseNames?: string[] }).pinnedExerciseNames).toEqual([
+      "push-up",
+      "pull-up",
+    ]);
   });
 
   it("triggers full sync after reset", async () => {

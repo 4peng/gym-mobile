@@ -17,26 +17,37 @@ interface HUDHeaderProps {
 /** Scroll offset (px) at which the sticky condensed HUD fades in. */
 const CONDENSE_THRESHOLD = 80;
 
-export const HUDHeader = React.memo(function HUDHeader({ scrollY, startedAt, progressData }: HUDHeaderProps) {
+export const HUDHeader = React.memo(function HUDHeader({
+  scrollY,
+  startedAt,
+  progressData,
+}: HUDHeaderProps) {
   const stickyHudOpacity = scrollY.interpolate({
     inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
     outputRange: [0, 1],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   const stickyHudTranslateY = scrollY.interpolate({
     inputRange: [CONDENSE_THRESHOLD - 20, CONDENSE_THRESHOLD],
     outputRange: [-20, 0],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   return (
     <>
-      <Animated.View style={[styles.stickyHud, { opacity: stickyHudOpacity, transform: [{ translateY: stickyHudTranslateY }] }]}>
+      <Animated.View
+        style={[
+          styles.stickyHud,
+          { opacity: stickyHudOpacity, transform: [{ translateY: stickyHudTranslateY }] },
+        ]}
+      >
         <View style={styles.stickyHudContent}>
           <View style={styles.stickyTimer}>
             <Timer size={14} color={COLORS.ACCENT_GREEN} />
-            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.stickyTimerText} />}
+            {startedAt && (
+              <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.stickyTimerText} />
+            )}
           </View>
           <View style={styles.stickyTimer}>
             <Clock size={14} color={COLORS.TEXT_TERTIARY} />
@@ -64,7 +75,8 @@ export const HUDHeader = React.memo(function HUDHeader({ scrollY, startedAt, pro
           <View style={styles.statsLeft}>
             <Check size={14} color={COLORS.ACCENT_GREEN} />
             <Text style={styles.statsValue}>
-              {Math.round(progressData.progress * 100)}% ({progressData.completed}/{progressData.total})
+              {Math.round(progressData.progress * 100)}% ({progressData.completed}/
+              {progressData.total})
             </Text>
           </View>
         </View>
@@ -81,21 +93,80 @@ export const HUDHeader = React.memo(function HUDHeader({ scrollY, startedAt, pro
 });
 
 const styles = StyleSheet.create({
-  stickyHud: { position: 'absolute', top: 0, left: 0, right: 0, height: UI.HEADER_TOP + 20, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER, paddingTop: UI.HEADER_TOP - 30, justifyContent: 'center', paddingHorizontal: 20 },
-  stickyHudContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  stickyTimer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stickyTimerText: { color: COLORS.TEXT_PRIMARY, fontSize: 13, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
+  stickyHud: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: UI.HEADER_TOP + 20,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    zIndex: 100,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
+    paddingTop: UI.HEADER_TOP - 30,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  stickyHudContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  stickyTimer: { flexDirection: "row", alignItems: "center", gap: 8 },
+  stickyTimerText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 13,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+  },
   header: { paddingTop: UI.HEADER_TOP - 20, paddingHorizontal: 20, paddingBottom: 20 },
-  headerTopLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 44 },
+  headerTopLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 44,
+  },
   timerBlock: { flexDirection: "row", marginTop: 2 },
-  timerLabel: { color: COLORS.TEXT_TERTIARY, fontSize: 14, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
-  timerValue: { color: COLORS.TEXT_PRIMARY, fontSize: 14, fontFamily: FONT_FAMILIES.MONO, fontWeight: "700" },
+  timerLabel: {
+    color: COLORS.TEXT_TERTIARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+  },
+  timerValue: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 14,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "700",
+  },
   activeRestSlot: { position: "absolute", top: 28, right: 0, zIndex: 20 },
   statsLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   statsLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statsValue: { color: COLORS.TEXT_SECONDARY, fontSize: 11, fontFamily: FONT_FAMILIES.MONO, fontWeight: "600" },
-  progressBarWrapper: { height: 4, backgroundColor: COLORS.PROGRESS_BG, borderRadius: 2, position: "relative", marginTop: 4 },
+  statsValue: {
+    color: COLORS.TEXT_SECONDARY,
+    fontSize: 11,
+    fontFamily: FONT_FAMILIES.MONO,
+    fontWeight: "600",
+  },
+  progressBarWrapper: {
+    height: 4,
+    backgroundColor: COLORS.PROGRESS_BG,
+    borderRadius: 2,
+    position: "relative",
+    marginTop: 4,
+  },
   progressBar: { height: "100%", backgroundColor: COLORS.ACCENT_GREEN, borderRadius: 2 },
-  progressIndicator: { position: "absolute", top: -4, width: 12, height: 12, marginLeft: -6, alignItems: "center", justifyContent: "center" },
-  indicatorCircle: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.ACCENT_GREEN, borderWidth: 2, borderColor: COLORS.BG },
+  progressIndicator: {
+    position: "absolute",
+    top: -4,
+    width: 12,
+    height: 12,
+    marginLeft: -6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  indicatorCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: COLORS.ACCENT_GREEN,
+    borderWidth: 2,
+    borderColor: COLORS.BG,
+  },
 });

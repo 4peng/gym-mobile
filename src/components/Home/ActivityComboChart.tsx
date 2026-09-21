@@ -23,8 +23,12 @@ export default function ActivityComboChart({
   const labelWidth = 44;
 
   const chartMax = useMemo(
-    () => Math.max(points.reduce((best, point) => Math.max(best, point.minutes), 0), 1),
-    [points]
+    () =>
+      Math.max(
+        points.reduce((best, point) => Math.max(best, point.minutes), 0),
+        1,
+      ),
+    [points],
   );
   const chartCeil = Math.ceil(chartMax * 1.15); // Add 15% headroom
 

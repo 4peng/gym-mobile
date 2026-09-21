@@ -8,10 +8,17 @@
  * modes needs a corresponding update in the server models.
  */
 
-export const DEFAULT_EXERCISE_SETS = [{ type: "working" }, { type: "working" }, { type: "working" }];
+export const DEFAULT_EXERCISE_SETS = [
+  { type: "working" },
+  { type: "working" },
+  { type: "working" },
+];
 export const DEFAULT_EXERCISE_REST_SECONDS = 90;
 export const DEFAULT_WEIGHT_UNIT = "kg";
 export const DEFAULT_TRACKING_MODE = "strength";
+
+/** Tap-cycle order for set-type markers. */
+export const NEXT_SET_TYPE = { working: "warmup", warmup: "dropset", dropset: "working" };
 
 function normalizeName(name) {
   return typeof name === "string" ? name.trim() : "";
@@ -45,7 +52,7 @@ function normalizeMuscles(muscles) {
   }
 
   return Array.from(
-    new Set(muscles.filter((muscle) => typeof muscle === "string" && muscle.length > 0))
+    new Set(muscles.filter((muscle) => typeof muscle === "string" && muscle.length > 0)),
   );
 }
 
@@ -125,8 +132,8 @@ export function copyExercises(exercises, createId) {
         ...exercise,
         id: typeof createId === "function" ? createId() : exercise?.id,
       },
-      createId
-    )
+      createId,
+    ),
   );
 }
 

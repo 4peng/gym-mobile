@@ -71,7 +71,11 @@ describe("buildActivitySummary - week mode", () => {
     const summary = buildActivitySummary(history, "week", now);
 
     expect(summary.points).toHaveLength(7);
-    expect(summary.points[0]).toEqual({ key: `${rangeStart.getTime()}`, label: "Fri", minutes: 30 });
+    expect(summary.points[0]).toEqual({
+      key: `${rangeStart.getTime()}`,
+      label: "Fri",
+      minutes: 30,
+    });
     expect(summary.points.slice(1, 6).every((p) => p.minutes === 0)).toBe(true);
     expect(summary.points[6]).toEqual({ key: `${day6.getTime()}`, label: "Thu", minutes: 60 });
 
@@ -107,8 +111,8 @@ describe("buildActivitySummary - month mode", () => {
 
     const summary = buildActivitySummary(history, "month", now);
 
-    const expectedKeys = [0, 1, 2, 3].map((i) =>
-      `${startOfDay(shiftDays(rangeStart, i * 7)).getTime()}`
+    const expectedKeys = [0, 1, 2, 3].map(
+      (i) => `${startOfDay(shiftDays(rangeStart, i * 7)).getTime()}`,
     );
 
     expect(summary.points).toHaveLength(4);

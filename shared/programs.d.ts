@@ -28,42 +28,42 @@ export const DEFAULT_EXERCISE_SETS: ProgramSetTemplate[];
 export const DEFAULT_EXERCISE_REST_SECONDS: 90;
 export const DEFAULT_WEIGHT_UNIT: "kg";
 export const DEFAULT_TRACKING_MODE: "strength";
+export const NEXT_SET_TYPE: Readonly<Record<SetType, SetType>>;
 
 export function normalizeTrackingMode(value: unknown): ExerciseTrackingMode;
 export function normalizeSets(sets: unknown): ProgramSetTemplate[];
 
 export function createEmptyExercise<TMuscle extends string = string>(
-  createId: () => string
+  createId: () => string,
 ): RoutineExerciseDraft<TMuscle>;
 
 export function normalizeExercise<TMuscle extends string = string>(
   exercise?: Partial<RoutineExerciseDraft<TMuscle>> | null,
-  createId?: (() => string) | undefined
+  createId?: (() => string) | undefined,
 ): RoutineExerciseDraft<TMuscle>;
 
 export function normalizeExercises<TMuscle extends string = string>(
   exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
-  createId?: (() => string) | undefined
+  createId?: (() => string) | undefined,
 ): RoutineExerciseDraft<TMuscle>[];
 
 export function copyExercises<TMuscle extends string = string>(
   exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
-  createId?: (() => string) | undefined
+  createId?: (() => string) | undefined,
 ): RoutineExerciseDraft<TMuscle>[];
 
 export function buildRoutineDraft<TMuscle extends string = string>(
   name: string,
   exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
-  createId?: (() => string) | undefined
+  createId?: (() => string) | undefined,
 ): RoutineDraft<TMuscle>;
 
 export function createRoutineSnapshot<TMuscle extends string = string>(
   name: string,
-  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
 ): string;
 
 export function validateRoutineDraft<TMuscle extends string = string>(
   name: string,
-  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null
+  exercises?: (Partial<RoutineExerciseDraft<TMuscle>> | null)[] | null,
 ): string | null;
-
