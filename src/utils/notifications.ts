@@ -31,8 +31,8 @@ export async function clearAppNotifications(): Promise<void> {
       Notifications.dismissAllNotificationsAsync(),
       Notifications.setBadgeCountAsync(0),
     ]);
-  } catch {
-    // Best-effort cleanup only.
+  } catch (err) {
+    console.error("clearAppNotifications error:", err);
   }
 }
 
@@ -88,7 +88,7 @@ export async function cancelScheduledNotification(
 ): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
-  } catch {
-    // Already delivered or no longer exists — safe to ignore.
+  } catch (err) {
+    console.error("cancelScheduledNotification error:", err);
   }
 }

@@ -18,6 +18,7 @@ import Svg, { Path, Line, Text as SvgText, Rect, G } from "react-native-svg";
 import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { workoutStorage } from "@/storage/workoutStorage";
+import { useShallow } from "zustand/react/shallow";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -377,8 +378,8 @@ const LogRow = React.memo(function LogRow({ log, unit, onDeleteSession, onEditDa
 
 export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScreenProps) {
   const router = useAppRouter();
-  const historyCache = useWorkoutSessionStore((s) => s.history);
-  const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
+  const historyCache = useWorkoutSessionStore(useShallow((s) => s.history));
+  const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
   const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);
   const updateHistorySet = useWorkoutSessionStore((s) => s.updateHistorySet);
   const updateSessionDate = useWorkoutSessionStore((s) => s.updateSessionDate);
@@ -600,7 +601,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
     // sets by date for the log list, and totals chart-bucket volume together
     // (previously two separate passes over the same sessions/sets, each
     // re-deriving the exercise's identity/bodyweight resolution per set).
-    const logsByDate: { [key: string]: any } = {};
+    const logsByDate: Record<string, SessionLogEntry> = {};
 
     history.forEach((session) => {
       const sessionDate = new Date(session.completedAt || session.startedAt);
@@ -664,7 +665,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: ExerciseVolumeScre
       });
     });
 
-    const rawLogs = Object.values(logsByDate) as any[];
+    const rawLogs = Object.values(logsByDate);
 
     if (rawLogs.length > 0) {
       maxDailyVolume = Math.max(...rawLogs.map((log: any) => log.volume));

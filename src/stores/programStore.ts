@@ -4,6 +4,7 @@ import { immer } from "zustand/middleware/immer";
 import { zustandAsyncStorage } from "@/storage/mmkv";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
+import { nextLocalUpdatedAt } from "@/utils/timestamps";
 import type { Program, ProgramExercise } from "@/types";
 import { normalizeExercises } from "@/shared/programs.js";
 
@@ -30,27 +31,23 @@ interface ProgramActions {
   applySyncMerge: (remote: Program[], syncStartTime: number) => void;
 }
 
-function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
-  const now = Date.now();
-  return typeof lastSyncedAt === "number" ? Math.max(now, lastSyncedAt + 1) : now;
-}
-
-function normalizeProgram(raw: any): Program {
+function normalizeProgram(raw: unknown): Program {
+  const r = raw as Record<string, unknown> | null | undefined;
   return {
-    _id: String(raw?._id ?? generateId()),
-    userId: String(raw?.userId ?? USER_ID),
-    name: typeof raw?.name === "string" ? raw.name : "Untitled Program",
-    exercises: normalizeExercises(Array.isArray(raw?.exercises) ? raw.exercises : [], generateId),
-    pinned: typeof raw?.pinned === "boolean" ? raw.pinned : undefined,
+    _id: String(r?._id ?? generateId()),
+    userId: String(r?.userId ?? USER_ID),
+    name: typeof r?.name === "string" ? r.name : "Untitled Program",
+    exercises: normalizeExercises(Array.isArray(r?.exercises) ? (r.exercises as any[]) : [], generateId),
+    pinned: typeof r?.pinned === "boolean" ? r.pinned : undefined,
     createdAt:
-      typeof raw?.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
+      typeof r?.createdAt === "string" ? r.createdAt : new Date().toISOString(),
     updatedAt:
-      typeof raw?.updatedAt === "number" && Number.isFinite(raw.updatedAt)
-        ? raw.updatedAt
+      typeof r?.updatedAt === "number" && Number.isFinite(r.updatedAt)
+        ? r.updatedAt
         : Date.now(),
     deletedAt:
-      typeof raw?.deletedAt === "number" || raw?.deletedAt === null
-        ? raw.deletedAt
+      typeof r?.deletedAt === "number" || r?.deletedAt === null
+        ? r.deletedAt
         : undefined,
   };
 }

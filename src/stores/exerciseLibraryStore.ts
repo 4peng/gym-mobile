@@ -16,16 +16,17 @@ interface ExerciseLibraryActions {
   updateCustomExerciseMuscles: (id: string, muscles: MuscleGroup[]) => void;
 }
 
-function normalizeCustomExercise(raw: any): ExerciseDefinition | null {
-  const name = typeof raw?.name === "string" ? raw.name.trim() : "";
-  const id = typeof raw?.id === "string" ? raw.id.trim() : "";
+function normalizeCustomExercise(raw: unknown): ExerciseDefinition | null {
+  const r = raw as Record<string, unknown> | null | undefined;
+  const name = typeof r?.name === "string" ? r.name.trim() : "";
+  const id = typeof r?.id === "string" ? r.id.trim() : "";
   if (!name || !id) return null;
 
   return {
     id,
     name,
-    muscles: Array.isArray(raw?.muscles) ? raw.muscles : [],
-    aliases: Array.isArray(raw?.aliases) ? raw.aliases : [],
+    muscles: Array.isArray(r?.muscles) ? (r.muscles as MuscleGroup[]) : [],
+    aliases: Array.isArray(r?.aliases) ? (r.aliases as string[]) : [],
     isCustom: true,
   };
 }

@@ -18,6 +18,7 @@ import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
+import { useShallow } from "zustand/react/shallow";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -29,9 +30,9 @@ export default function SettingsScreen() {
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const runFullSync = useSyncStore((s) => s.runFullSync);
   const forceResync = useSyncStore((s) => s.forceResync);
-  const programs = useProgramStore((s) => s.programs);
-  const history = useWorkoutSessionStore((s) => s.history);
-  const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
+  const programs = useProgramStore(useShallow((s) => s.programs));
+  const history = useWorkoutSessionStore(useShallow((s) => s.history));
+  const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
   const showDetailedMuscleGroups = useUiPreferencesStore(
     (s) => s.showDetailedMuscleGroups
   );
@@ -128,30 +129,12 @@ export default function SettingsScreen() {
   };
 
   const runMergeDiagnostic = () => {
-    const workoutId = "diag-merge-" + Date.now();
-    const base = { _id: workoutId, userId: "test", startedAt: "2026-01-01T10:00:00Z", updatedAt: 1000 };
+    const exCount = useWorkoutSessionStore.getState().runMergeDiagnostic();
     
-    const local = { ...base, exercises: [{ id: "ex-1", name: "Local Exercise", sets: [], restSeconds: 60, notes: "" }] };
-    const remote = { ...base, updatedAt: 2000, exercises: [{ id: "ex-2", name: "Remote Exercise", sets: [], restSeconds: 60, notes: "" }] };
-
-    const store = useWorkoutSessionStore.getState();
-    const originalHistory = [...store.history];
-    
-    try {
-      useWorkoutSessionStore.setState({ history: [local as any, ...originalHistory] });
-      store.applySyncMerge([remote as any], Date.now());
-      const merged = useWorkoutSessionStore.getState().history.find(w => w._id === workoutId);
-      const exCount = merged?.exercises.length || 0;
-      
-      if (exCount === 2) {
-        showAlert("Merge Diagnostic", "SUCCESS: Deep merge preserved both local and remote exercises (2 total). Your data is safe.");
-      } else {
-        showAlert("Merge Diagnostic", `FAILED: Found ${exCount} exercises. Expected 2. Data loss occurred.`);
-      }
-    } finally {
-      useWorkoutSessionStore.setState({ 
-        history: useWorkoutSessionStore.getState().history.filter(w => w._id !== workoutId) 
-      });
+    if (exCount === 2) {
+      showAlert("Merge Diagnostic", "SUCCESS: Deep merge preserved both local and remote exercises (2 total). Your data is safe.");
+    } else {
+      showAlert("Merge Diagnostic", `FAILED: Found ${exCount} exercises. Expected 2. Data loss occurred.`);
     }
   };
 

@@ -1,20 +1,9 @@
 import { Router } from 'express';
-import Workout from '../models/Workout.js';
+import { z } from 'zod';
+import { workoutSchema, batchWorkoutSchema, deleteQuerySchema, validateOrError } from '../validation/schemas.js';
+import * as workoutService from '../services/workoutService.js';
 
 const router = Router();
-
-function isIncomingWriteStale(
-  existingUpdatedAt: unknown,
-  incomingUpdatedAt: unknown
-): boolean {
-  return (
-    typeof existingUpdatedAt === 'number' &&
-    Number.isFinite(existingUpdatedAt) &&
-    typeof incomingUpdatedAt === 'number' &&
-    Number.isFinite(incomingUpdatedAt) &&
-    existingUpdatedAt > incomingUpdatedAt
-  );
-}
 
 // GET workouts for a user (with Delta Sync and Pagination support)
 router.get('/', async (req, res) => {
@@ -22,23 +11,12 @@ router.get('/', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   try {
-    const query: any = { userId: userId as string };
-    
-    if (since) {
-      // Delta Sync: Fetch everything modified since last sync (including deleted)
-      const sinceNum = parseInt(since as string, 10);
-      query.updatedAt = { $gt: Number.isFinite(sinceNum) && sinceNum > 0 ? sinceNum : 0 };
-    } else {
-      // Initial Sync: Only fetch active (non-deleted) workouts
-      query.deletedAt = null;
-    }
-
-    const mQuery = Workout.find(query).sort({ completedAt: -1, startedAt: -1 });
-
-    if (limit) mQuery.limit(parseInt(limit as string));
-    if (skip) mQuery.skip(parseInt(skip as string));
-
-    const workouts = await mQuery.exec();
+    const workouts = await workoutService.findAll(
+      userId as string,
+      limit as string | undefined,
+      skip as string | undefined,
+      since as string | undefined,
+    );
     res.json(workouts);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch workouts' });
@@ -47,27 +25,13 @@ router.get('/', async (req, res) => {
 
 // PUT (Upsert) a workout
 router.put('/', async (req, res) => {
-  const workoutData = req.body;
-  if (!workoutData._id || !workoutData.userId) {
-    return res.status(400).json({ error: '_id and userId are required' });
+  const validation = validateOrError(workoutSchema, req.body);
+  if (!validation.success) {
+    return res.status(400).json({ error: validation.error });
   }
 
   try {
-    const existing = await Workout.findOne({
-      _id: workoutData._id,
-      userId: workoutData.userId,
-    });
-
-    if (existing && isIncomingWriteStale(existing.updatedAt, workoutData.updatedAt)) {
-      return res.json(existing);
-    }
-
-    const serverUpdatedAt = Date.now();
-    const workout = await Workout.findOneAndUpdate(
-      { _id: workoutData._id, userId: workoutData.userId },
-      { ...workoutData, updatedAt: serverUpdatedAt }, // Server assigns the accepted version timestamp.
-      { upsert: true, new: true }
-    );
+    const workout = await workoutService.upsertOne(validation.data);
     res.json(workout);
   } catch (err) {
     res.status(500).json({ error: 'Failed to upsert workout' });
@@ -76,76 +40,62 @@ router.put('/', async (req, res) => {
 
 // BATCH PUT (Upsert)
 router.put('/batch', async (req, res) => {
-  const { workouts } = req.body;
-  if (!Array.isArray(workouts)) {
-    return res.status(400).json({ error: 'workouts array is required' });
+  const validation = validateOrError(batchWorkoutSchema, req.body);
+  if (!validation.success) {
+    return res.status(400).json({ error: validation.error });
   }
 
   try {
+    const { workouts } = validation.data;
     if (workouts.length === 0) {
       return res.json([]);
     }
-
-    const existingWorkouts = await Workout.find({
-      $or: workouts.map((w) => ({ _id: w._id, userId: w.userId })),
-    });
-    const existingByKey = new Map(
-      existingWorkouts.map((workout) => [`${workout.userId}:${workout._id}`, workout])
-    );
-    const serverUpdatedAt = Date.now();
-
-    const ops = workouts
-      .filter((workout) => {
-        const existing = existingByKey.get(`${workout.userId}:${workout._id}`);
-        return !existing || !isIncomingWriteStale(existing.updatedAt, workout.updatedAt);
-      })
-      .map((workout) => ({
-        updateOne: {
-          filter: { _id: workout._id, userId: workout.userId },
-          update: { ...workout, updatedAt: serverUpdatedAt },
-          upsert: true,
-        },
-      }));
-
-    if (ops.length > 0) {
-      await Workout.bulkWrite(ops);
-    }
-
-    const updated = await Workout.find({
-      $or: workouts.map((w) => ({ _id: w._id, userId: w.userId })),
-    });
+    const updated = await workoutService.batchUpsert(workouts);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Failed to batch upsert workouts' });
   }
 });
 
+// DELETE /batch — Soft delete multiple workouts in one bulkWrite
+router.delete('/batch', async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array is required' });
+  }
+
+  const userValidation = validateOrError(deleteQuerySchema, { userId: req.query.userId ?? req.headers['x-user-id'] });
+  if (!userValidation.success) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  try {
+    const count = await workoutService.softDeleteBatch(ids, userValidation.data.userId);
+    res.json({ ok: true, deleted: count });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to batch delete workouts' });
+  }
+});
+
 // DELETE a workout (Soft Delete)
 router.delete('/:id', async (req, res) => {
-  try {
-    const requestedUserId =
-      typeof req.query.userId === 'string'
-        ? req.query.userId
-        : typeof req.headers['x-user-id'] === 'string'
-          ? req.headers['x-user-id']
-          : undefined;
-    const filter: Record<string, string> = { _id: req.params.id };
-    if (requestedUserId) {
-      filter.userId = requestedUserId;
-    }
+  const userValidation = validateOrError(deleteQuerySchema, {
+    userId: typeof req.query.userId === 'string'
+      ? req.query.userId
+      : typeof req.headers['x-user-id'] === 'string'
+        ? req.headers['x-user-id']
+        : undefined,
+  });
+  if (!userValidation.success) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
 
-    const updated = await Workout.findOneAndUpdate(
-      filter,
-      {
-        deletedAt: Date.now(),
-        updatedAt: Date.now()
-      },
-      { new: true }
-    );
+  try {
+    const updated = await workoutService.softDelete(req.params.id, userValidation.data.userId);
     if (!updated) {
       return res.status(404).json({ error: 'Workout not found' });
     }
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to soft delete workout' });
   }

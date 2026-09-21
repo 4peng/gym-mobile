@@ -36,6 +36,7 @@ import {
 } from "@/utils/restTimerLiveActivity";
 import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
+import { nextLocalUpdatedAt } from "@/utils/timestamps";
 
 // ──────────────────────────────────────────────
 // Constants for Optimization
@@ -166,6 +167,9 @@ interface WorkoutSessionActions {
    */
   applySyncMerge: (remote: WorkoutSession[], syncStartTime: number) => void;
 
+  /** Runs a merge diagnostic: injects test sessions, merges, returns exercise count, cleans up. */
+  runMergeDiagnostic: () => number;
+
   /**
    * Append workouts fetched from backend that are not present locally.
    */
@@ -201,11 +205,6 @@ function createEmptySetsFromTemplates(
   initialWeight: number | null = null
 ): WorkoutSet[] {
   return templates.map((t) => createEmptySet(trackingMode, initialWeight, t.type));
-}
-
-function nextLocalUpdatedAt(lastSyncedAt: number | null): number {
-  const now = Date.now();
-  return typeof lastSyncedAt === "number" ? Math.max(now, lastSyncedAt + 1) : now;
 }
 
 // ──────────────────────────────────────────────
@@ -447,7 +446,7 @@ function normalizePersistedWorkoutState(
         .filter((s): s is WorkoutSession => s !== null)
     : [];
 
-  const activeSession = normalizePersistedWorkoutSession(state?.activeSession as any);
+  const activeSession = normalizePersistedWorkoutSession(state?.activeSession);
   const historyIndex = Array.isArray(state?.historyIndex)
     ? state!.historyIndex.map((id) => String(id))
     : history.map((h) => h._id);
@@ -1469,6 +1468,7 @@ export const useWorkoutSessionStore = create<
 
       applySyncMerge: (remote, syncStartTime) => {
         let deletedSessionIds: string[] = [];
+        let shardsToSave: WorkoutSession[] = [];
         set((state) => {
           if (remote.length === 0) {
             state.lastSyncedAt = syncStartTime;
@@ -1481,7 +1481,7 @@ export const useWorkoutSessionStore = create<
 
           const remoteMap = new Map(remote.map((w) => [w._id, w]));
           let historyChanged = false;
-          const shardsToSave: WorkoutSession[] = [];
+          shardsToSave = [];
           const deletedIds = new Set<string>();
           // How many sessions are currently paged into RAM. A full sync
           // (since=undefined) returns the ENTIRE history; we must not keep all
@@ -1553,10 +1553,6 @@ export const useWorkoutSessionStore = create<
             }
           }
 
-          if (shardsToSave.length > 0) {
-            workoutStorage.saveBatch(shardsToSave);
-          }
-
           state.lastSyncedAt = syncStartTime;
           state.isDirty =
             state.dirtyWorkoutIds.length > 0 ||
@@ -1567,6 +1563,10 @@ export const useWorkoutSessionStore = create<
           // discovers that case once local shards are exhausted.
           state.hasMoreHistory = state.historyIndex.length > state.history.length;
         });
+
+        if (shardsToSave.length > 0) {
+          void workoutStorage.saveBatch(shardsToSave);
+        }
 
         if (deletedSessionIds.length > 0) {
           void workoutStorage.removeBatch(deletedSessionIds);
@@ -1595,6 +1595,64 @@ export const useWorkoutSessionStore = create<
             state.history.sort(byCompletedAtDesc);
           }
         });
+      },
+
+      runMergeDiagnostic: () => {
+        const workoutId = "diag-merge-" + Date.now();
+        const base: WorkoutSession = {
+          _id: workoutId,
+          userId: "test",
+          startedAt: "2026-01-01T10:00:00Z",
+          updatedAt: 1000,
+          notes: "",
+          exercises: [],
+        };
+
+        const local: WorkoutSession = {
+          ...base,
+          exercises: [{
+            id: "ex-1",
+            name: "Local Exercise",
+            trackingMode: "strength",
+            sets: [],
+            restSeconds: 60,
+            notes: "",
+            muscles: [],
+          }],
+        };
+
+        const remote: WorkoutSession = {
+          ...base,
+          updatedAt: 2000,
+          exercises: [{
+            id: "ex-2",
+            name: "Remote Exercise",
+            trackingMode: "strength",
+            sets: [],
+            restSeconds: 60,
+            notes: "",
+            muscles: [],
+          }],
+        };
+
+        // Inject local diagnostic session
+        set((state) => {
+          state.history = [local, ...state.history];
+        });
+
+        // Apply merge — remote has higher updatedAt so it should win/last-write-wins
+        get().applySyncMerge([remote], Date.now());
+
+        // Check merged result
+        const merged = get().history.find((w) => w._id === workoutId);
+        const exCount = merged?.exercises.length || 0;
+
+        // Clean up diagnostic session
+        set((state) => {
+          state.history = state.history.filter((w) => w._id !== workoutId);
+        });
+
+        return exCount;
       },
     })),
     {

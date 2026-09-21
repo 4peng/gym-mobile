@@ -25,11 +25,10 @@ export async function syncPrograms(): Promise<boolean> {
   const store = useProgramStore.getState();
 
   if (store.deletedProgramIds.length > 0) {
-    const deletedSuccessfully = [];
-    for (const id of store.deletedProgramIds) {
-      const ok = await deleteRemoteProgram(id);
-      if (ok) deletedSuccessfully.push(id);
-    }
+    const results = await Promise.all(
+      store.deletedProgramIds.map((id) => deleteRemoteProgram(id))
+    );
+    const deletedSuccessfully = store.deletedProgramIds.filter((_, i) => results[i]);
     if (deletedSuccessfully.length > 0) {
       useProgramStore.getState().clearDeletedPrograms(deletedSuccessfully);
     }
@@ -84,11 +83,10 @@ export async function syncWorkouts(): Promise<boolean> {
   const store = useWorkoutSessionStore.getState();
 
   if (store.deletedWorkoutIds.length > 0) {
-    const deletedSuccessfully = [];
-    for (const id of store.deletedWorkoutIds) {
-      const ok = await deleteRemoteWorkout(id);
-      if (ok) deletedSuccessfully.push(id);
-    }
+    const results = await Promise.all(
+      store.deletedWorkoutIds.map((id) => deleteRemoteWorkout(id))
+    );
+    const deletedSuccessfully = store.deletedWorkoutIds.filter((_, i) => results[i]);
     if (deletedSuccessfully.length > 0) {
       useWorkoutSessionStore.getState().clearDeletedWorkouts(deletedSuccessfully);
     }

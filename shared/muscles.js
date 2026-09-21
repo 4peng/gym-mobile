@@ -1,3 +1,13 @@
+/**
+ * Shared muscle-group catalog and labeling utilities.
+ *
+ * IMPORTANT: This module is currently client-only (mobile + web). The server
+ * has its own independent Mongoose schemas in server/src/models/. Both the
+ * client-side muscle lists here AND the server-side enum/schema must be kept
+ * in sync — any new muscle group added here needs a corresponding update in
+ * the server's validation and schema.
+ */
+
 export const PRIMARY_MUSCLE_GROUPS = [
   "chest",
   "shoulder",

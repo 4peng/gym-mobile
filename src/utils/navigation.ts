@@ -17,8 +17,8 @@ export interface AppRouter {
 export function useAppRouter(): AppRouter {
   const router = useRouter();
   return {
-    push: (href: string) => router.push(href as any),
-    replace: (href: string) => router.replace(href as any),
+    push: (href: string) => router.push(href as `${string}`),
+    replace: (href: string) => router.replace(href as `${string}`),
     back: () => router.back(),
   };
 }

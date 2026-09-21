@@ -48,6 +48,19 @@ export async function upsertWorkout(
 /**
  * Push multiple completed workouts at once (batch upsert).
  */
+/**
+ * Batch delete workouts on the backend by their IDs.
+ */
+export async function batchDeleteWorkouts(
+  ids: string[]
+): Promise<boolean> {
+  const res = await apiRequest(`/workouts/batch`, {
+    method: "DELETE",
+    body: JSON.stringify({ ids }),
+  });
+  return res.ok;
+}
+
 export async function batchUpsertWorkouts(
   workouts: WorkoutSession[]
 ): Promise<WorkoutSession[] | null> {

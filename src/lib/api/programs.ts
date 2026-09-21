@@ -55,6 +55,19 @@ export async function deleteRemoteProgram(
  * Push multiple programs at once (batch upsert).
  * Returns the list of successfully synced programs from the server.
  */
+/**
+ * Batch delete programs on the backend by their IDs.
+ */
+export async function batchDeletePrograms(
+  ids: string[]
+): Promise<boolean> {
+  const res = await apiRequest(`/programs/batch`, {
+    method: "DELETE",
+    body: JSON.stringify({ ids }),
+  });
+  return res.ok;
+}
+
 export async function batchUpsertPrograms(
   programs: Program[]
 ): Promise<Program[] | null> {

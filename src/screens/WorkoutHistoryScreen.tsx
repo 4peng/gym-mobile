@@ -34,6 +34,7 @@ import {
 } from "@/stores/workoutHistoryStore";
 import { useProgramStore } from "@/stores/programStore";
 import { useSyncStore } from "@/stores/syncStore";
+import { useShallow } from "zustand/react/shallow";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -269,7 +270,7 @@ export default function WorkoutHistoryScreen() {
   const hasMoreHistoryOnServer = useHasMoreWorkoutHistory();
   const deleteHistorySession = useDeleteHistorySession();
   const fetchMoreHistory = useFetchMoreWorkoutHistory();
-  const programs = useProgramStore((s) => s.programs);
+  const programs = useProgramStore(useShallow((s) => s.programs));
   const programsById = useMemo(() => {
     const map = new Map<string, (typeof programs)[number]>();
     for (const p of programs) {

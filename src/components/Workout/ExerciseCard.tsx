@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useRef } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, LayoutAnimation, ScrollView, Dimensions } from "react-native";
 import { Trash2, Clock, StickyNote, Dumbbell, Plus, Check, User, Activity, Timer } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
+import { useShallow } from "zustand/react/shallow";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -42,7 +43,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   const toggleExerciseUnit = useWorkoutSessionStore((s) => s.toggleExerciseUnit);
   const toggleExerciseBodyweight = useWorkoutSessionStore((s) => s.toggleExerciseBodyweight);
   const selectExerciseDefinition = useWorkoutSessionStore((s) => s.selectExerciseDefinition);
-  const history = useWorkoutSessionStore((s) => s.history);
+  const history = useWorkoutSessionStore(useShallow((s) => s.history));
   const handleRestSave = useCallback((seconds: number) => { updateExerciseField(exercise.id, "restSeconds", seconds); }, [exercise.id, updateExerciseField]);
   const handleExerciseSelect = useCallback((selectedExercise: ExerciseDefinition) => { selectExerciseDefinition(exercise.id, selectedExercise); }, [exercise.id, selectExerciseDefinition]);
   const handleNotesChange = useCallback((text: string) => { updateExerciseField(exercise.id, "notes", text); }, [exercise.id, updateExerciseField]);

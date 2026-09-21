@@ -14,8 +14,9 @@ import { ExerciseCard } from "@/components/Workout/ExerciseCard";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
 import ExerciseNavMenu from "@/components/Workout/ExerciseNavMenu";
 import MuscleSelector from "@/components/MuscleSelector";
-import type { ExerciseDefinition, ProgramExercise } from "@/types";
+import type { ExerciseDefinition } from "@/types";
 import { MuscleGroup } from "@/constants/muscles";
+import { sessionExercisesToProgramExercises } from "@/utils/workoutToProgram";
 
 // Modular HUD Components
 import { HUDHeader } from "@/components/Workout/HUD/HUDHeader";
@@ -56,6 +57,13 @@ const [routineNameDefault, setRoutineNameDefault] = useState("");
   const scrubberScrollRef = useRef<ScrollView>(null);
   const isFirstScrubRender = useRef(true);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollHandler = useMemo(
+    () => Animated.event(
+      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+      { useNativeDriver: true }
+    ),
+    [scrollY]
+  );
 
   const currentExercise = useWorkoutSessionStore((s) => s.activeSession?.exercises.find(e => e.id === activeExerciseId));
   const musclePickerExercise = useWorkoutSessionStore((s) => s.activeSession?.exercises.find(e => e.id === musclePicker.exerciseId));
@@ -96,20 +104,7 @@ const [routineNameDefault, setRoutineNameDefault] = useState("");
   const handleSaveRoutine = useCallback((name: string) => {
     const session = useWorkoutSessionStore.getState().activeSession;
     if (session) {
-      const programExercises: ProgramExercise[] = session.exercises.map((ex): ProgramExercise => ({
-        id: ex.id,
-        exerciseDefinitionId: ex.exerciseDefinitionId || "",
-        trackingMode: ex.trackingMode,
-        name: ex.name,
-        defaultSets: ex.sets.map((s) => ({ type: s.type || "working" })),
-        restSeconds: ex.restSeconds,
-        notes: ex.notes,
-        weightUnit: ex.weightUnit,
-        initialWeight: ex.sets[0]?.weight ?? null,
-        muscles: ex.muscles,
-        isBodyweight: ex.isBodyweight,
-      }));
-      addProgram(name, programExercises);
+      addProgram(name, sessionExercisesToProgramExercises(session.exercises));
     }
     setRoutineNamePrompt(false);
     handleFinishConfirmed();
@@ -161,7 +156,7 @@ const [routineNameDefault, setRoutineNameDefault] = useState("");
       <View style={styles.container}>
         <HUDHeader scrollY={scrollY} startedAt={startedAt} progressData={progressData} condenseThreshold={CONDENSE_THRESHOLD} />
         
-        <Animated.ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })} scrollEventThrottle={16}>
+        <Animated.ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true} onScroll={scrollHandler} scrollEventThrottle={16}>
           <View style={styles.mainFocus}>{currentExercise ? (<ExerciseCard exercise={currentExercise} key={currentExercise.id} onMusclePickerOpen={handleMusclePickerOpen} />) : (<View style={styles.noExercise}><Text style={styles.noExerciseText}>NO EXERCISES ADDED</Text><Pressable style={UI.SHARED.iconBtn} onPress={() => setExercisePickerVisible(true)}><Plus size={20} color={COLORS.ACCENT_BLUE} /></Pressable></View>)}</View>
           <View style={{ height: 120 }} />
         </Animated.ScrollView>

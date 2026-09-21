@@ -14,6 +14,7 @@ import { useAppRouter } from "@/utils/navigation";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { workoutStorage } from "@/storage/workoutStorage";
+import { useShallow } from "zustand/react/shallow";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -108,9 +109,9 @@ const MiniChart = ({ data }: { data: number[] }) => {
 
 export default function ExerciseListStatsScreen() {
   const router = useAppRouter();
-  const rawHistory = useWorkoutSessionStore((s) => s.history);
-  const historyIndex = useWorkoutSessionStore((s) => s.historyIndex);
-  const pinnedExerciseNamesRaw = useWorkoutSessionStore((s) => s.pinnedExerciseNames);
+  const rawHistory = useWorkoutSessionStore(useShallow((s) => s.history));
+  const historyIndex = useWorkoutSessionStore(useShallow((s) => s.historyIndex));
+  const pinnedExerciseNamesRaw = useWorkoutSessionStore(useShallow((s) => s.pinnedExerciseNames));
   const pinnedExerciseNames = useMemo(
     () => pinnedExerciseNamesRaw || [],
     [pinnedExerciseNamesRaw]

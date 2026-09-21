@@ -1,12 +1,23 @@
 import { buildActivitySummary, formatDurationMinutes } from "@/utils/activitySummary";
 import type { WorkoutSession } from "@/types";
 
-// Pins down current bucketing/aggregation behavior of buildActivitySummary for
-// week/month/year, plus formatDurationMinutes's rounding rules. Dates are all
-// passed explicitly (never Date.now()) so this is deterministic regardless of
-// when it runs. Verified against the actual runner's local timezone
-// (GMT+0800) at the time these were written - fixed local `now` values are
-// used throughout, matching how the app always calls this with `new Date()`.
+// Timezone-independent test helpers:
+// The key values emitted by buildActivitySummary are `startOfDay(date).getTime()`
+// which depends on the local timezone. Instead of hardcoding timestamps that
+// only work in one timezone (like GMT+0800), we compute expected keys using the
+// same `startOfDay` logic. This makes every assertion timezone-agnostic.
+
+function startOfDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function shiftDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
 
 function session(id: string, startedAt: string, completedAt: string): WorkoutSession {
   return {
@@ -48,6 +59,9 @@ describe("buildActivitySummary - week mode", () => {
   const now = new Date(2026, 0, 15, 12, 0, 0, 0); // Thu Jan 15 2026, local noon
 
   it("buckets sessions into 7 daily points from 6-days-ago through today", () => {
+    const rangeStart = startOfDay(shiftDays(now, -6));
+    const day6 = startOfDay(shiftDays(rangeStart, 6));
+
     const history: WorkoutSession[] = [
       session("a", "2026-01-15T09:00:00.000", "2026-01-15T10:00:00.000"), // today, 60 min
       session("b", "2026-01-09T09:00:00.000", "2026-01-09T09:30:00.000"), // 6 days ago (range start), 30 min
@@ -57,9 +71,9 @@ describe("buildActivitySummary - week mode", () => {
     const summary = buildActivitySummary(history, "week", now);
 
     expect(summary.points).toHaveLength(7);
-    expect(summary.points[0]).toEqual({ key: "1767888000000", label: "Fri", minutes: 30 });
+    expect(summary.points[0]).toEqual({ key: `${rangeStart.getTime()}`, label: "Fri", minutes: 30 });
     expect(summary.points.slice(1, 6).every((p) => p.minutes === 0)).toBe(true);
-    expect(summary.points[6]).toEqual({ key: "1768406400000", label: "Thu", minutes: 60 });
+    expect(summary.points[6]).toEqual({ key: `${day6.getTime()}`, label: "Thu", minutes: 60 });
 
     expect(summary.totalMinutes).toBe(90);
     expect(summary.sessions).toBe(2); // session "c" excluded as out of range
@@ -84,6 +98,8 @@ describe("buildActivitySummary - month mode", () => {
   const now = new Date(2026, 0, 15, 12, 0, 0, 0);
 
   it("buckets sessions into 4 weekly points over the trailing 28 days", () => {
+    const rangeStart = startOfDay(shiftDays(now, -27));
+
     const history: WorkoutSession[] = [
       session("a", "2026-01-15T09:00:00.000", "2026-01-15T10:00:00.000"), // last bucket, 60 min
       session("b", "2025-12-20T09:00:00.000", "2025-12-20T09:45:00.000"), // first bucket, 45 min
@@ -91,11 +107,15 @@ describe("buildActivitySummary - month mode", () => {
 
     const summary = buildActivitySummary(history, "month", now);
 
+    const expectedKeys = [0, 1, 2, 3].map((i) =>
+      `${startOfDay(shiftDays(rangeStart, i * 7)).getTime()}`
+    );
+
     expect(summary.points).toHaveLength(4);
-    expect(summary.points[0]).toEqual({ key: "1766073600000", label: "Dec 19", minutes: 45 });
-    expect(summary.points[1]).toEqual({ key: "1766678400000", label: "Dec 26", minutes: 0 });
-    expect(summary.points[2]).toEqual({ key: "1767283200000", label: "Jan 2", minutes: 0 });
-    expect(summary.points[3]).toEqual({ key: "1767888000000", label: "Jan 9", minutes: 60 });
+    expect(summary.points[0]).toEqual({ key: expectedKeys[0], label: "Dec 19", minutes: 45 });
+    expect(summary.points[1]).toEqual({ key: expectedKeys[1], label: "Dec 26", minutes: 0 });
+    expect(summary.points[2]).toEqual({ key: expectedKeys[2], label: "Jan 2", minutes: 0 });
+    expect(summary.points[3]).toEqual({ key: expectedKeys[3], label: "Jan 9", minutes: 60 });
 
     expect(summary.totalMinutes).toBe(105);
     expect(summary.sessions).toBe(2);
@@ -116,10 +136,14 @@ describe("buildActivitySummary - year mode", () => {
 
     const summary = buildActivitySummary(history, "year", now);
 
+    // Compute expected month-start keys using the same logic as the source
+    const expectedFirstKey = `${new Date(2025, 1, 1).getTime()}`;
+    const expectedLastKey = `${new Date(now.getFullYear(), now.getMonth(), 1).getTime()}`;
+
     expect(summary.points).toHaveLength(12);
-    expect(summary.points[0]).toEqual({ key: "1738339200000", label: "Feb", minutes: 45 });
+    expect(summary.points[0]).toEqual({ key: expectedFirstKey, label: "Feb", minutes: 45 });
     expect(summary.points[summary.points.length - 1]).toEqual({
-      key: "1767196800000",
+      key: expectedLastKey,
       label: "Jan",
       minutes: 60,
     });

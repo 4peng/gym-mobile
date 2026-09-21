@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      # Every check runs even after an earlier one fails, so a single run
+      # reports the whole backlog instead of one failure at a time.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+      - name: Format check
+        if: ${{ !cancelled() }}
+        run: npm run format:check
+
+      - name: Typecheck (app)
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
+
+      - name: Typecheck (server)
+        if: ${{ !cancelled() }}
+        working-directory: server
+        run: npx tsc --noEmit
+
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: npm test

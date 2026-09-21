@@ -1,4 +1,14 @@
+// ──────────────────────────────────────────────
+// Program Mongoose model
+// CANONICAL EXERCISE NORMALIZATION: shared/programs.js
+// The normalizeExercise / normalizeExercises functions in shared/programs.js
+// define the canonical shape for program exercises and their defaultSets
+// (template array of { type: 'working'|'warmup'|'dropset' }). Keep this
+// schema's exercise subdoc in sync with that shared contract.
+// ──────────────────────────────────────────────
+
 import mongoose, { Schema, Document } from 'mongoose';
+import updatedAtPlugin from '../plugins/updatedAtPlugin.js';
 
 export interface IProgramSetTemplate {
   type: 'working' | 'warmup' | 'dropset';
@@ -59,34 +69,8 @@ const ProgramSchema = new Schema({
   deletedAt: { type: Number, default: null },
 }, { _id: false });
 
-function applyUpdatedAt(update: Record<string, any>, updatedAt: number) {
-  const hasMongoOperators = Object.keys(update).some((key) => key.startsWith('$'));
-  if (hasMongoOperators) {
-    update.$set = {
-      ...(update.$set ?? {}),
-      updatedAt,
-    };
-    return;
-  }
-
-  update.updatedAt = updatedAt;
-}
-
-ProgramSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-for (const operation of ['findOneAndUpdate', 'updateOne', 'updateMany', 'replaceOne'] as const) {
-  ProgramSchema.pre(operation, function(next) {
-    const update = this.getUpdate();
-    if (update && typeof update === 'object' && !Array.isArray(update)) {
-      applyUpdatedAt(update as Record<string, any>, Date.now());
-      this.setUpdate(update);
-    }
-    next();
-  });
-}
+ProgramSchema.plugin(updatedAtPlugin);
+ProgramSchema.index({ userId: 1, updatedAt: 1 });
 
 // Export the model (resetting it to ensure schema update)
 if (mongoose.models.Program) {

@@ -6,8 +6,12 @@
 // `runFullSync` action the UI can call directly.
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WORKOUT_STATS_KEY } from "@/storage/workoutStatsStorage";
+import { runFullSync as engineRunFullSync } from "@/lib/api/sync";
+import { useProgramStore } from "@/stores/programStore";
+import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 
 const APP_STORAGE_KEYS = [
   "program-store",
@@ -47,9 +51,6 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
   lastSyncSuccess: null,
 
   runFullSync: async (manual = false) => {
-    // Dynamic import inside the function to break circular dependencies
-    const { runFullSync: engineRunFullSync } = await import("@/lib/api/sync");
-
     if (get().isSyncing) return false;
 
     set({ 
@@ -62,26 +63,23 @@ export const useSyncStore = create<SyncState & SyncActions>()((set, get) => ({
       const success = await engineRunFullSync();
       set({ isSyncing: false, isManualSync: false, lastSyncSuccess: success });
       return success;
-    } catch {
+    } catch (err) {
+      console.error("Full sync failed:", err);
       set({ isSyncing: false, isManualSync: false, lastSyncSuccess: false });
       return false;
     }
   },
 
   backgroundSync: async () => {
-    const { runFullSync: engineRunFullSync } = await import("@/lib/api/sync");
     try {
       return await engineRunFullSync();
-    } catch {
+    } catch (err) {
+      console.error("Background sync failed:", err);
       return false;
     }
   },
 
   forceResync: async () => {
-    const { useProgramStore } = await import("./programStore");
-    const { useWorkoutSessionStore } = await import("./workoutSessionStore");
-    const { runFullSync: engineRunFullSync } = await import("@/lib/api/sync");
-
     if (get().isSyncing) return false;
     set({ isSyncing: true, isManualSync: true, lastSyncAttempt: Date.now() });
 

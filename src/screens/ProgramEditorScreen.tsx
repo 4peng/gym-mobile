@@ -9,6 +9,7 @@ import { generateId } from "@/utils/id";
 import { COLORS } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import RoutineEditorScreen, { type RoutineDraft } from "@/components/RoutineEditorScreen";
+import type { ExerciseFormData } from "@/components/ExerciseEditor";
 import type { Program, ProgramExercise } from "@/types";
 
 type ProgramEditorVariant = "create" | "edit";
@@ -20,7 +21,7 @@ interface ProgramEditorScreenProps {
 function toProgramUpdates(draft: RoutineDraft): Partial<Program> {
   return {
     name: draft.name,
-    exercises: normalizeExercises(draft.exercises as any) as any as ProgramExercise[],
+    exercises: normalizeExercises(draft.exercises) as ProgramExercise[],
   };
 }
 
@@ -69,10 +70,10 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
 
   const initialExercises = useMemo(() => {
     if (variant === "edit") {
-      return normalizeExercises(program?.exercises as any) as any;
+      return normalizeExercises(program?.exercises as ProgramExercise[]) as ExerciseFormData[];
     }
 
-    return copyExercises(sourceProgram?.exercises as any, generateId) as any;
+    return copyExercises(sourceProgram?.exercises as ProgramExercise[], generateId) as ExerciseFormData[];
   }, [program, sourceProgram, variant]);
 
   const applyUpdate = useCallback((draft: RoutineDraft): Program | null => {
@@ -91,11 +92,12 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
       if (variant === "edit") {
         applyUpdate(draft);
       } else {
-        addProgram(draft.name, copyExercises(draft.exercises as any, generateId) as any);
+        addProgram(draft.name, copyExercises(draft.exercises, generateId) as ProgramExercise[]);
       }
 
       router.back();
-    } catch {
+    } catch (err) {
+      console.error("Program save failed:", err);
       showAlert("Error", "An unexpected error occurred while saving.");
     }
   }, [addProgram, applyUpdate, router, variant]);
@@ -120,7 +122,8 @@ export default function ProgramEditorScreen({ variant }: ProgramEditorScreenProp
 
       startFromProgram(nextProgram);
       router.replace("/workout");
-    } catch {
+    } catch (err) {
+      console.error("Program save and start failed:", err);
       showAlert("Error", "An unexpected error occurred while saving.");
     }
   }, [activeSession, applyUpdate, router, startFromProgram]);

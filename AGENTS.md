@@ -89,6 +89,11 @@ Expo Router workout tracker with Express + Mongo backend. Core: routine creation
 - `cd server && npm run build && npm start`: backend prod
 - `cd server && npm run seed:year` / `seed:4day-split`: seed data
 
+## CI
+- `.github/workflows/ci.yml`: quality gate on every push/PR — `lint`, `format:check`, `typecheck`, server `tsc --noEmit`, `test`. Steps use `if: !cancelled()` so one run reports every failure, not just the first.
+- `.github/workflows/ios-build.yml`: IPA build + release, `main` only. Not a gate.
+- Root `tsconfig.json` covers `app/` and `src/` only; `server/` is typechecked via its own tsconfig, `shared/` by neither.
+
 ## Coding Style
 - TypeScript strict, 2-space indent
 - PascalCase: components/screens; camelCase: stores/utils

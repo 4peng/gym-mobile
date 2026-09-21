@@ -24,6 +24,7 @@ import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useSyncStore } from "@/stores/syncStore";
+import { useShallow } from "zustand/react/shallow";
 import { COLORS, withAlpha } from "@/constants/colors";
 import { FONT_FAMILIES } from "@/constants/fonts";
 import { UI } from "@/constants/ui";
@@ -43,9 +44,9 @@ export default function ProgramsListScreen() {
   const activeSession = useWorkoutSessionStore((s) => s.activeSession);
   const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
   const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
-  const allHistory = useWorkoutSessionStore((s) => s.history);
+  const allHistory = useWorkoutSessionStore(useShallow((s) => s.history));
 
-  const allPrograms = useProgramStore((s) => s.programs);
+  const allPrograms = useProgramStore(useShallow((s) => s.programs));
   const deleteProgram = useProgramStore((s) => s.deleteProgram);
   const togglePin = useProgramStore((s) => s.togglePin);
 

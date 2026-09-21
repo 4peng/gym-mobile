@@ -49,7 +49,7 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
       if (typeof e.defaultSets === "number") {
         defaultSets = Array.from({ length: e.defaultSets }, () => ({ type: "working" }));
       } else if (Array.isArray(e.defaultSets)) {
-        defaultSets = (e.defaultSets as any[]).map(s => ({
+        defaultSets = e.defaultSets.map(s => ({
           type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working"
         }));
       } else {

@@ -11,18 +11,21 @@
     "seed:year": "tsx scripts/seed_year_training.ts",
     "seed:year:remove": "tsx scripts/remove_seed_year_training.ts",
     "seed:4day-split": "tsx scripts/seed_4_day_split.ts",
-    "seed:4day-split:remove": "tsx scripts/remove_seed_4_day_split.ts"
+    "seed:4day-split:remove": "tsx scripts/remove_seed_4_day_split.ts",
+    "db:clear": "tsx clear_db.ts",
+    "db:diag": "tsx diag_db.ts",
+    "test": "echo \"No server tests configured yet. Run seed:* scripts to verify.\""
   },
   "dependencies": {
-    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
-    "cross-env": "^10.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.6.0",
     "helmet": "^7.1.0",
     "mongoose": "^8.3.0",
     "morgan": "^1.10.0",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -31,5 +34,9 @@
     "@types/node": "^20.12.7",
     "nodemon": "^3.1.0",
     "typescript": "^5.4.5"
+  },
+  "overrides": {
+    "path-to-regexp": ">=0.1.13",
+    "picomatch": ">=4.0.4"
   }
 }

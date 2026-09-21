@@ -1,7 +1,8 @@
+import { useShallow } from "zustand/react/shallow";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 
 export const useWorkoutHistory = () =>
-  useWorkoutSessionStore((state) => state.history);
+  useWorkoutSessionStore(useShallow((state) => state.history));
 
 export const useHasMoreWorkoutHistory = () =>
   useWorkoutSessionStore((state) => state.hasMoreHistory);

@@ -1,3 +1,13 @@
+/**
+ * Shared program/routine utilities.
+ *
+ * IMPORTANT: This module is currently client-only (mobile + web). The server
+ * has its own independent Mongoose schemas in server/src/models/ for programs
+ * and workouts. Both the client normalization here AND the server schemas must
+ * be kept in sync — any structural change to exercises, sets, or tracking
+ * modes needs a corresponding update in the server models.
+ */
+
 export const DEFAULT_EXERCISE_SETS = [{ type: "working" }, { type: "working" }, { type: "working" }];
 export const DEFAULT_EXERCISE_REST_SECONDS = 90;
 export const DEFAULT_WEIGHT_UNIT = "kg";
@@ -17,7 +27,7 @@ function normalizeWholeNumber(value, fallback, minimum) {
   return rounded < minimum ? minimum : rounded;
 }
 
-function normalizeSets(sets) {
+export function normalizeSets(sets) {
   if (Array.isArray(sets)) {
     return sets.map((s) => ({
       type: s?.type === "warmup" || s?.type === "dropset" ? s.type : "working",

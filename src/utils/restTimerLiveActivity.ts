@@ -75,7 +75,8 @@ async function getRestTimerActivity() {
   try {
     const module = await import("@/widgets/RestTimerLiveActivity");
     return module.default;
-  } catch {
+  } catch (err) {
+    console.error("getRestTimerActivity error:", err);
     return null;
   }
 }
@@ -93,8 +94,8 @@ export async function startRestTimerLiveActivity(
       await instance.end("immediate", props, new Date());
     }
     activity.start(props, "gym-mobile://workout");
-  } catch {
-    // Live Activities are best-effort; the in-app timer and local notification remain canonical.
+  } catch (err) {
+    console.error("startRestTimerLiveActivity error:", err);
   }
 }
 
@@ -111,8 +112,8 @@ export async function updateRestTimerLiveActivity(
     if (instance) {
       await instance.update(props);
     }
-  } catch {
-    // Best-effort native surface.
+  } catch (err) {
+    console.error("updateRestTimerLiveActivity error:", err);
   }
 }
 
@@ -126,7 +127,7 @@ export async function endRestTimerLiveActivity(
     for (const instance of activity.getInstances()) {
       await instance.end("immediate", props ?? undefined, new Date());
     }
-  } catch {
-    // Best-effort native surface.
+  } catch (err) {
+    console.error("endRestTimerLiveActivity error:", err);
   }
 }
