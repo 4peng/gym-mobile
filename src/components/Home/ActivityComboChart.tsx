@@ -140,13 +140,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   axisText: {
-    ...TYPE.monoSmall,
-    fontSize: 9,
-    color: COLORS.TEXT_TERTIARY,
+    ...TYPE.label,
+    letterSpacing: 0,
+    textTransform: "none",
     paddingLeft: SPACE.xs,
     zIndex: 10,
   },
   labels: { position: "absolute", left: 0, right: 0, bottom: SPACE.sm + 2, height: 16 },
   label: { position: "absolute", alignItems: "center" },
-  labelText: { fontSize: 11, color: COLORS.TEXT_TERTIARY, textAlign: "center" },
+  labelText: { color: COLORS.TEXT_TERTIARY, textAlign: "center" },
 });

@@ -16,7 +16,7 @@ interface ProgramTileProps {
   onToggleScroll: (enabled: boolean) => void;
 }
 
-const formatLastUsed = (lastUsedAt?: number) =>
+export const formatLastUsed = (lastUsedAt?: number) =>
   lastUsedAt
     ? new Date(lastUsedAt)
         .toLocaleDateString("en-US", { month: "short", day: "numeric" })
@@ -53,7 +53,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
             <Text style={[TYPE.label, program.pinned && { color: COLORS.ACCENT_BLUE }]}>
               {program.pinned ? "Pinned" : "Routine"}
             </Text>
-            <Text style={[TYPE.label, { color: COLORS.BORDER_LIGHT }]}>/</Text>
+            <Text style={[TYPE.label, { color: COLORS.TEXT_TERTIARY }]}>/</Text>
             <Text style={TYPE.label}>{String(count).padStart(2, "0")} ex</Text>
           </View>
           {program.pinned ? (
@@ -96,7 +96,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 
 const styles = StyleSheet.create({
   card: { padding: SPACE.lg, gap: SPACE.md },
-  name: { ...TYPE.title, fontSize: 24, lineHeight: 26 },
+  name: { ...TYPE.titleSm, lineHeight: 24 },
   meta: { flexDirection: "row", gap: SPACE.md },
   metaCell: {
     flex: 1,

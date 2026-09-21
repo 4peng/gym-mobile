@@ -69,7 +69,6 @@ beforeEach(() => {
     activeSession: null,
     activeRestTimer: null,
     pinnedExerciseNames: [],
-    activeExerciseId: null,
     dirtyWorkoutIds: [],
     deletedWorkoutIds: [],
   });
@@ -82,10 +81,9 @@ describe("session lifecycle", () => {
     const s = store().activeSession!;
     expect(s.exercises).toEqual([]);
     expect(s.userId).toBe("default-user");
-    expect(store().activeExerciseId).toBeNull();
   });
 
-  it("startFromProgram expands set templates and focuses the first exercise", () => {
+  it("startFromProgram expands set templates", () => {
     const program: Program = {
       _id: "p1",
       userId: "test-user",
@@ -113,7 +111,6 @@ describe("session lifecycle", () => {
     expect(ex.sets[0].weight).toBe(60);
     expect(ex.programExerciseId).toBe("pe1");
     expect(store().activeSession!.programId).toBe("p1");
-    expect(store().activeExerciseId).toBe(ex.id);
   });
 
   it("completeSession stores only completed sets, drops empty exercises, and marks the session dirty", () => {
@@ -186,6 +183,25 @@ describe("exercise defaults from history", () => {
     expect(ex.weightUnit).toBe("lbs");
     expect(ex.sets[0].durationSeconds).toBeNull();
     expect(ex.sets[0].weight).toBeNull();
+  });
+
+  it("toggleExerciseUnit converts every set's weight, completed or not", () => {
+    store().startQuickSession();
+    store().addExercise({ id: "squat", name: "Squat", muscles: ["quads"] });
+    const ex = store().activeSession!.exercises[0];
+    store().updateSet(ex.id, ex.sets[0].id, "weight", 100);
+    store().toggleSetCompletion(ex.id, ex.sets[0].id);
+    store().updateSet(ex.id, ex.sets[1].id, "weight", 60);
+
+    store().toggleExerciseUnit(ex.id);
+    let sets = store().activeSession!.exercises[0].sets;
+    expect(store().activeSession!.exercises[0].weightUnit).toBe("lbs");
+    expect(sets.map((s) => s.weight)).toEqual([220.5, 132.5, null]);
+
+    store().toggleExerciseUnit(ex.id);
+    sets = store().activeSession!.exercises[0].sets;
+    expect(store().activeSession!.exercises[0].weightUnit).toBe("kg");
+    expect(sets.map((s) => s.weight)).toEqual([100, 60.1, null]);
   });
 
   it("toggleSetType cycles working → warmup → dropset → working", () => {

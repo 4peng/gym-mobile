@@ -79,10 +79,10 @@ const styles = StyleSheet.create({
   backdrop: { backgroundColor: SURFACE.backdrop, opacity: 0.6 },
   menu: {
     position: "absolute",
-    backgroundColor: COLORS.BG,
+    backgroundColor: COLORS.CARD_BG,
     borderRadius: RADIUS.item,
     borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
+    borderColor: COLORS.BORDER,
     padding: SPACE.xs,
     zIndex: 1000,
   },
@@ -96,5 +96,5 @@ const styles = StyleSheet.create({
     gap: SPACE.sm,
   },
   optionSelected: { backgroundColor: SURFACE.blueTint },
-  optionText: { color: COLORS.TEXT_SECONDARY, fontSize: 11, letterSpacing: 0.5 },
+  optionText: { color: COLORS.TEXT_SECONDARY, letterSpacing: 0.5 },
 });

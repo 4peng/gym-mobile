@@ -182,7 +182,7 @@ export default function ExerciseListStatsScreen() {
         scrollEnabled={scrollEnabled}
         ListEmptyComponent={
           <EmptyState
-            icon={<BarChart2 size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />}
+            icon={<BarChart2 size={48} color={COLORS.BORDER} strokeWidth={1} />}
             title={search || selectedMuscles.length ? "No matches" : "No stats yet"}
             subtitle={search || selectedMuscles.length ? undefined : "Complete a workout first."}
           />
@@ -207,7 +207,7 @@ export default function ExerciseListStatsScreen() {
             >
               <View style={{ flex: 1, gap: SPACE.xs }}>
                 <View style={[UI.row, { gap: SPACE.sm }]}>
-                  <Text style={[TYPE.body, { fontSize: 17 }]}>{toTitleCase(item.name)}</Text>
+                  <Text style={TYPE.body}>{toTitleCase(item.name)}</Text>
                   {item.isPinned && (
                     <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
                   )}
@@ -224,7 +224,7 @@ export default function ExerciseListStatsScreen() {
                 </Text>
               </View>
               <MiniChart data={item.recentVolume} />
-              <ChevronRight size={20} color={COLORS.BORDER_LIGHT} />
+              <ChevronRight size={20} color={COLORS.BORDER} />
             </Pressable>
           </Swipeable>
         )}
@@ -240,8 +240,6 @@ const styles = StyleSheet.create({
     marginHorizontal: LAYOUT.gutter,
     marginBottom: SPACE.lg,
     paddingHorizontal: SPACE.lg,
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: RADIUS.container,
   },
   searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md, marginLeft: SPACE.sm + 2 },
   chipRow: { flexGrow: 0, marginBottom: SPACE.xl },

@@ -1,29 +1,22 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  BarChart2,
-  ChevronRight,
-  Clock3,
-  CloudUpload,
-  Play,
-  Plus,
-  Settings2,
-} from "lucide-react-native";
+import { BarChart2, ChevronRight, Clock3, Play, Plus, Settings2 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useShallow } from "zustand/react/shallow";
 import ActivityComboChart from "@/components/Home/ActivityComboChart";
+import StartWorkoutSheet from "@/components/Home/StartWorkoutSheet";
 import { ProgramTile } from "@/components/ProgramTile";
 import { IconButton } from "@/components/ui/IconButton";
+import { Button, buttonForeground } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { showConfirm } from "@/utils/alerts";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { useSyncStore } from "@/stores/syncStore";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import {
   activityRangeStart,
   buildActivitySummary,
@@ -41,8 +34,6 @@ const PERIODS = [
 /** Home: activity summary, quick actions, saved routines. */
 export default function ProgramsListScreen() {
   const router = useRouter();
-  const isSyncing = useSyncStore((s) => s.isSyncing);
-  const pushPending = useSyncStore((s) => s.pushPending);
   const hasActiveSession = useWorkoutSessionStore((s) => s.activeSession !== null);
   const startQuickSession = useWorkoutSessionStore((s) => s.startQuickSession);
   const startFromProgram = useWorkoutSessionStore((s) => s.startFromProgram);
@@ -52,6 +43,7 @@ export default function ProgramsListScreen() {
 
   const [periodMode, setPeriodMode] = useState<ActivityPeriodMode>("week");
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [startVisible, setStartVisible] = useState(false);
 
   const sinceIso = useMemo(
     () => activityRangeStart(periodMode, new Date()).toISOString(),
@@ -75,8 +67,9 @@ export default function ProgramsListScreen() {
   );
 
   const goToWorkout = () => router.replace("/workout");
-  const handlePrimary = () => {
-    if (!hasActiveSession) startQuickSession();
+  const handlePrimary = () => (hasActiveSession ? goToWorkout() : setStartVisible(true));
+  const handleStartBlank = () => {
+    startQuickSession();
     goToWorkout();
   };
   const handleStartProgram = (program: Program) => {
@@ -110,14 +103,9 @@ export default function ProgramsListScreen() {
               <Text style={TYPE.title}>Activities</Text>
               <Text style={[TYPE.label, { marginTop: SPACE.xs }]}>{summary.rangeLabel}</Text>
             </View>
-            <View style={[UI.row, { gap: SPACE.sm + 2 }]}>
-              <IconButton size="md" onPress={() => void pushPending()} disabled={isSyncing}>
-                <CloudUpload size={18} color={COLORS.TEXT_SECONDARY} />
-              </IconButton>
-              <IconButton size="md" onPress={() => router.push("/settings")}>
-                <Settings2 size={18} color={COLORS.TEXT_SECONDARY} />
-              </IconButton>
-            </View>
+            <IconButton size="md" onPress={() => router.push("/settings")}>
+              <Settings2 size={18} color={COLORS.TEXT_SECONDARY} />
+            </IconButton>
           </View>
 
           <SegmentedControl options={PERIODS} value={periodMode} onChange={setPeriodMode} />
@@ -145,9 +133,7 @@ export default function ProgramsListScreen() {
             >
               <View>
                 <Text style={TYPE.label}>In progress</Text>
-                <Text style={[TYPE.mono, { fontSize: 18, marginTop: SPACE.xs }]}>
-                  Resume workout
-                </Text>
+                <Text style={[TYPE.monoMedium, { marginTop: SPACE.xs }]}>Resume workout</Text>
               </View>
               <ChevronRight size={18} color={COLORS.ACCENT_BLUE} />
             </Pressable>
@@ -169,7 +155,7 @@ export default function ProgramsListScreen() {
               style={({ pressed }) => [UI.card, styles.metric, pressed && UI.pressed]}
             >
               <Clock3 size={18} color={COLORS.TEXT_SECONDARY} />
-              <Text style={[TYPE.mono, { fontSize: 18 }]}>History</Text>
+              <Text style={TYPE.monoMedium}>History</Text>
               <Text style={TYPE.caption}>All workouts</Text>
             </Pressable>
             <Pressable
@@ -177,12 +163,12 @@ export default function ProgramsListScreen() {
               style={({ pressed }) => [UI.card, styles.metric, pressed && UI.pressed]}
             >
               <BarChart2 size={18} color={COLORS.TEXT_SECONDARY} />
-              <Text style={[TYPE.mono, { fontSize: 18 }]}>Insights</Text>
+              <Text style={TYPE.monoMedium}>Insights</Text>
               <Text style={TYPE.caption}>Exercise stats</Text>
             </Pressable>
           </View>
 
-          <Text style={[TYPE.heading, styles.sectionTitle]}>Routines</Text>
+          <Text style={[TYPE.titleSm, styles.sectionTitle]}>Routines</Text>
           {programs.length === 0 ? (
             <View style={[UI.card, styles.emptyRoutines]}>
               <EmptyState title="No routines yet" subtitle="Tap + to build your first one." />
@@ -205,29 +191,37 @@ export default function ProgramsListScreen() {
       </SafeAreaView>
 
       <View style={styles.floatingWrap} pointerEvents="box-none">
-        <View style={[UI.hudPill, UI.shadow, styles.floating]}>
-          <IconButton onPress={() => router.push("/programs/create")}>
+        <View style={[UI.hudBar, UI.shadow, styles.floating]}>
+          <IconButton tone="primary" onPress={() => router.push("/programs/create")}>
             <Plus size={20} color={COLORS.ACCENT_BLUE} />
           </IconButton>
-          <Text
-            style={[
-              TYPE.monoSmall,
-              { flex: 1, paddingHorizontal: SPACE.xs, color: COLORS.TEXT_PRIMARY },
-            ]}
-          >
-            {hasActiveSession ? "RESUME WORKOUT" : "QUICK WORKOUT"}
+          <Text style={[TYPE.label, styles.floatingLabel]}>
+            {hasActiveSession ? "Workout in progress" : "Ready to train"}
           </Text>
-          <Pressable
+          <Button
+            label={hasActiveSession ? "Resume" : "Start"}
+            tone="success"
+            variant="filled"
+            icon={
+              <Play
+                size={16}
+                color={buttonForeground("success", "filled")}
+                fill={buttonForeground("success", "filled")}
+              />
+            }
             onPress={handlePrimary}
-            style={({ pressed }) => [styles.primaryBtn, pressed && UI.pressed]}
-          >
-            <Play size={18} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />
-            <Text style={[TYPE.mono, { fontSize: 16 }]}>
-              {hasActiveSession ? "Resume" : "Start"}
-            </Text>
-          </Pressable>
+          />
         </View>
       </View>
+
+      <StartWorkoutSheet
+        visible={startVisible}
+        onClose={() => setStartVisible(false)}
+        programs={programs}
+        lastUsed={lastUsed}
+        onStartBlank={handleStartBlank}
+        onStartProgram={handleStartProgram}
+      />
     </View>
   );
 }
@@ -251,7 +245,7 @@ const styles = StyleSheet.create({
   },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: SPACE.md },
   metric: { width: "48%", minHeight: 128, padding: SPACE.md + 2, justifyContent: "space-between" },
-  sectionTitle: { fontSize: 20, marginTop: SPACE.sm },
+  sectionTitle: { marginTop: SPACE.sm },
   emptyRoutines: { paddingVertical: SPACE.sm },
   floatingWrap: {
     position: "absolute",
@@ -261,16 +255,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   floating: { width: LAYOUT.screenWidth - LAYOUT.gutter * 2, height: 72, gap: SPACE.sm },
-  primaryBtn: {
-    minWidth: 96,
-    height: LAYOUT.buttonLg,
-    paddingHorizontal: SPACE.lg + 2,
-    borderRadius: RADIUS.item,
-    borderWidth: 1,
-    borderColor: COLORS.ACCENT_GREEN,
-    flexDirection: "row",
-    gap: SPACE.sm,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  floatingLabel: { flex: 1, paddingHorizontal: SPACE.xs, color: COLORS.TEXT_SECONDARY },
 });

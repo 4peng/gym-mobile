@@ -9,8 +9,8 @@ export const COLORS = {
   BG: "#000000", // OLED black
   CARD_BG: "#121212",
   CARD_HOVER: "#1C1C1E",
-  BORDER: "#1C1C1E",
-  BORDER_LIGHT: "#27272A",
+  /** The one grey outline colour (cards, inputs, ghost buttons). */
+  BORDER: "#27272A",
 
   ACCENT_BLUE: "#007AFF",
   ACCENT_YELLOW: "#FFCC00",
@@ -68,6 +68,10 @@ export const FONT_ASSETS = {
   "Viga-Regular": require("../../assets/fonts/Viga-Regular.ttf"),
 };
 
+/**
+ * Both families ship a single weight, so text styles never set `fontWeight`:
+ * a weight the family lacks makes iOS substitute a system face mid-screen.
+ */
 export const FONT_FAMILIES = {
   /** UI text. */
   MEDIUM: "Viga-Regular",
@@ -77,7 +81,7 @@ export const FONT_FAMILIES = {
 
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;
 
-export const RADIUS = { sm: 6, item: 12, container: 16, sheet: 24, pill: 32 } as const;
+export const RADIUS = { sm: 6, item: 12, container: 16, sheet: 24 } as const;
 
 export const LAYOUT = {
   screenWidth: Dimensions.get("window").width,
@@ -85,7 +89,7 @@ export const LAYOUT = {
   gutter: SPACE.lg,
   /** Top padding for screens that draw their own header (status bar + breathing room). */
   headerTop: 60,
-  /** Ghost button sizes. */
+  /** Button sizes. */
   buttonLg: 48,
   buttonMd: 40,
   buttonSm: 32,
@@ -93,9 +97,16 @@ export const LAYOUT = {
   sheetMs: 180,
 } as const;
 
-/** Text presets. Fonts: Viga for UI, SpaceMono for numbers and labels. */
+/**
+ * Text presets. Viga for UI text, SpaceMono for numbers and small-caps labels.
+ * Screens use these as-is; the only per-use overrides are colour and alignment.
+ */
 export const TYPE = StyleSheet.create({
+  /** Screen title. */
   title: { fontFamily: FONT_FAMILIES.MEDIUM, fontSize: 26, color: COLORS.TEXT_PRIMARY },
+  /** Card / list-item title (routine, exercise, session). */
+  titleSm: { fontFamily: FONT_FAMILIES.MEDIUM, fontSize: 20, color: COLORS.TEXT_PRIMARY },
+  /** Section heading, sheet title. */
   heading: { fontFamily: FONT_FAMILIES.MEDIUM, fontSize: 18, color: COLORS.TEXT_PRIMARY },
   body: { fontFamily: FONT_FAMILIES.MEDIUM, fontSize: 15, color: COLORS.TEXT_PRIMARY },
   bodyMuted: {
@@ -109,23 +120,14 @@ export const TYPE = StyleSheet.create({
   label: {
     fontFamily: FONT_FAMILIES.MONO,
     fontSize: 10,
-    fontWeight: "800",
     letterSpacing: 1.2,
     textTransform: "uppercase",
     color: COLORS.TEXT_TERTIARY,
   },
-  mono: {
-    fontFamily: FONT_FAMILIES.MONO,
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.TEXT_PRIMARY,
-  },
-  monoSmall: {
-    fontFamily: FONT_FAMILIES.MONO,
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.TEXT_SECONDARY,
-  },
+  mono: { fontFamily: FONT_FAMILIES.MONO, fontSize: 14, color: COLORS.TEXT_PRIMARY },
+  monoSmall: { fontFamily: FONT_FAMILIES.MONO, fontSize: 12, color: COLORS.TEXT_SECONDARY },
+  /** Emphasised value (stat tiles, timers, bar labels). */
+  monoMedium: { fontFamily: FONT_FAMILIES.MONO, fontSize: 18, color: COLORS.TEXT_PRIMARY },
   monoLarge: { fontFamily: FONT_FAMILIES.MONO, fontSize: 28, color: COLORS.TEXT_PRIMARY },
   monoHero: { fontFamily: FONT_FAMILIES.MONO, fontSize: 34, color: COLORS.TEXT_PRIMARY },
 });
@@ -137,13 +139,14 @@ export const UI = StyleSheet.create({
   fill: { position: "absolute", inset: 0 },
   row: { flexDirection: "row", alignItems: "center" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  /** Top-level container: solid fill, 1px outline. */
   card: {
     backgroundColor: COLORS.CARD_BG,
     borderRadius: RADIUS.container,
     borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
+    borderColor: COLORS.BORDER,
   },
-  /** Faint inset panel inside a card. */
+  /** Faint inset panel inside a card (inputs, sub-panels, list rows). */
   inset: {
     backgroundColor: SURFACE.raised,
     borderRadius: RADIUS.item,
@@ -151,10 +154,10 @@ export const UI = StyleSheet.create({
     borderColor: SURFACE.hairline,
   },
   hairline: { height: 1, backgroundColor: SURFACE.hairline },
-  /** Translucent floating bar (HUD nav, dashboard action bar). */
-  hudPill: {
+  /** Floating action bar (workout HUD, dashboard). Same corner radius as cards. */
+  hudBar: {
     height: 64,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.container,
     backgroundColor: SURFACE.sheet,
     flexDirection: "row",
     alignItems: "center",

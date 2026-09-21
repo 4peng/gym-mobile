@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { Check, Dumbbell, Plus, X } from "lucide-react-native";
-import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useRouter } from "expo-router";
 import { useShallow } from "zustand/react/shallow";
 import { showConfirm } from "@/utils/alerts";
@@ -18,48 +17,52 @@ import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
 import { COLORS, LAYOUT, SPACE, TYPE, UI } from "@/constants/theme";
 import { HapticFeedback } from "@/utils/haptics";
-import { ExerciseCard } from "@/components/Workout/ExerciseCard";
+import {
+  ExerciseCard,
+  type AnchorLayout,
+  type ExerciseCardPicker,
+} from "@/components/Workout/ExerciseCard";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
-import ExerciseNavMenu from "@/components/Workout/ExerciseNavMenu";
+import ExerciseReorderModal from "@/components/Workout/ExerciseReorderModal";
+import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelector";
 import MuscleSelector from "@/components/MuscleSelector";
+import RestTimerPicker from "@/components/RestTimerPicker";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
+import { Button, buttonForeground } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import type { ExerciseDefinition } from "@/types";
+import type { ExerciseDefinition, WorkoutExercise } from "@/types";
 import type { MuscleGroup } from "@/constants/muscles";
 import { sessionExercisesToProgramExercises } from "@/utils/workoutToProgram";
 import { HUDHeader } from "@/components/Workout/HUD/HUDHeader";
-import { ScrubberRail, SCRUB_STEP } from "@/components/Workout/HUD/ScrubberRail";
-import { HUDPillNav } from "@/components/Workout/HUD/HUDPillNav";
+import { HUDBar } from "@/components/Workout/HUD/HUDBar";
 
 const EMPTY_MUSCLES: MuscleGroup[] = [];
+const EMPTY_EXERCISES: WorkoutExercise[] = [];
+
+/** Which overlay is open. Pickers live here so they float over the whole screen. */
+type Picker =
+  | { kind: "add" }
+  | { kind: Exclude<ExerciseCardPicker, "tracking">; exerciseId: string }
+  | { kind: "tracking"; exerciseId: string; anchor: AnchorLayout }
+  | null;
 
 export default function WorkoutSessionScreen() {
   const router = useRouter();
   const activeSessionId = useWorkoutSessionStore((s) => s.activeSession?._id);
   const startedAt = useWorkoutSessionStore((s) => s.activeSession?.startedAt);
-  const activeExerciseId = useWorkoutSessionStore((s) => s.activeExerciseId);
-  const setActiveExerciseId = useWorkoutSessionStore((s) => s.setActiveExerciseId);
+  // Immer keeps untouched exercise objects referentially stable, so each memoised card
+  // re-renders only when its own exercise changes.
+  const exercises = useWorkoutSessionStore((s) => s.activeSession?.exercises ?? EMPTY_EXERCISES);
   const updateExerciseField = useWorkoutSessionStore((s) => s.updateExerciseField);
+  const selectExerciseDefinition = useWorkoutSessionStore((s) => s.selectExerciseDefinition);
   const addExercise = useWorkoutSessionStore((s) => s.addExercise);
+  const reorderExercises = useWorkoutSessionStore((s) => s.reorderExercises);
   const completeSession = useWorkoutSessionStore((s) => s.completeSession);
   const discardSession = useWorkoutSessionStore((s) => s.discardSession);
   const clearExpiredTimer = useWorkoutSessionStore((s) => s.clearExpiredTimer);
   const addProgram = useProgramStore((s) => s.addProgram);
 
-  const exerciseIds = useWorkoutSessionStore(
-    useShallow((s) => s.activeSession?.exercises.map((e) => e.id) ?? []),
-  );
-  const exerciseNames = useWorkoutSessionStore(
-    useShallow((s) => s.activeSession?.exercises.map((e) => e.name) ?? []),
-  );
-  const exerciseProgress = useWorkoutSessionStore(
-    useShallow((s) =>
-      (s.activeSession?.exercises ?? []).map((e) =>
-        e.sets.length > 0 ? e.sets.filter((st) => !!st.completedAt).length / e.sets.length : 0,
-      ),
-    ),
-  );
   const progressData = useWorkoutSessionStore(
     useShallow((s) => {
       let total = 0;
@@ -71,21 +74,27 @@ export default function WorkoutSessionScreen() {
       return { progress: total > 0 ? completed / total : 0, completed, total };
     }),
   );
-  const currentExercise = useWorkoutSessionStore((s) =>
-    s.activeSession?.exercises.find((e) => e.id === activeExerciseId),
-  );
 
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [scrubbingIndex, setScrubbingIndex] = useState<number | null>(null);
-  const [muscleExerciseId, setMuscleExerciseId] = useState<string | null>(null);
+  const [picker, setPicker] = useState<Picker>(null);
+  const [reorderVisible, setReorderVisible] = useState(false);
   const [routineNameVisible, setRoutineNameVisible] = useState(false);
-  const musclePickerMuscles = useWorkoutSessionStore(
-    (s) =>
-      s.activeSession?.exercises.find((e) => e.id === muscleExerciseId)?.muscles ?? EMPTY_MUSCLES,
+  const target =
+    picker && "exerciseId" in picker
+      ? exercises.find((e) => e.id === picker.exerciseId)
+      : undefined;
+  const closePicker = useCallback(() => setPicker(null), []);
+  const openPicker = useCallback(
+    (kind: ExerciseCardPicker, exerciseId: string, anchor?: AnchorLayout) => {
+      if (kind === "tracking") {
+        if (anchor) setPicker({ kind, exerciseId, anchor });
+        return;
+      }
+      setPicker({ kind, exerciseId });
+    },
+    [],
   );
 
-  const scrubberScrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollHandler = useMemo(
     () =>
@@ -94,17 +103,8 @@ export default function WorkoutSessionScreen() {
       }),
     [scrollY],
   );
-  const activeIndex = activeExerciseId ? exerciseIds.indexOf(activeExerciseId) : -1;
 
-  useEffect(() => {
-    if (activeSessionId && !activeExerciseId && exerciseIds.length > 0)
-      setActiveExerciseId(exerciseIds[0]);
-  }, [activeSessionId, activeExerciseId, exerciseIds, setActiveExerciseId]);
   useEffect(() => clearExpiredTimer(), [clearExpiredTimer]);
-  useEffect(() => {
-    if (scrubbingIndex !== null)
-      scrubberScrollRef.current?.scrollTo({ x: scrubbingIndex * SCRUB_STEP, animated: true });
-  }, [scrubbingIndex]);
 
   const goHome = () => setTimeout(() => router.replace("/programs/"), 100);
   const finish = useCallback(() => {
@@ -142,60 +142,21 @@ export default function WorkoutSessionScreen() {
     finish();
   };
 
-  const navigateToId = useCallback(
-    (id: string, animated = true) => {
-      if (id === activeExerciseId) return;
-      if (animated) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setActiveExerciseId(id);
-      HapticFeedback.selection();
-    },
-    [activeExerciseId, setActiveExerciseId],
-  );
-  const step = useCallback(
-    (dir: 1 | -1) => {
-      const next = activeIndex + dir;
-      if (next >= 0 && next < exerciseIds.length) navigateToId(exerciseIds[next]);
-    },
-    [activeIndex, exerciseIds, navigateToId],
-  );
-
-  const scrubStart = useRef(activeIndex);
-  const gesture = useMemo(() => {
-    const flingLeft = Gesture.Fling()
-      .direction(Directions.LEFT)
-      .runOnJS(true)
-      .onStart(() => step(1));
-    const flingRight = Gesture.Fling()
-      .direction(Directions.RIGHT)
-      .runOnJS(true)
-      .onStart(() => step(-1));
-    const scrub = Gesture.Pan()
-      .activateAfterLongPress(250)
-      .runOnJS(true)
-      .onStart(() => {
-        scrubStart.current = activeIndex;
-        setScrubbingIndex(activeIndex);
-        HapticFeedback.selection();
-      })
-      .onUpdate((e) => {
-        const next = Math.max(
-          0,
-          Math.min(scrubStart.current + Math.round(e.translationX / 30), exerciseIds.length - 1),
-        );
-        if (next !== scrubbingIndex) {
-          setScrubbingIndex(next);
-          navigateToId(exerciseIds[next], false);
-        }
-      })
-      .onFinalize(() => setScrubbingIndex(null));
-    return Gesture.Race(scrub, flingLeft, flingRight);
-  }, [activeIndex, exerciseIds, scrubbingIndex, navigateToId, step]);
+  const handleExerciseSelect = (def: ExerciseDefinition) => {
+    if (picker?.kind === "exercise") {
+      selectExerciseDefinition(picker.exerciseId, def);
+      return;
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    addExercise(def);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+  };
 
   if (!activeSessionId) {
     return (
       <View style={[UI.screen, { justifyContent: "center" }]}>
         <EmptyState
-          icon={<Dumbbell size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />}
+          icon={<Dumbbell size={48} color={COLORS.BORDER} strokeWidth={1} />}
           title="No active session"
         />
       </View>
@@ -207,6 +168,7 @@ export default function WorkoutSessionScreen() {
       <HUDHeader scrollY={scrollY} startedAt={startedAt} progressData={progressData} />
 
       <Animated.ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -214,65 +176,70 @@ export default function WorkoutSessionScreen() {
         onScroll={scrollHandler}
         scrollEventThrottle={16}
       >
-        {currentExercise ? (
-          <ExerciseCard
-            exercise={currentExercise}
-            key={currentExercise.id}
-            onMusclePickerOpen={setMuscleExerciseId}
-          />
-        ) : (
+        {exercises.map((exercise) => (
+          <ExerciseCard key={exercise.id} exercise={exercise} onOpenPicker={openPicker} />
+        ))}
+        {exercises.length === 0 ? (
           <View style={styles.noExercise}>
             <Text style={TYPE.label}>No exercises added</Text>
-            <IconButton tone="primary" onPress={() => setPickerVisible(true)}>
-              <Plus size={20} color={COLORS.ACCENT_BLUE} />
-            </IconButton>
+            <Button
+              label="Add exercise"
+              tone="primary"
+              variant="filled"
+              icon={<Plus size={18} color={buttonForeground("primary", "filled")} />}
+              onPress={() => setPicker({ kind: "add" })}
+            />
           </View>
-        )}
-        <View style={{ height: 120 }} />
+        ) : null}
       </Animated.ScrollView>
 
-      {scrubbingIndex !== null && (
-        <ScrubberRail
-          exerciseIds={exerciseIds}
-          exerciseNames={exerciseNames}
-          exerciseProgress={exerciseProgress}
-          displayIndex={scrubbingIndex}
-          scrubberScrollRef={scrubberScrollRef}
-        />
-      )}
-
-      <GestureDetector gesture={gesture}>
-        <HUDPillNav
-          activeIndex={activeIndex}
-          totalExercises={exerciseIds.length}
-          onMenuPress={() => setMenuVisible(true)}
-          onDiscardPress={handleDiscardPress}
-          onFinishPress={handleFinishPress}
-          onPrevPress={() => step(-1)}
-          onNextPress={() => step(1)}
-        />
-      </GestureDetector>
-
-      <ExerciseNavMenu
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        activeExerciseId={activeExerciseId}
-        onSelect={setActiveExerciseId}
-        onAddPress={() => setPickerVisible(true)}
+      <HUDBar
+        canReorder={exercises.length > 1}
+        onAddPress={() => setPicker({ kind: "add" })}
+        onReorderPress={() => setReorderVisible(true)}
+        onDiscardPress={handleDiscardPress}
+        onFinishPress={handleFinishPress}
       />
+
       <ExercisePickerModal
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        onSelect={(def: ExerciseDefinition) => addExercise(def)}
-        title="Add exercise"
+        visible={picker?.kind === "add" || picker?.kind === "exercise"}
+        onClose={closePicker}
+        onSelect={handleExerciseSelect}
+        selectedDefinitionId={
+          picker?.kind === "exercise" ? target?.exerciseDefinitionId : undefined
+        }
+        title={picker?.kind === "exercise" ? "Change exercise" : "Add exercise"}
       />
       <MuscleSelector
-        visible={muscleExerciseId !== null}
-        onClose={() => setMuscleExerciseId(null)}
-        selectedMuscles={musclePickerMuscles}
+        visible={picker?.kind === "muscles"}
+        onClose={closePicker}
+        selectedMuscles={target?.muscles ?? EMPTY_MUSCLES}
         onSelect={(muscles) => {
-          if (muscleExerciseId) updateExerciseField(muscleExerciseId, "muscles", muscles);
+          if (target) updateExerciseField(target.id, "muscles", muscles);
         }}
+      />
+      <RestTimerPicker
+        visible={picker?.kind === "rest"}
+        initialSeconds={target?.restSeconds ?? 90}
+        onClose={closePicker}
+        onSave={(seconds) => {
+          if (target) updateExerciseField(target.id, "restSeconds", seconds);
+        }}
+      />
+      <ExerciseTrackingModeSelector
+        visible={picker?.kind === "tracking"}
+        onClose={closePicker}
+        anchorLayout={picker?.kind === "tracking" ? picker.anchor : undefined}
+        value={target?.trackingMode ?? "strength"}
+        onChange={(mode) => {
+          if (target) updateExerciseField(target.id, "trackingMode", mode);
+        }}
+      />
+      <ExerciseReorderModal
+        visible={reorderVisible}
+        exercises={exercises.map((e) => ({ id: e.id, name: e.name }))}
+        onClose={() => setReorderVisible(false)}
+        onSave={reorderExercises}
       />
       <RoutineNamePrompt
         visible={routineNameVisible}
@@ -331,7 +298,7 @@ function RoutineNamePrompt({
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { flexGrow: 1, paddingTop: SPACE.sm + 2 },
+  scrollContent: { flexGrow: 1, paddingTop: SPACE.sm + 2, paddingBottom: 140 },
   noExercise: {
     flex: 1,
     justifyContent: "center",
@@ -341,7 +308,6 @@ const styles = StyleSheet.create({
   },
   promptInput: {
     ...TYPE.body,
-    fontSize: 16,
     paddingHorizontal: LAYOUT.gutter + SPACE.sm,
     paddingVertical: SPACE.xl,
   },

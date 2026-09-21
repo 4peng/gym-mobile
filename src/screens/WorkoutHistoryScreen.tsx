@@ -92,7 +92,7 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({
         </View>
 
         <Pressable onPress={toggle}>
-          <Text style={[TYPE.heading, { fontSize: 20 }]}>{programName || "Quick session"}</Text>
+          <Text style={TYPE.titleSm}>{programName || "Quick session"}</Text>
           <View style={[UI.row, { gap: SPACE.lg, marginVertical: SPACE.sm }]}>
             <View style={[UI.row, { gap: SPACE.sm - 2 }]}>
               <Clock size={12} color={COLORS.ACCENT_YELLOW} />
@@ -179,7 +179,7 @@ export default function WorkoutHistoryScreen() {
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
           <EmptyState
-            icon={<Clock size={48} color={COLORS.BORDER_LIGHT} strokeWidth={1} />}
+            icon={<Clock size={48} color={COLORS.BORDER} strokeWidth={1} />}
             title="No history yet"
             subtitle="Complete your first workout to see it here."
           />
@@ -199,7 +199,7 @@ export default function WorkoutHistoryScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: LAYOUT.gutter, paddingBottom: 100 },
-  card: { padding: SPACE.md, gap: SPACE.md, borderColor: SURFACE.hairline },
+  card: { padding: SPACE.md, gap: SPACE.md },
   details: { gap: SPACE.lg },
   notes: {
     padding: SPACE.md + 2,

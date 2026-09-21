@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: LAYOUT.gutter + SPACE.xs,
   },
   stickyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  stickyText: { fontSize: 13 },
+  stickyText: { ...TYPE.mono },
   header: {
     paddingTop: LAYOUT.headerTop - 10,
     paddingHorizontal: LAYOUT.gutter + SPACE.xs,

@@ -29,5 +29,5 @@ const styles = StyleSheet.create({
   },
   item: { flexDirection: "row", alignItems: "center", gap: SPACE.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  text: { color: COLORS.TEXT_PRIMARY, fontSize: 9, letterSpacing: 0.5 },
+  text: { color: COLORS.TEXT_PRIMARY, letterSpacing: 0.5 },
 });

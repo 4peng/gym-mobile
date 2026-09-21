@@ -136,6 +136,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  label: { flex: 1, fontSize: 13 },
+  label: { flex: 1 },
   handle: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 });

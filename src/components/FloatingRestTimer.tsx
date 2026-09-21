@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { X } from "lucide-react-native";
 import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { formatSecondsToMMSS } from "@/utils/conversions";
@@ -36,7 +37,7 @@ const FloatingRestTimer = React.memo(function FloatingRestTimer() {
         hitSlop={12}
         style={({ pressed }) => [styles.cancel, pressed && UI.pressed]}
       >
-        <Text style={styles.cancelText}>X</Text>
+        <X size={12} color={COLORS.DANGER} />
       </Pressable>
     </View>
   );
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.BORDER,
     gap: SPACE.sm + 2,
   },
-  countdown: { ...TYPE.mono, fontSize: 18, letterSpacing: 0.5 },
+  countdown: { ...TYPE.monoMedium },
   cancel: {
     width: 24,
     height: 24,
@@ -65,5 +66,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cancelText: { ...TYPE.monoSmall, color: COLORS.DANGER },
 });

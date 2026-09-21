@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     borderColor: SURFACE.blueBorder,
   },
   tagText: { ...TYPE.monoSmall, color: COLORS.TEXT_PRIMARY },
-  tagX: { ...TYPE.monoSmall, fontSize: 10, color: COLORS.TEXT_TERTIARY, marginHorizontal: 2 },
+  tagX: { ...TYPE.monoSmall, color: COLORS.TEXT_TERTIARY, marginHorizontal: 2 },
   editRow: {
     flexDirection: "row",
     alignItems: "center",

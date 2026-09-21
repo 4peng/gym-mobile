@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.item,
     padding: SPACE.xs,
     borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
+    borderColor: COLORS.BORDER,
   },
   segment: { borderRadius: RADIUS.sm + 2, justifyContent: "center", alignItems: "center" },
   segmentRegular: { flex: 1, height: 40 },

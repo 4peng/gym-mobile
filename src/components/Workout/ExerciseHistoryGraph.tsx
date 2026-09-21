@@ -13,7 +13,14 @@ const CHART_HEIGHT = 160;
 const DAYS = 20;
 
 /** Volume per day for the last 20 days of one exercise. Lives inside ExerciseCard's HISTORY tab. */
-function ExerciseHistoryGraph({ exerciseKey }: { exerciseKey: string }) {
+function ExerciseHistoryGraph({
+  exerciseKey,
+  width = LAYOUT.screenWidth - 64,
+}: {
+  exerciseKey: string;
+  /** Drawing width; defaults to the screen minus card padding. */
+  width?: number;
+}) {
   const key = normalizeExerciseIdentityKey(exerciseKey);
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
@@ -59,7 +66,7 @@ function ExerciseHistoryGraph({ exerciseKey }: { exerciseKey: string }) {
     }
 
     const maxVolume = Math.max(100, ...buckets.map((b) => b.value));
-    const chartWidth = LAYOUT.screenWidth - 64;
+    const chartWidth = width;
     const barWidth = (chartWidth / DAYS) * 0.7;
     const gap = (chartWidth - DAYS * barWidth) / (DAYS - 1);
     const points = buckets.flatMap((b, i) =>
@@ -81,7 +88,7 @@ function ExerciseHistoryGraph({ exerciseKey }: { exerciseKey: string }) {
       gap,
       linePath: buildSmoothPath(points),
     };
-  }, [rows, latest, analyticsBodyweight, analyticsBodyweightUnit]);
+  }, [rows, latest, width, analyticsBodyweight, analyticsBodyweightUnit]);
 
   if (!latest) {
     return (
@@ -119,7 +126,6 @@ function ExerciseHistoryGraph({ exerciseKey }: { exerciseKey: string }) {
                   y={CHART_HEIGHT - 5}
                   fill={COLORS.TEXT_TERTIARY}
                   fontSize="8"
-                  fontWeight="800"
                   textAnchor="middle"
                   fontFamily={FONT_FAMILIES.MONO}
                 >
@@ -145,7 +151,7 @@ function ExerciseHistoryGraph({ exerciseKey }: { exerciseKey: string }) {
   );
 }
 
-// Mounted permanently as a pager page inside ExerciseCard; memo keeps it from re-rendering per keystroke.
+// Memo keeps the SVG from re-rendering on every keystroke in the sibling SETS page.
 export default React.memo(ExerciseHistoryGraph);
 
 const styles = StyleSheet.create({

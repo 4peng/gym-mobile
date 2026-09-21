@@ -187,7 +187,6 @@ const VolumeChart = React.memo(function VolumeChart({
             y="10"
             fill={COLORS.TEXT_TERTIARY}
             fontSize="9"
-            fontWeight="900"
             fontFamily={FONT_FAMILIES.MONO}
             letterSpacing="0.5"
           >
@@ -211,7 +210,6 @@ const VolumeChart = React.memo(function VolumeChart({
                   y={y + 4}
                   fill={COLORS.TEXT_TERTIARY}
                   fontSize="10"
-                  fontWeight="800"
                   textAnchor="end"
                   fontFamily={FONT_FAMILIES.MONO}
                 >
@@ -245,7 +243,6 @@ const VolumeChart = React.memo(function VolumeChart({
                     y={CHART_HEIGHT - barHeight - 28}
                     fill={active ? COLORS.ACCENT_YELLOW : withAlpha(COLORS.ACCENT_YELLOW, 0.8)}
                     fontSize="10"
-                    fontWeight="900"
                     textAnchor="middle"
                   >
                     ★
@@ -257,7 +254,6 @@ const VolumeChart = React.memo(function VolumeChart({
                     y={CHART_HEIGHT + 10}
                     fill={COLORS.TEXT_TERTIARY}
                     fontSize="9"
-                    fontWeight="800"
                     textAnchor="middle"
                     fontFamily={FONT_FAMILIES.MONO}
                   >
@@ -351,7 +347,7 @@ function StatTile({ label, value, unit }: { label: string; value: number; unit: 
   return (
     <View style={{ flex: 1 }}>
       <Text style={TYPE.label}>{label}</Text>
-      <Text style={[TYPE.monoLarge, { fontSize: 24 }]}>
+      <Text style={TYPE.monoMedium}>
         {Math.round(value)}
         <Text style={[TYPE.monoSmall, { color: COLORS.TEXT_TERTIARY }]}> {unit}</Text>
       </Text>
@@ -579,7 +575,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   content: { paddingHorizontal: LAYOUT.gutter, paddingBottom: 120 },
-  title: { fontSize: 32, lineHeight: 38, marginTop: SPACE.xl, marginBottom: SPACE.xxl },
+  title: { lineHeight: 32, marginTop: SPACE.xl, marginBottom: SPACE.xxl },
   muscleTrigger: {
     flexDirection: "row",
     alignItems: "center",

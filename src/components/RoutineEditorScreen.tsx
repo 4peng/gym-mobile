@@ -12,11 +12,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowUpDown, Check, ChevronRight, Play, Plus, Save, Trash2, X } from "lucide-react-native";
 import { showAlert } from "@/utils/alerts";
 import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
-import ExerciseEditor, { type ExerciseFormData } from "@/components/ExerciseEditor";
+import ExerciseEditor, {
+  type ExerciseEditorPicker,
+  type ExerciseFormData,
+} from "@/components/ExerciseEditor";
 import ExerciseReorderModal from "@/components/Workout/ExerciseReorderModal";
 import ExercisePickerModal from "@/components/ExercisePickerModal";
+import MuscleSelector from "@/components/MuscleSelector";
+import RestTimerPicker from "@/components/RestTimerPicker";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
+import { Button, buttonForeground } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   buildRoutineDraft,
@@ -26,7 +32,9 @@ import {
 } from "@/shared/programs.js";
 import { generateId } from "@/utils/id";
 import type { ExerciseDefinition } from "@/types";
+import type { MuscleGroup } from "@/constants/muscles";
 import { inferTrackingModeFromExerciseDefinition } from "@/utils/exerciseTracking";
+import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 
 export interface RoutineDraft {
   name: string;
@@ -43,6 +51,11 @@ interface RoutineEditorScreenProps {
   onDelete?: (draft: RoutineDraft) => void;
 }
 
+const EMPTY_MUSCLES: MuscleGroup[] = [];
+
+/** Which overlay is open; `add` appends a new exercise, the others edit one. */
+type Picker = { kind: "add" } | { kind: ExerciseEditorPicker; exerciseId: string } | null;
+
 /** Routine form: name, add/reorder exercises, per-exercise editors. */
 export default function RoutineEditorScreen({
   mode,
@@ -56,9 +69,10 @@ export default function RoutineEditorScreen({
   // Seeded once: the props derive from the store and may change identity mid-edit.
   const [name, setName] = useState(initialName);
   const [exercises, setExercises] = useState<ExerciseFormData[]>(initialExercises);
+  const [picker, setPicker] = useState<Picker>(null);
   const [reorderVisible, setReorderVisible] = useState(false);
-  const [pickerVisible, setPickerVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const updateCustomExerciseMuscles = useExerciseLibraryStore((s) => s.updateCustomExerciseMuscles);
   const isCreate = mode === "create";
 
   const initialSnapshot = useMemo(
@@ -67,6 +81,15 @@ export default function RoutineEditorScreen({
   );
   const hasChanges = createRoutineSnapshot(name, exercises) !== initialSnapshot;
   const totalSets = exercises.reduce((n, e) => n + (e.defaultSets?.length || 0), 0);
+  const target =
+    picker && "exerciseId" in picker
+      ? exercises.find((e) => e.id === picker.exerciseId)
+      : undefined;
+  const closePicker = useCallback(() => setPicker(null), []);
+  const openPicker = useCallback(
+    (kind: ExerciseEditorPicker, exerciseId: string) => setPicker({ kind, exerciseId }),
+    [],
+  );
 
   const draft = useCallback(
     (): RoutineDraft => buildRoutineDraft(name, exercises) as RoutineDraft,
@@ -89,15 +112,26 @@ export default function RoutineEditorScreen({
     (id: string) => setExercises((prev) => prev.filter((e) => e.id !== id)),
     [],
   );
-  const handleAddFromPicker = useCallback((def: ExerciseDefinition) => {
-    const next = createEmptyExercise(generateId) as ExerciseFormData;
-    next.exerciseDefinitionId = def.id;
-    next.trackingMode = inferTrackingModeFromExerciseDefinition(def);
-    next.name = def.name;
-    next.muscles = def.muscles;
+  const handleExerciseSelect = (def: ExerciseDefinition) => {
+    const fields = {
+      exerciseDefinitionId: def.id,
+      name: def.name,
+      muscles: def.muscles,
+      trackingMode: inferTrackingModeFromExerciseDefinition(def),
+    };
+    if (picker?.kind === "exercise") {
+      handleUpdateExercise(picker.exerciseId, fields);
+      return;
+    }
+    const next = { ...(createEmptyExercise(generateId) as ExerciseFormData), ...fields };
     setExercises((prev) => [...prev, next]);
-    setPickerVisible(false);
-  }, []);
+  };
+  const handleMusclesChange = (muscles: MuscleGroup[]) => {
+    if (!target) return;
+    handleUpdateExercise(target.id, { muscles });
+    if (target.exerciseDefinitionId?.startsWith("custom-"))
+      updateCustomExerciseMuscles(target.exerciseDefinitionId, muscles);
+  };
   const handleReorder = useCallback((ids: string[]) => {
     setExercises((prev) => {
       const byId = new Map(prev.map((e) => [e.id, e]));
@@ -156,26 +190,20 @@ export default function RoutineEditorScreen({
           </View>
 
           <View style={styles.actions}>
-            <Pressable
-              onPress={() => setPickerVisible(true)}
-              style={({ pressed }) => [UI.inset, styles.actionBtn, pressed && UI.pressed]}
-            >
-              <Plus size={18} color={COLORS.ACCENT_BLUE} />
-              <Text style={[TYPE.body, { color: COLORS.ACCENT_BLUE }]}>Add exercise</Text>
-            </Pressable>
-            <Pressable
+            <Button
+              label="Add exercise"
+              tone="primary"
+              icon={<Plus size={18} color={buttonForeground("primary")} />}
+              onPress={() => setPicker({ kind: "add" })}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Reorder"
+              icon={<ArrowUpDown size={18} color={buttonForeground()} />}
               onPress={() => setReorderVisible(true)}
               disabled={exercises.length < 2}
-              style={({ pressed }) => [
-                UI.inset,
-                styles.actionBtn,
-                exercises.length < 2 && { opacity: 0.3 },
-                pressed && UI.pressed,
-              ]}
-            >
-              <ArrowUpDown size={18} color={COLORS.TEXT_PRIMARY} />
-              <Text style={TYPE.body}>Reorder</Text>
-            </Pressable>
+              style={{ flex: 1 }}
+            />
           </View>
 
           {exercises.map((item, index) => (
@@ -185,6 +213,7 @@ export default function RoutineEditorScreen({
               index={index}
               onUpdate={handleUpdateExercise}
               onRemove={handleRemoveExercise}
+              onOpenPicker={openPicker}
             />
           ))}
           {exercises.length === 0 ? (
@@ -236,10 +265,27 @@ export default function RoutineEditorScreen({
         onSave={handleReorder}
       />
       <ExercisePickerModal
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-        onSelect={handleAddFromPicker}
-        title="Add exercise"
+        visible={picker?.kind === "add" || picker?.kind === "exercise"}
+        onClose={closePicker}
+        onSelect={handleExerciseSelect}
+        selectedDefinitionId={
+          picker?.kind === "exercise" ? target?.exerciseDefinitionId : undefined
+        }
+        title={picker?.kind === "exercise" ? "Change exercise" : "Add exercise"}
+      />
+      <MuscleSelector
+        visible={picker?.kind === "muscles"}
+        onClose={closePicker}
+        selectedMuscles={target?.muscles ?? EMPTY_MUSCLES}
+        onSelect={handleMusclesChange}
+      />
+      <RestTimerPicker
+        visible={picker?.kind === "rest"}
+        initialSeconds={target?.restSeconds ?? 90}
+        onClose={closePicker}
+        onSave={(restSeconds) => {
+          if (target) handleUpdateExercise(target.id, { restSeconds });
+        }}
       />
     </KeyboardAvoidingView>
   );
@@ -283,7 +329,7 @@ const styles = StyleSheet.create({
     borderBottomColor: SURFACE.hairline,
   },
   content: { paddingHorizontal: LAYOUT.gutter, paddingTop: SPACE.xxl, paddingBottom: 140 },
-  nameInput: { ...TYPE.title, fontSize: 28, padding: 0, marginBottom: SPACE.lg },
+  nameInput: { ...TYPE.title, padding: 0, marginBottom: SPACE.lg },
   summary: {
     flexDirection: "row",
     alignItems: "center",
@@ -293,14 +339,6 @@ const styles = StyleSheet.create({
   summaryItem: { flex: 1, alignItems: "center", gap: 2 },
   summaryDivider: { width: 1, height: 24, backgroundColor: SURFACE.hairline },
   actions: { flexDirection: "row", gap: SPACE.md, marginBottom: SPACE.xxl },
-  actionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: SPACE.sm,
-    height: 46,
-  },
   options: { paddingTop: SPACE.sm },
   option: { flexDirection: "row", alignItems: "center", paddingVertical: SPACE.md, gap: SPACE.lg },
   optionIcon: {

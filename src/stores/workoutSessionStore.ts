@@ -34,8 +34,9 @@ import { useExerciseLibraryStore } from "@/stores/exerciseLibraryStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { normalizePersistedWorkoutSession } from "@/utils/normalizeWorkout";
 import { NEXT_SET_TYPE } from "@/shared/programs.js";
+import { convertWeight } from "@/utils/conversions";
 
-const STORE_VERSION = 6;
+const STORE_VERSION = 7;
 
 export interface ActiveRestTimer {
   /** Absolute epoch-ms when the rest period ends. */
@@ -57,8 +58,6 @@ interface WorkoutSessionState {
   activeRestTimer: ActiveRestTimer | null;
   /** Identity keys pinned to the top of the stats list. */
   pinnedExerciseNames: string[];
-  /** Focused exercise in the single-exercise workout view. */
-  activeExerciseId: string | null;
   /** Completed sessions changed locally and not yet backed up. */
   dirtyWorkoutIds: string[];
   /** Sessions deleted locally and not yet deleted in the cloud. */
@@ -77,7 +76,6 @@ interface WorkoutSessionActions {
   deleteHistorySession: (sessionId: string) => void;
   updateSessionDate: (sessionId: string, completedAtIso: string) => void;
 
-  setActiveExerciseId: (id: string | null) => void;
   addExercise: (exerciseDefinition?: ExerciseDefinition | null) => void;
   reorderExercises: (exerciseIds: string[]) => void;
   removeExercise: (exerciseId: string) => void;
@@ -87,6 +85,7 @@ interface WorkoutSessionActions {
     field: F,
     value: ExerciseFieldValue<F>,
   ) => void;
+  /** Switches kg ↔ lbs and converts every set's weight so logged loads stay physically the same. */
   toggleExerciseUnit: (exerciseId: string) => void;
   toggleExerciseBodyweight: (exerciseId: string) => void;
 
@@ -257,10 +256,6 @@ function normalizePersistedState(
         ? timer
         : null,
     pinnedExerciseNames: ids(state?.pinnedExerciseNames).map((n) => n.toLowerCase()),
-    activeExerciseId:
-      typeof state?.activeExerciseId === "string"
-        ? state.activeExerciseId
-        : (activeSession?.exercises[0]?.id ?? null),
     dirtyWorkoutIds: ids(state?.dirtyWorkoutIds),
     deletedWorkoutIds: ids(state?.deletedWorkoutIds),
   };
@@ -310,7 +305,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
         activeSession: null,
         activeRestTimer: null,
         pinnedExerciseNames: [],
-        activeExerciseId: null,
         dirtyWorkoutIds: [],
         deletedWorkoutIds: [],
 
@@ -327,7 +321,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
               exercises: [],
               cumulativeRestSeconds: 0,
             };
-            state.activeExerciseId = null;
           });
         },
 
@@ -363,7 +356,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
               exercises,
               cumulativeRestSeconds: 0,
             };
-            state.activeExerciseId = exercises[0]?.id ?? null;
           });
         },
 
@@ -388,7 +380,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
           set((state) => {
             state.activeSession = null;
             state.activeRestTimer = null;
-            state.activeExerciseId = null;
             if (stored) addUnique(state.dirtyWorkoutIds, finalSession._id);
           });
           return stored;
@@ -400,7 +391,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
           set((state) => {
             state.activeSession = null;
             state.activeRestTimer = null;
-            state.activeExerciseId = null;
           });
         },
 
@@ -419,11 +409,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
 
         // ── Exercise mutations ──
 
-        setActiveExerciseId: (id) =>
-          set((state) => {
-            state.activeExerciseId = id;
-          }),
-
         addExercise: (exerciseDefinition = null) => {
           const trackingMode = inferTrackingMode(exerciseDefinition);
           const weightUnit = inferWeightUnit(exerciseDefinition);
@@ -441,9 +426,8 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
             weightUnit,
             muscles: exerciseDefinition?.muscles || [],
           };
-          withActive((session, state) => {
+          withActive((session) => {
             session.exercises.push(exercise);
-            state.activeExerciseId = exercise.id;
           });
         },
 
@@ -457,10 +441,8 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
           }),
 
         removeExercise: (exerciseId) =>
-          withActive((session, state) => {
+          withActive((session) => {
             session.exercises = session.exercises.filter((e) => e.id !== exerciseId);
-            if (state.activeExerciseId === exerciseId)
-              state.activeExerciseId = session.exercises[0]?.id ?? null;
           }),
 
         selectExerciseDefinition: (exerciseId, definition) => {
@@ -538,7 +520,12 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
 
         toggleExerciseUnit: (exerciseId) =>
           withExercise(exerciseId, (ex) => {
-            ex.weightUnit = ex.weightUnit === "lbs" ? "kg" : "lbs";
+            const from = ex.weightUnit === "lbs" ? "lbs" : "kg";
+            const to = from === "lbs" ? "kg" : "lbs";
+            ex.weightUnit = to;
+            ex.sets.forEach((s) => {
+              s.weight = convertWeight(s.weight, from, to);
+            });
           }),
 
         toggleExerciseBodyweight: (exerciseId) =>
@@ -720,15 +707,15 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
       name: "workout-session-store",
       storage: createJSONStorage(() => zustandAsyncStorage),
       version: STORE_VERSION,
-      // v6 moved completed sessions out of this store into SQLite; the migration
-      // in src/db/migrateFromAsyncStorage.ts imports the old shards on startup.
+      // v6 moved completed sessions out of this store into SQLite (the migration in
+      // src/db/migrateFromAsyncStorage.ts imports the old shards on startup); v7 dropped
+      // the focused-exercise id when the workout screen became a single page.
       migrate: (persisted) =>
         normalizePersistedState(persisted as Partial<WorkoutSessionState> | undefined),
       partialize: (state) => ({
         activeSession: state.activeSession,
         activeRestTimer: state.activeRestTimer,
         pinnedExerciseNames: state.pinnedExerciseNames,
-        activeExerciseId: state.activeExerciseId,
         dirtyWorkoutIds: state.dirtyWorkoutIds,
         deletedWorkoutIds: state.deletedWorkoutIds,
       }),

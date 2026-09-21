@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.CARD_BG,
     borderRadius: RADIUS.sheet,
     borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
+    borderColor: COLORS.BORDER,
     padding: SPACE.xl,
     maxHeight: "80%",
   },

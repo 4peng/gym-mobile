@@ -28,6 +28,7 @@ import { showAlert } from "@/utils/alerts";
 import { Swipeable } from "./Swipeable";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
+import { Button, buttonForeground } from "@/components/ui/Button";
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -255,25 +256,23 @@ export default function ExercisePickerModal({
             <Text style={[TYPE.caption, { marginTop: SPACE.sm }]}>{renameHint}</Text>
           ) : null}
           <View style={styles.renameActions}>
-            <Pressable
-              style={({ pressed }) => [styles.secondaryBtn, pressed && UI.pressed]}
+            <Button
+              label="Cancel"
+              size="md"
+              icon={<X size={14} color={buttonForeground()} />}
               onPress={() => setRenameTarget(null)}
-            >
-              <X size={14} color={COLORS.TEXT_SECONDARY} />
-              <Text style={[TYPE.bodyMuted, { lineHeight: undefined }]}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryBtn,
-                !canRename && { opacity: 0.45 },
-                pressed && UI.pressed,
-              ]}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Save name"
+              size="md"
+              tone="success"
+              variant="filled"
+              icon={<Pencil size={14} color={buttonForeground("success", "filled")} />}
               onPress={commitRename}
               disabled={!canRename}
-            >
-              <Pencil size={14} color={COLORS.BG} />
-              <Text style={[TYPE.body, { color: COLORS.BG }]}>Save name</Text>
-            </Pressable>
+              style={{ flex: 1 }}
+            />
           </View>
         </KeyboardAvoidingView>
       </Sheet>
@@ -289,8 +288,6 @@ const styles = StyleSheet.create({
     marginTop: SPACE.lg,
     marginBottom: SPACE.lg,
     paddingHorizontal: SPACE.lg,
-    backgroundColor: COLORS.BG,
-    borderColor: COLORS.BORDER_LIGHT,
   },
   searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md + 2, marginLeft: SPACE.sm + 2 },
   addCustom: {
@@ -316,31 +313,9 @@ const styles = StyleSheet.create({
   empty: { textAlign: "center", paddingVertical: SPACE.xxxl },
   renameInput: {
     ...TYPE.body,
-    backgroundColor: COLORS.BG,
-    borderColor: COLORS.BORDER_LIGHT,
     paddingHorizontal: SPACE.md + 2,
     paddingVertical: SPACE.md,
     marginTop: SPACE.md,
   },
   renameActions: { flexDirection: "row", gap: SPACE.sm + 2, marginTop: SPACE.lg },
-  secondaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACE.sm,
-    paddingHorizontal: SPACE.md,
-    paddingVertical: SPACE.sm + 2,
-    borderRadius: RADIUS.item,
-    backgroundColor: SURFACE.raisedStrong,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_LIGHT,
-  },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACE.sm,
-    paddingHorizontal: SPACE.md,
-    paddingVertical: SPACE.sm + 2,
-    borderRadius: RADIUS.item,
-    backgroundColor: COLORS.ACCENT_GREEN,
-  },
 });

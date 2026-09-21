@@ -7,8 +7,8 @@ phone; an Express + Mongo mirror exists only so data survives reinstalling a sid
 ## Project Structure
 - `app/`: Expo Router routes (thin: each renders one screen)
 - `src/screens/`: Screen implementations
-- `src/components/`: Feature components (`Workout/` live-workout pieces, `Workout/HUD/` session HUD, `Home/` dashboard chart)
-- `src/components/ui/`: Primitives: `IconButton`, `ScreenHeader`, `SegmentedControl`, `Chip`, `Sheet`, `EmptyState`, `SectionLabel`
+- `src/components/`: Feature components (`Workout/` live-workout pieces, `Workout/HUD/` session header + bottom bar, `Home/` dashboard chart + start sheet)
+- `src/components/ui/`: Primitives: `IconButton`, `Button` (text button, same tones/radius), `ScreenHeader`, `SegmentedControl`, `Chip`, `Sheet`, `EmptyState`, `SectionLabel`
 - `src/constants/theme.ts`: every design token (`COLORS`, `SURFACE`, `SPACE`, `RADIUS`, `TYPE`, `UI`, fonts)
 - `src/hooks/useSheet.ts`: sheet mount/animation + drag-to-close (used by `Sheet`)
 - `src/db/`: SQLite layer (`driver.ts` schema + driver interface, `workoutRepo.ts`, `dbVersion.ts`, `migrateFromAsyncStorage.ts`, `index.ts` expo-sqlite binding)
@@ -17,6 +17,7 @@ phone; an Express + Mongo mirror exists only so data survives reinstalling a sid
 - `src/lib/api/`: HTTP client, `backup.ts`, converters, `networkListener.ts`
 - `src/utils/`: Shared helpers
 - `src/widgets/`: iOS Live Activity (SwiftUI via `expo-widgets`; exempt from the colour-token lint rule)
+- `patches/`: `patch-package` patches applied on `npm install` (expo-widgets resolves the entitled App Group at runtime, see README “Sideloading”)
 - `shared/`: JS helpers used by app and (contractually) server: `programs.js`, `muscles.js` with `.d.ts`
 - `server/`: Express + TypeScript backend
 
@@ -30,12 +31,12 @@ phone; an Express + Mongo mirror exists only so data survives reinstalling a sid
 - `app/_layout.tsx` opens the database, runs the shard migration, then mounts the stack. Routes auto-register; only list a `Stack.Screen` when it needs options.
 
 ## Ownership
-- `ProgramsListScreen`: activity summary (SQLite summaries), quick actions, routine list (`ProgramTile`)
+- `ProgramsListScreen`: activity summary (SQLite summaries), routine list (`ProgramTile`), floating bar whose Start opens `StartWorkoutSheet` (search routines or start blank)
 - `ProgramEditorScreen` → `RoutineEditorScreen` (form) → `ExerciseEditor` rows
-- `WorkoutSessionScreen`: live session; `ExerciseCard` → `SetRow`, `ExerciseHistoryGraph`; HUD in `Workout/HUD/`; `ExerciseNavMenu`, `RoutineNamePrompt`
+- `WorkoutSessionScreen`: live session as one scrollable page of `ExerciseCard`s (→ `SetRow`, lazy `ExerciseHistoryGraph`); `HUDHeader` + `HUDBar` (add, reorder, discard, finish); `RoutineNamePrompt`. Every picker (exercise, muscles, rest, tracking mode, reorder) is mounted by the screen, never inside a card: an overlay inside a scrolling card is positioned relative to that card and gets clipped. `RoutineEditorScreen` follows the same rule for `ExerciseEditor` rows.
 - `WorkoutHistoryScreen`, `ExerciseListStatsScreen`, `ExerciseVolumeScreen`, `SettingsScreen` read the repo through `useDbQuery`
 - Shared: `EditableSetTag` (tap-to-edit weight×reps), `SetTypeLegend`, `Swipeable`, `FloatingRestTimer`, `LiveRestTimer`, `LiveWorkoutTimer`, `RestTimerLiveActivity`
-- `workoutSessionStore.ts`: active session, rest timer, pins, `dirtyWorkoutIds` / `deletedWorkoutIds`. Completed sessions are written to `workoutRepo`, never kept in the store. `propagateExerciseEdit()` is the one path for muscle/rename/removal propagation (repo + active session).
+- `workoutSessionStore.ts`: active session, rest timer, pins, `dirtyWorkoutIds` / `deletedWorkoutIds`. Completed sessions are written to `workoutRepo`, never kept in the store. `toggleExerciseUnit` converts every set's weight (the logged load stays physically the same); the session is written to SQLite only on finish. `propagateExerciseEdit()` is the one path for muscle/rename/removal propagation (repo + active session).
 - `programStore.ts`: programs, `dirtyProgramIds` / `deletedProgramIds`, `importPrograms` for restore
 - `exerciseLibraryStore.ts` (custom exercises, local-only), `uiPreferencesStore.ts`
 - `syncStore.ts`: `pushPending`, `backupEverything`, `restoreFromCloud` with an in-flight guard; `syncEffect.ts` debounces a push whenever something becomes pending; `networkListener.ts` restores on an empty install or pushes on startup/reconnect
@@ -44,7 +45,7 @@ phone; an Express + Mongo mirror exists only so data survives reinstalling a sid
 - SQLite `gym.db`: `workouts` (one row per completed session) + `workout_exercises` (one JSON row per exercise, indexed by `identity_key`). Stats read `recentExercises` (window function) or `exerciseHistory(key)`; nothing loads the whole history into memory.
 - `useDbQuery(fn, deps)` re-runs after any repo write (`bumpDbVersion`). Repo reads are synchronous.
 - Legacy `workout_*` AsyncStorage shards are imported once by `migrateFromAsyncStorage` and then deleted.
-- Stores persist with `zustandAsyncStorage` (per-key debounce, flushed on background). Store versions: workout-session 6, program 7.
+- Stores persist with `zustandAsyncStorage` (per-key debounce, flushed on background). Store versions: workout-session 7, program 7.
 - Tests run the repository against Node's built-in `node:sqlite` (`src/db/__tests__/nodeDriver.ts`); CI needs Node ≥ 22.
 
 ## Backup Model (single device)
@@ -62,19 +63,19 @@ phone; an Express + Mongo mirror exists only so data survives reinstalling a sid
 - Finishing a workout stores only completed sets; a session with none is discarded
 
 ## Commands
-- `npm install`; `npm run dev`; `npm run ios`
+- `npm install` (runs `patch-package`); `npm run dev`; `npm run ios`
 - `npm run typecheck`, `npm run lint`, `npm run format` / `format:check` (app, shared, server), `npm test`
 - `cd server && npm install && npm run dev`; `npm run build && npm start`; seeds `seed:year`, `seed:4day-split` (+ `:remove`); dev tools `db:clear`, `db:diag`
 - EAS: project `@4peng/gym-mobile`; `eas.json` has a `simulator` dev-client profile
 
 ## CI
 - `.github/workflows/ci.yml` (Node 24): `lint`, `format:check`, `typecheck`, server `tsc --noEmit`, `test`; steps use `if: !cancelled()`
-- `.github/workflows/ios-build.yml`: unsigned IPA on `main`, released for sideloading. Not a gate.
+- `.github/workflows/ios-build.yml`: IPA on `main`, released for sideloading. Ad-hoc signed only so the App Group entitlement travels with the app and the widget extension (see README “Sideloading”). Not a gate.
 
 ## Coding Style
 - TypeScript strict; Prettier is the formatting authority (100 cols, double quotes, trailing commas). Never hand-minify JSX.
 - iOS only: no `Platform.OS` branches, no `BackHandler`, no web fallbacks
-- Colours, spacing, radii and text styles come from `@/constants/theme`; raw hex/rgba literals in components, screens or routes fail lint
+- Colours, spacing, radii and text styles come from `@/constants/theme`; raw hex/rgba literals in components, screens or routes fail lint. Use `TYPE` presets as-is (override colour/alignment only, never `fontSize`/`fontWeight`); one grey outline (`COLORS.BORDER`) for cards/buttons, `SURFACE.hairline` for insets; corner radius `item` for controls, `container` for cards and bars
 - Overlays use `Sheet` (or `useSheet` for the one anchored dropdown); never a native `Modal`
 - Selectors return primitives or `useShallow`-wrapped arrays/objects; screens read the store directly, no wrapper hooks
 - Reuse before writing: check `src/utils/`, `src/hooks/`, `src/components/ui/`, `shared/` first

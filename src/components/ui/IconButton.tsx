@@ -5,15 +5,7 @@ import { COLORS, LAYOUT, RADIUS, UI } from "@/constants/theme";
 type Tone = "neutral" | "primary" | "success" | "danger";
 
 const BORDER: Record<Tone, string> = {
-  neutral: COLORS.BORDER_LIGHT,
-  primary: COLORS.ACCENT_BLUE,
-  success: COLORS.ACCENT_GREEN,
-  danger: COLORS.DANGER,
-};
-
-/** Icon colour that matches a tone; use it for the child icon. */
-const ICON_TONE: Record<Tone, string> = {
-  neutral: COLORS.TEXT_PRIMARY,
+  neutral: COLORS.BORDER,
   primary: COLORS.ACCENT_BLUE,
   success: COLORS.ACCENT_GREEN,
   danger: COLORS.DANGER,
