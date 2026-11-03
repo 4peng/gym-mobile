@@ -16,7 +16,7 @@ import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/components/Swipeable";
 import { Chip } from "@/components/ui/Chip";
@@ -36,25 +36,23 @@ const RECENT = 10;
 function MiniChart({ data }: { data: number[] }) {
   const max = Math.max(1, ...data);
   return (
-    <View style={styles.miniChart}>
-      <Svg width={60} height={30}>
-        {data.map((v, i) => {
-          const h = (v / max) * 30;
-          return (
-            <Rect
-              key={i}
-              x={i * 6}
-              y={30 - h}
-              width={4}
-              height={Math.max(1, h)}
-              fill={COLORS.ACCENT_GREEN}
-              rx={1}
-              opacity={0.8}
-            />
-          );
-        })}
-      </Svg>
-    </View>
+    <Svg width={60} height={30}>
+      {data.map((v, i) => {
+        const h = (v / max) * 30;
+        return (
+          <Rect
+            key={i}
+            x={i * 6}
+            y={30 - h}
+            width={4}
+            height={Math.max(1, h)}
+            fill={COLORS.TEXT_SECONDARY}
+            rx={1}
+            opacity={0.8}
+          />
+        );
+      })}
+    </Svg>
   );
 }
 
@@ -207,13 +205,13 @@ export default function ExerciseListStatsScreen() {
                 <View style={[UI.row, { gap: SPACE.sm }]}>
                   <Text style={TYPE.body}>{toTitleCase(item.name)}</Text>
                   {item.isPinned && (
-                    <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+                    <Pin size={14} color={COLORS.TEXT_SECONDARY} fill={COLORS.TEXT_SECONDARY} />
                   )}
                 </View>
                 <Text
                   style={[
                     TYPE.label,
-                    { color: item.muscles.length ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY },
+                    { color: item.muscles.length ? COLORS.TEXT_SECONDARY : COLORS.TEXT_TERTIARY },
                   ]}
                 >
                   {item.muscles.length
@@ -245,5 +243,4 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: LAYOUT.gutter, gap: SPACE.sm },
   list: { paddingHorizontal: LAYOUT.gutter, paddingBottom: SPACE.xxxl + SPACE.sm },
   item: { padding: SPACE.xl, flexDirection: "row", alignItems: "center", gap: SPACE.lg },
-  miniChart: { backgroundColor: SURFACE.greenTint, padding: SPACE.sm, borderRadius: RADIUS.item },
 });

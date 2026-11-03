@@ -42,7 +42,7 @@ export const HUDHeader = React.memo(function HUDHeader({
       >
         <View style={styles.stickyRow}>
           <View style={styles.stat}>
-            <Timer size={14} color={COLORS.ACCENT_GREEN} />
+            <Timer size={14} color={COLORS.TEXT_TERTIARY} />
             {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={TYPE.mono} />}
           </View>
           <View style={styles.stat}>
@@ -68,7 +68,7 @@ export const HUDHeader = React.memo(function HUDHeader({
         </View>
 
         <View style={styles.progressLine}>
-          <Check size={14} color={COLORS.ACCENT_GREEN} />
+          <Check size={14} color={COLORS.TEXT_TERTIARY} />
           <Text style={TYPE.monoSmall}>
             {Math.round(progressData.progress * 100)}% ({progressData.completed}/
             {progressData.total})

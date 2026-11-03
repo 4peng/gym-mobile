@@ -24,7 +24,7 @@ import { useSyncStore } from "@/stores/syncStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, SPACE, TYPE, UI } from "@/constants/theme";
 import { showAlert, showConfirm } from "@/utils/alerts";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionLabel } from "@/components/ui/SectionLabel";
@@ -63,14 +63,7 @@ function SettingsRow({
         disabled && styles.disabled,
       ]}
     >
-      <View
-        style={[
-          styles.iconBox,
-          { backgroundColor: danger ? SURFACE.dangerTint : SURFACE.blueTint },
-        ]}
-      >
-        {icon}
-      </View>
+      <View style={styles.iconBox}>{icon}</View>
       <View style={{ flex: 1 }}>
         <Text style={[TYPE.body, danger && { color: COLORS.DANGER }]}>{title}</Text>
         <Text style={TYPE.caption}>{description}</Text>
@@ -169,7 +162,7 @@ export default function SettingsScreen() {
           <SettingsRow
             icon={
               <Animated.View style={{ transform: [{ rotate }] }}>
-                <RefreshCw size={20} color={COLORS.ACCENT_BLUE} />
+                <RefreshCw size={20} color={COLORS.TEXT_SECONDARY} />
               </Animated.View>
             }
             title="Back up now"
@@ -179,7 +172,7 @@ export default function SettingsScreen() {
           />
           <View style={[UI.hairline, styles.divider]} />
           <SettingsRow
-            icon={<CloudUpload size={20} color={COLORS.ACCENT_BLUE} />}
+            icon={<CloudUpload size={20} color={COLORS.TEXT_SECONDARY} />}
             title="Back up everything"
             description="Re-upload every routine and session"
             onPress={() => void backupEverything()}
@@ -199,7 +192,7 @@ export default function SettingsScreen() {
         <SectionLabel>Display</SectionLabel>
         <View style={[UI.card, styles.group]}>
           <SettingsRow
-            icon={<Tags size={20} color={COLORS.ACCENT_BLUE} />}
+            icon={<Tags size={20} color={COLORS.TEXT_SECONDARY} />}
             title="Detailed muscle groups"
             description="Show delts, lats, biceps and so on"
             onPress={toggleDetailed}
@@ -213,7 +206,7 @@ export default function SettingsScreen() {
           />
           <View style={[UI.hairline, styles.divider]} />
           <SettingsRow
-            icon={<RefreshCw size={20} color={COLORS.ACCENT_BLUE} />}
+            icon={<RefreshCw size={20} color={COLORS.TEXT_SECONDARY} />}
             title="Preferred weight unit"
             description="Used for new exercises"
             right={
@@ -257,7 +250,7 @@ export default function SettingsScreen() {
         <SectionLabel>Data</SectionLabel>
         <View style={[UI.card, styles.group]}>
           <SettingsRow
-            icon={<Download size={20} color={COLORS.ACCENT_BLUE} />}
+            icon={<Download size={20} color={COLORS.TEXT_SECONDARY} />}
             title="Export as JSON"
             description="Copy every routine and session to the clipboard"
             onPress={() => void handleExport()}
@@ -285,9 +278,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.md,
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.item,
+    width: 24,
     justifyContent: "center",
     alignItems: "center",
   },

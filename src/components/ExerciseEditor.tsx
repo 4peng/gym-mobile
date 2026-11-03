@@ -74,7 +74,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
     <View style={[UI.card, styles.shell]}>
       <View style={styles.header}>
         <View style={styles.indexBadge}>
-          <Text style={[TYPE.mono, { color: COLORS.ACCENT_BLUE }]}>{index + 1}</Text>
+          <Text style={[TYPE.mono, { color: COLORS.TEXT_SECONDARY }]}>{index + 1}</Text>
         </View>
         <View style={styles.grow}>
           <Pressable
@@ -185,7 +185,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
             <Text
               style={[
                 styles.cellValue,
-                { color: exercise.isBodyweight ? COLORS.ACCENT_GREEN : COLORS.TEXT_TERTIARY },
+                { color: exercise.isBodyweight ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY },
               ]}
             >
               {exercise.isBodyweight ? "ON" : "OFF"}
@@ -242,13 +242,11 @@ const styles = StyleSheet.create({
     minWidth: SPACE.xxl,
     height: SPACE.xxl,
     paddingHorizontal: SPACE.xs,
-    borderRadius: RADIUS.sm,
-    backgroundColor: SURFACE.blueTint,
     justifyContent: "center",
     alignItems: "center",
   },
   grow: { flex: 1 },
-  muscleText: { color: COLORS.ORANGE, marginTop: SPACE.xs },
+  muscleText: { color: COLORS.TEXT_SECONDARY, marginTop: SPACE.xs },
   content: { padding: SPACE.lg },
   section: { marginBottom: SPACE.xl },
   labelGroup: {

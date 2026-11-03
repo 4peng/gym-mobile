@@ -228,17 +228,6 @@ const VolumeChart = React.memo(function VolumeChart({
                   }
                   rx={barWidth / 2}
                 />
-                {b.isPeak && (
-                  <SvgText
-                    x={xAt(i) + barWidth / 2}
-                    y={CHART_HEIGHT - barHeight - 28}
-                    fill={active ? COLORS.ACCENT_YELLOW : withAlpha(COLORS.ACCENT_YELLOW, 0.8)}
-                    fontSize="10"
-                    textAnchor="middle"
-                  >
-                    ★
-                  </SvgText>
-                )}
                 {b.label ? (
                   <SvgText
                     x={xAt(i) + barWidth / 2}
@@ -258,7 +247,7 @@ const VolumeChart = React.memo(function VolumeChart({
             <Path
               d={linePath}
               fill="none"
-              stroke={COLORS.ACCENT_GREEN}
+              stroke={COLORS.TEXT_SECONDARY}
               strokeWidth={2.5}
               opacity={0.8}
               strokeLinecap="round"
@@ -293,14 +282,14 @@ const LogRow = React.memo(function LogRow({
       onToggleScroll={onToggleScroll}
       marginBottom={SPACE.md}
     >
-      <View style={[UI.card, styles.logCard, log.isPR && { borderColor: COLORS.ACCENT_YELLOW }]}>
+      <View style={[UI.card, styles.logCard]}>
         <View style={UI.rowBetween}>
           <Pressable
             onPress={() => onEditDate(log.sessionIds, log.date.toISOString())}
             style={({ pressed }) => [UI.row, { gap: SPACE.sm }, pressed && UI.pressed]}
           >
-            <Calendar size={14} color={COLORS.TEXT_TERTIARY} />
-            <Text style={TYPE.bodyMuted}>
+            <Calendar size={14} color={COLORS.ACCENT_BLUE} />
+            <Text style={[TYPE.label, { color: COLORS.ACCENT_BLUE }]}>
               {log.date.toLocaleDateString("default", { month: "short", day: "numeric" })}
             </Text>
           </Pressable>
@@ -310,9 +299,7 @@ const LogRow = React.memo(function LogRow({
                 <Text style={[TYPE.label, { color: COLORS.ACCENT_YELLOW }]}>PR</Text>
               </View>
             )}
-            <Text
-              style={[TYPE.mono, { color: log.isPR ? COLORS.ACCENT_YELLOW : COLORS.ACCENT_BLUE }]}
-            >
+            <Text style={TYPE.mono}>
               {Math.round(log.volume)} {unit}
             </Text>
           </View>
@@ -499,10 +486,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
         )}
         ListHeaderComponent={
           <>
-            <Text style={[TYPE.title, styles.title]}>
-              Volume trends{"\n"}
-              <Text style={{ color: COLORS.ACCENT_GREEN }}>{toTitleCase(displayName)}</Text>
-            </Text>
+            <Text style={[TYPE.title, styles.title]}>{toTitleCase(displayName)}</Text>
 
             <Pressable
               onPress={() => setMuscleSelectorVisible(true)}

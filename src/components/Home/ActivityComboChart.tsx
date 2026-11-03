@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Line, Polyline } from "react-native-svg";
-import { COLORS, RADIUS, SPACE, SURFACE, TYPE, withAlpha } from "@/constants/theme";
+import { COLORS, SPACE, SURFACE, TYPE } from "@/constants/theme";
 import type { ActivityChartPoint } from "@/utils/activitySummary";
 
 interface ActivityComboChartProps {
@@ -42,11 +42,6 @@ export default function ActivityComboChart({
     y: height - Math.max(8, (p.minutes / chartCeil) * (height - 8)),
   }));
   const line = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
-  const area = [
-    `${linePoints[0].x},${height}`,
-    line,
-    `${linePoints[linePoints.length - 1].x},${height}`,
-  ].join(" ");
 
   return (
     <View style={[styles.shell, { width }]}>
@@ -68,15 +63,14 @@ export default function ActivityComboChart({
             y1={height}
             x2={linePoints[i].x}
             y2={linePoints[i].y}
-            stroke={SURFACE.blueTintStrong}
+            stroke={SURFACE.raisedStrong}
             strokeWidth={BAR_WIDTH}
           />
         ))}
-        <Polyline points={area} fill={withAlpha(COLORS.ACCENT_GREEN, 0.05)} stroke="transparent" />
         <Polyline
           points={line}
           fill="none"
-          stroke={COLORS.ACCENT_GREEN}
+          stroke={COLORS.ACCENT_BLUE}
           strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -88,7 +82,7 @@ export default function ActivityComboChart({
             y1={p.y}
             x2={p.x}
             y2={p.y - 0.5}
-            stroke={COLORS.ACCENT_GREEN}
+            stroke={COLORS.ACCENT_BLUE}
             strokeWidth={4}
             strokeLinecap="round"
           />
@@ -115,10 +109,6 @@ export default function ActivityComboChart({
 const styles = StyleSheet.create({
   shell: {
     height: 190,
-    borderRadius: RADIUS.item,
-    backgroundColor: COLORS.BG,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
     paddingTop: PADDING,
     paddingBottom: SPACE.sm,
     justifyContent: "flex-end",

@@ -14,7 +14,7 @@ import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useProgramStore } from "@/stores/programStore";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, LAYOUT, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, SPACE, TYPE, UI } from "@/constants/theme";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/components/Swipeable";
 import { EditableSetTag } from "@/components/Workout/EditableSetTag";
@@ -96,13 +96,13 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({
           <Text style={TYPE.titleSm}>{programName || "Quick session"}</Text>
           <View style={[UI.row, { gap: SPACE.lg, marginVertical: SPACE.sm }]}>
             <View style={[UI.row, { gap: SPACE.sm }]}>
-              <Clock size={12} color={COLORS.ACCENT_YELLOW} />
+              <Clock size={12} color={COLORS.TEXT_SECONDARY} />
               <Text style={TYPE.monoSmall}>
                 {durationLabel(session.startedAt, session.completedAt)}
               </Text>
             </View>
             <View style={[UI.row, { gap: SPACE.sm }]}>
-              <Dumbbell size={12} color={COLORS.ACCENT_GREEN} />
+              <Dumbbell size={12} color={COLORS.TEXT_SECONDARY} />
               <Text style={TYPE.monoSmall}>{session.exercises.length} exercises</Text>
             </View>
           </View>
@@ -117,16 +117,14 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({
           <View style={styles.details}>
             <View style={UI.hairline} />
             {session.notes.trim() ? (
-              <View style={[UI.inset, styles.notes]}>
-                <Text style={[TYPE.label, { color: COLORS.ACCENT_BLUE }]}>Workout notes</Text>
+              <View style={styles.notes}>
+                <Text style={TYPE.label}>Workout notes</Text>
                 <Text style={TYPE.bodyMuted}>{session.notes}</Text>
               </View>
             ) : null}
             {session.exercises.map((ex) => (
               <View key={ex.id} style={{ gap: SPACE.sm }}>
-                <Text style={[TYPE.body, { color: COLORS.ACCENT_BLUE }]}>
-                  {toTitleCase(ex.name)}
-                </Text>
+                <Text style={TYPE.body}>{toTitleCase(ex.name)}</Text>
                 <View style={styles.sets}>
                   {ex.sets.map((s) => (
                     <EditableSetTag
@@ -202,11 +200,6 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: LAYOUT.gutter, paddingBottom: 100 },
   card: { padding: SPACE.md, gap: SPACE.md },
   details: { gap: SPACE.lg },
-  notes: {
-    padding: SPACE.md,
-    gap: SPACE.xs,
-    backgroundColor: SURFACE.blueTint,
-    borderColor: SURFACE.blueBorder,
-  },
+  notes: { gap: SPACE.xs },
   sets: { flexDirection: "row", flexWrap: "wrap", gap: SPACE.sm },
 });

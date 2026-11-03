@@ -54,14 +54,9 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: COLORS.BG },
-            animation: "fade_from_bottom",
+            animation: "default",
           }}
-        >
-          <Stack.Screen
-            name="exercises/[name]/volume"
-            options={{ animation: "slide_from_bottom", gestureEnabled: true }}
-          />
-        </Stack>
+        />
       ) : (
         <View style={[UI.screen, { justifyContent: "center", alignItems: "center" }]}>
           <ActivityIndicator size="large" color={COLORS.ACCENT_BLUE} />

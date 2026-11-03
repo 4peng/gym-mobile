@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Text, type StyleProp, type TextStyle } from "react-native";
-import { COLORS, TYPE } from "@/constants/theme";
+import { TYPE } from "@/constants/theme";
 import { formatClock } from "@/utils/conversions";
 
 /** Elapsed time since `startedAt`. Ticks once a second. */
@@ -22,5 +22,5 @@ export default function LiveWorkoutTimer({
     return () => clearInterval(interval);
   }, [startedAt]);
 
-  return <Text style={[TYPE.mono, { color: COLORS.ACCENT_GREEN }, textStyle]}>{display}</Text>;
+  return <Text style={[TYPE.mono, textStyle]}>{display}</Text>;
 }

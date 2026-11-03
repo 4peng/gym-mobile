@@ -58,17 +58,18 @@ export default function StartWorkoutSheet({
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        ItemSeparatorComponent={() => <View style={UI.hairline} />}
         ListHeaderComponent={
           <Pressable
             onPress={pick(onStartBlank)}
-            style={({ pressed }) => [UI.inset, styles.row, styles.blank, pressed && UI.pressed]}
+            style={({ pressed }) => [styles.row, styles.blank, pressed && UI.pressed]}
           >
-            <Zap size={18} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+            <Zap size={18} color={COLORS.ACCENT_BLUE} />
             <View style={styles.grow}>
               <Text style={TYPE.body}>Blank workout</Text>
               <Text style={TYPE.caption}>Add exercises as you go</Text>
             </View>
-            <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
+            <ChevronRight size={16} color={COLORS.TEXT_TERTIARY} />
           </Pressable>
         }
         renderItem={({ item }) => {
@@ -76,7 +77,7 @@ export default function StartWorkoutSheet({
           return (
             <Pressable
               onPress={pick(() => onStartProgram(item))}
-              style={({ pressed }) => [UI.inset, styles.row, pressed && UI.pressed]}
+              style={({ pressed }) => [styles.row, pressed && UI.pressed]}
             >
               <View style={styles.grow}>
                 <Text style={TYPE.body}>{item.name || "Untitled Routine"}</Text>
@@ -108,9 +109,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.lg,
   },
   searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md, marginLeft: SPACE.sm },
-  list: { paddingHorizontal: SPACE.lg, paddingBottom: SPACE.lg, gap: SPACE.sm },
-  row: { flexDirection: "row", alignItems: "center", gap: SPACE.md, padding: SPACE.lg },
-  blank: { backgroundColor: SURFACE.blueTint, borderColor: SURFACE.blueBorder },
+  list: { paddingHorizontal: SPACE.xl, paddingBottom: SPACE.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: SPACE.md, paddingVertical: SPACE.md },
+  blank: { borderBottomWidth: 1, borderBottomColor: SURFACE.hairline },
   grow: { flex: 1 },
   empty: { textAlign: "center", paddingVertical: SPACE.xxxl },
 });

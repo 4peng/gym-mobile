@@ -154,7 +154,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
       <View style={[UI.inset, styles.instrumentBar]}>
         <View ref={trackingSegmentRef} style={styles.segmentWrap} collapsable={false}>
           <Pressable style={segmentStyle} onPress={openTrackingPicker}>
-            <TrackingIcon size={12} color={COLORS.ACCENT_BLUE} />
+            <TrackingIcon size={12} color={COLORS.TEXT_SECONDARY} />
             <Text style={styles.segmentText}>
               {getTrackingModeLabel(exercise.trackingMode).toUpperCase()}
             </Text>
@@ -171,16 +171,11 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
               }}
             >
               {exercise.isBodyweight ? (
-                <User size={12} color={COLORS.ACCENT_GREEN} />
+                <User size={12} color={COLORS.TEXT_SECONDARY} />
               ) : (
-                <Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />
+                <Dumbbell size={12} color={COLORS.TEXT_SECONDARY} />
               )}
-              <Text
-                style={[
-                  styles.segmentText,
-                  exercise.isBodyweight && { color: COLORS.ACCENT_GREEN },
-                ]}
-              >
+              <Text style={styles.segmentText}>
                 {exercise.isBodyweight ? "BODYWEIGHT" : "WEIGHTED"}
               </Text>
             </Pressable>
@@ -194,7 +189,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
                     toggleExerciseUnit(exercise.id);
                   }}
                 >
-                  <Text style={[styles.segmentText, { color: COLORS.ACCENT_BLUE }]}>
+                  <Text style={styles.segmentText}>
                     {(exercise.weightUnit || "kg").toUpperCase()}
                   </Text>
                 </Pressable>
@@ -274,7 +269,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
               ) : null}
             </View>
             <View style={styles.headerActions}>
-              <Check size={12} color={COLORS.ACCENT_GREEN} />
+              <Check size={12} color={COLORS.TEXT_TERTIARY} />
             </View>
           </View>
           <View style={styles.rows}>
@@ -319,7 +314,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACE.lg,
   },
   topContent: { flex: 1 },
-  muscleText: { ...TYPE.monoSmall, color: COLORS.ORANGE, marginTop: SPACE.xs },
+  muscleText: { ...TYPE.monoSmall, marginTop: SPACE.xs },
   instrumentBar: {
     flexDirection: "row",
     alignItems: "center",

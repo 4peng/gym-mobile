@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { MoreHorizontal, Pin, Play } from "lucide-react-native";
+import { Pin, Play } from "lucide-react-native";
 import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
 import { Swipeable } from "@/components/Swipeable";
 import { IconButton } from "@/components/ui/IconButton";
@@ -50,15 +50,11 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
       >
         <View style={UI.rowBetween}>
           <View style={[UI.row, { gap: SPACE.sm }]}>
-            <Text style={[TYPE.label, program.pinned && { color: COLORS.ACCENT_BLUE }]}>
-              {program.pinned ? "Pinned" : "Routine"}
-            </Text>
-            <Text style={[TYPE.label, { color: COLORS.TEXT_TERTIARY }]}>/</Text>
+            <Text style={TYPE.label}>{program.pinned ? "Pinned" : "Routine"}</Text>
+            <Text style={TYPE.label}>/</Text>
             <Text style={TYPE.label}>{String(count).padStart(2, "0")} ex</Text>
           </View>
-          {program.pinned ? (
-            <Pin size={14} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-          ) : null}
+          {program.pinned ? <Pin size={14} color={COLORS.TEXT_SECONDARY} /> : null}
         </View>
 
         <Text style={TYPE.titleSm} numberOfLines={2}>
@@ -66,13 +62,13 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
         </Text>
 
         <View style={styles.meta}>
-          <View style={[UI.inset, styles.metaCell]}>
+          <View style={styles.metaCell}>
             <Text style={TYPE.label}>Loadout</Text>
             <Text style={[TYPE.monoSmall, styles.metaValue]}>
               {count} exercise{count === 1 ? "" : "s"}
             </Text>
           </View>
-          <View style={[UI.inset, styles.metaCell]}>
+          <View style={styles.metaCell}>
             <Text style={TYPE.label}>Last run</Text>
             <Text style={[TYPE.monoSmall, styles.metaValue]}>{formatLastUsed(lastUsedAt)}</Text>
           </View>
@@ -80,14 +76,9 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 
         <View style={UI.rowBetween}>
           <Text style={TYPE.caption}>Tap card to edit</Text>
-          <View style={[UI.row, { gap: SPACE.sm }]}>
-            <IconButton size="md" onPress={() => onPress(program._id)}>
-              <MoreHorizontal size={18} color={COLORS.TEXT_SECONDARY} />
-            </IconButton>
-            <IconButton size="md" tone="primary" onPress={() => onStart(program)}>
-              <Play size={16} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
-            </IconButton>
-          </View>
+          <IconButton size="md" tone="primary" onPress={() => onStart(program)}>
+            <Play size={16} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+          </IconButton>
         </View>
       </Pressable>
     </Swipeable>
@@ -97,12 +88,6 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 const styles = StyleSheet.create({
   card: { padding: SPACE.lg, gap: SPACE.md },
   meta: { flexDirection: "row", gap: SPACE.md },
-  metaCell: {
-    flex: 1,
-    paddingHorizontal: SPACE.md,
-    paddingVertical: SPACE.md,
-    justifyContent: "center",
-    gap: SPACE.xs,
-  },
+  metaCell: { flex: 1, gap: SPACE.xs },
   metaValue: { color: COLORS.TEXT_PRIMARY },
 });

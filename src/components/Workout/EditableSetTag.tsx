@@ -59,8 +59,8 @@ export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
         onChangeText={(v) => setDraft({ ...draft, reps: v })}
         keyboardType="numeric"
       />
-      <IconButton ghost size="sm" tone="success" onPress={save}>
-        <Check size={14} color={COLORS.ACCENT_GREEN} />
+      <IconButton ghost size="sm" tone="primary" onPress={save}>
+        <Check size={14} color={COLORS.ACCENT_BLUE} />
       </IconButton>
       <IconButton ghost size="sm" tone="danger" onPress={() => setDraft(null)}>
         <X size={14} color={COLORS.DANGER} />
@@ -71,12 +71,12 @@ export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
 
 const styles = StyleSheet.create({
   tag: {
-    backgroundColor: SURFACE.blueTint,
+    backgroundColor: SURFACE.raised,
     paddingHorizontal: SPACE.md,
     paddingVertical: SPACE.sm,
     borderRadius: RADIUS.item,
     borderWidth: 1,
-    borderColor: SURFACE.blueBorder,
+    borderColor: SURFACE.hairline,
   },
   tagText: { ...TYPE.monoSmall, color: COLORS.TEXT_PRIMARY },
   tagX: { ...TYPE.monoSmall, color: COLORS.TEXT_TERTIARY, marginHorizontal: SPACE.xs },

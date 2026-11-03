@@ -16,7 +16,7 @@ import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, LAYOUT, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, SPACE, TYPE, UI } from "@/constants/theme";
 import {
   activityRangeStart,
   buildActivitySummary,
@@ -122,7 +122,7 @@ export default function ProgramsListScreen() {
             </Text>
             <ActivityComboChart
               points={summary.points}
-              width={LAYOUT.screenWidth - LAYOUT.gutter * 2 - SPACE.lg * 2 - 2}
+              width={LAYOUT.screenWidth - LAYOUT.gutter * 2 - SPACE.lg * 2}
             />
           </View>
 
@@ -135,7 +135,7 @@ export default function ProgramsListScreen() {
                 <Text style={TYPE.label}>In progress</Text>
                 <Text style={[TYPE.monoMedium, { marginTop: SPACE.xs }]}>Resume workout</Text>
               </View>
-              <ChevronRight size={18} color={COLORS.ACCENT_BLUE} />
+              <ChevronRight size={18} color={COLORS.TEXT_TERTIARY} />
             </Pressable>
           ) : null}
 
@@ -192,8 +192,8 @@ export default function ProgramsListScreen() {
 
       <View style={styles.floatingWrap} pointerEvents="box-none">
         <View style={[UI.hudBar, UI.shadow, styles.floating]}>
-          <IconButton tone="primary" onPress={() => router.push("/programs/create")}>
-            <Plus size={20} color={COLORS.ACCENT_BLUE} />
+          <IconButton onPress={() => router.push("/programs/create")}>
+            <Plus size={20} color={COLORS.TEXT_SECONDARY} />
           </IconButton>
           <Text style={[TYPE.label, styles.floatingLabel]}>
             {hasActiveSession ? "Workout in progress" : "Ready to train"}
@@ -238,7 +238,6 @@ const styles = StyleSheet.create({
   summaryCard: { padding: SPACE.lg, gap: SPACE.sm },
   resumeCard: {
     paddingVertical: SPACE.lg,
-    borderColor: SURFACE.blueBorder,
     paddingHorizontal: SPACE.lg,
     flexDirection: "row",
     justifyContent: "space-between",
