@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Check, X } from "lucide-react-native";
+import { Check } from "lucide-react-native";
 import { COLORS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import {
   collapseDetailedMusclesToPrimary,
@@ -14,7 +14,6 @@ import {
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { HapticFeedback } from "@/utils/haptics";
 import { Sheet } from "@/components/ui/Sheet";
-import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
@@ -91,10 +90,15 @@ export default function MuscleSelector({
       onClose={applyAndClose}
       dragToClose
       title={label}
-      headerRight={
-        <IconButton size="md" ghost onPress={applyAndClose}>
-          <X size={20} color={COLORS.TEXT_TERTIARY} />
-        </IconButton>
+      closeButton
+      footer={
+        <Button
+          label="Done"
+          tone="primary"
+          variant="filled"
+          onPress={applyAndClose}
+          style={styles.action}
+        />
       }
     >
       <View style={styles.modeToggle}>
@@ -134,13 +138,6 @@ export default function MuscleSelector({
           );
         })}
       </ScrollView>
-      <Button
-        label="Done"
-        tone="primary"
-        variant="filled"
-        onPress={applyAndClose}
-        style={styles.done}
-      />
     </Sheet>
   );
 }
@@ -156,5 +153,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.xl,
   },
   itemActive: { backgroundColor: SURFACE.blueTint, borderColor: SURFACE.blueBorder },
-  done: { marginHorizontal: SPACE.lg, marginBottom: SPACE.lg },
+  action: { flex: 1 },
 });

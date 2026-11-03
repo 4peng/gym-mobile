@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ArrowUpDown, Check, Play, Plus, Save, Trash2, X } from "lucide-react-native";
+import { ArrowUpDown, Check, Plus, X } from "lucide-react-native";
 import { showAlert } from "@/utils/alerts";
 import { COLORS, LAYOUT, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import ExerciseEditor, {
@@ -222,37 +222,36 @@ export default function RoutineEditorScreen({
         onClose={() => setOptionsVisible(false)}
         placement="center"
         title="Routine options"
-        headerRight={
-          <IconButton size="md" ghost onPress={() => setOptionsVisible(false)}>
-            <X size={20} color={COLORS.TEXT_TERTIARY} />
-          </IconButton>
+        closeButton
+        footer={
+          <>
+            {onDelete ? (
+              <Button
+                label="Delete"
+                tone="danger"
+                onPress={withOptionsClosed(() => onDelete(draft()))}
+                style={styles.fill}
+              />
+            ) : null}
+            {onSaveAndStart ? (
+              <Button
+                label="Start"
+                tone="primary"
+                onPress={withOptionsClosed(doSaveAndStart)}
+                style={styles.fill}
+              />
+            ) : null}
+            <Button
+              label="Save"
+              tone="primary"
+              variant="filled"
+              onPress={withOptionsClosed(doSave)}
+              style={styles.fill}
+            />
+          </>
         }
       >
-        <View style={styles.options}>
-          <Button
-            label="Save changes"
-            tone="primary"
-            variant="filled"
-            icon={<Save size={18} color={buttonForeground("primary", "filled")} />}
-            onPress={withOptionsClosed(doSave)}
-          />
-          {onSaveAndStart ? (
-            <Button
-              label="Save and start"
-              tone="primary"
-              icon={<Play size={18} color={buttonForeground("primary")} />}
-              onPress={withOptionsClosed(doSaveAndStart)}
-            />
-          ) : null}
-          {onDelete ? (
-            <Button
-              label="Delete routine"
-              tone="danger"
-              icon={<Trash2 size={18} color={buttonForeground("danger")} />}
-              onPress={withOptionsClosed(() => onDelete(draft()))}
-            />
-          ) : null}
-        </View>
+        {null}
       </Sheet>
 
       <ExerciseReorderModal
@@ -314,5 +313,4 @@ const styles = StyleSheet.create({
   summaryItem: { flex: 1, alignItems: "center", gap: SPACE.xs },
   summaryDivider: { width: 1, height: SPACE.xxl, backgroundColor: SURFACE.hairline },
   actions: { flexDirection: "row", gap: SPACE.md, marginBottom: SPACE.xxl },
-  options: { paddingTop: SPACE.sm, gap: SPACE.md },
 });

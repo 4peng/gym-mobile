@@ -8,11 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { Check, X } from "lucide-react-native";
 import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { Sheet } from "@/components/ui/Sheet";
-import { IconButton } from "@/components/ui/IconButton";
-import { Button, buttonForeground } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 
 const ITEM_HEIGHT = 60;
 const VISIBLE_ITEMS = 3;
@@ -118,10 +116,18 @@ export default function RestTimerPicker({
       visible={visible}
       onClose={onClose}
       title="Rest duration"
-      headerRight={
-        <IconButton size="md" ghost onPress={onClose}>
-          <X size={20} color={COLORS.TEXT_TERTIARY} />
-        </IconButton>
+      closeButton
+      footer={
+        <Button
+          label="Save"
+          tone="primary"
+          variant="filled"
+          onPress={() => {
+            onSave(minute * 60 + second);
+            onClose();
+          }}
+          style={styles.action}
+        />
       }
     >
       <View style={styles.pickerWrap}>
@@ -138,17 +144,6 @@ export default function RestTimerPicker({
           {minute}m {second}s
         </Text>
       </Text>
-      <Button
-        label="Save"
-        tone="primary"
-        variant="filled"
-        icon={<Check size={16} color={buttonForeground("primary", "filled")} />}
-        onPress={() => {
-          onSave(minute * 60 + second);
-          onClose();
-        }}
-        style={styles.save}
-      />
     </Sheet>
   );
 }
@@ -182,5 +177,5 @@ const styles = StyleSheet.create({
   list: { flex: 1, width: "100%" },
   item: { height: ITEM_HEIGHT, justifyContent: "center", alignItems: "center", width: "100%" },
   footer: { textAlign: "center", paddingTop: SPACE.sm },
-  save: { marginHorizontal: SPACE.xl, marginTop: SPACE.xl },
+  action: { flex: 1 },
 });

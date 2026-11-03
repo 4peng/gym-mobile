@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Check, GripVertical, X } from "lucide-react-native";
+import { GripVertical } from "lucide-react-native";
 import DraggableFlatList, {
   type RenderItemParams,
   ScaleDecorator,
@@ -9,7 +9,7 @@ import { Pressable as GesturePressable } from "react-native-gesture-handler";
 import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { HapticFeedback } from "@/utils/haptics";
 import { Sheet } from "@/components/ui/Sheet";
-import { IconButton } from "@/components/ui/IconButton";
+import { Button } from "@/components/ui/Button";
 
 interface ReorderItem {
   id: string;
@@ -84,22 +84,18 @@ export default function ExerciseReorderModal({
       onClose={onClose}
       placement="center"
       title="Reorder"
-      headerLeft={
-        <IconButton size="md" tone="danger" onPress={onClose}>
-          <X size={20} color={COLORS.DANGER} />
-        </IconButton>
-      }
-      headerRight={
-        <IconButton
-          size="md"
-          tone="success"
+      closeButton
+      footer={
+        <Button
+          label="Save"
+          tone="primary"
+          variant="filled"
+          style={styles.footerButton}
           onPress={() => {
             onSave(draft.map((e) => e.id));
             onClose();
           }}
-        >
-          <Check size={20} color={COLORS.ACCENT_GREEN} />
-        </IconButton>
+        />
       }
     >
       <DraggableFlatList
@@ -137,6 +133,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   label: { flex: 1 },
+  footerButton: { flex: 1 },
   handle: {
     width: LAYOUT.buttonMd,
     height: LAYOUT.buttonMd,

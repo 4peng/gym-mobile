@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { ChevronRight, Search, X, Zap } from "lucide-react-native";
+import { ChevronRight, Search, Zap } from "lucide-react-native";
 import { COLORS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { Sheet } from "@/components/ui/Sheet";
-import { IconButton } from "@/components/ui/IconButton";
 import { formatLastUsed } from "@/components/ProgramTile";
 import type { Program } from "@/types";
 
@@ -42,17 +41,7 @@ export default function StartWorkoutSheet({
   };
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      dragToClose
-      title="Start workout"
-      headerRight={
-        <IconButton size="md" ghost onPress={onClose}>
-          <X size={20} color={COLORS.TEXT_TERTIARY} />
-        </IconButton>
-      }
-    >
+    <Sheet visible={visible} onClose={onClose} dragToClose title="Start workout" closeButton>
       <View style={[UI.inset, styles.search]}>
         <Search size={16} color={COLORS.TEXT_TERTIARY} />
         <TextInput

@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Check, Dumbbell, Plus, X } from "lucide-react-native";
+import { Dumbbell, Plus } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useShallow } from "zustand/react/shallow";
 import { showConfirm } from "@/utils/alerts";
@@ -28,7 +28,6 @@ import ExerciseTrackingModeSelector from "@/components/ExerciseTrackingModeSelec
 import MuscleSelector from "@/components/MuscleSelector";
 import RestTimerPicker from "@/components/RestTimerPicker";
 import { Sheet } from "@/components/ui/Sheet";
-import { IconButton } from "@/components/ui/IconButton";
 import { Button, buttonForeground } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { ExerciseDefinition, WorkoutExercise } from "@/types";
@@ -272,15 +271,15 @@ function RoutineNamePrompt({
       visible={visible}
       onClose={onCancel}
       title="Save as routine"
-      headerLeft={
-        <IconButton size="md" tone="danger" onPress={onCancel}>
-          <X size={20} color={COLORS.DANGER} />
-        </IconButton>
-      }
-      headerRight={
-        <IconButton size="md" tone="success" onPress={save}>
-          <Check size={20} color={COLORS.ACCENT_GREEN} />
-        </IconButton>
+      closeButton
+      footer={
+        <Button
+          label="Save"
+          tone="primary"
+          variant="filled"
+          style={styles.footerButton}
+          onPress={save}
+        />
       }
     >
       <TextInput
@@ -311,4 +310,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: LAYOUT.gutter + SPACE.sm,
     paddingVertical: SPACE.xl,
   },
+  footerButton: { flex: 1 },
 });

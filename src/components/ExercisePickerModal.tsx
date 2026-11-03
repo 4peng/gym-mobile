@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Check, Pencil, Search, X } from "lucide-react-native";
+import { Check, Pencil, Search } from "lucide-react-native";
 import { EXERCISE_CATALOG } from "@/data/exerciseCatalog";
 import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import type { ExerciseDefinition } from "@/types";
@@ -28,7 +28,7 @@ import { showAlert } from "@/utils/alerts";
 import { Swipeable } from "./Swipeable";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
-import { Button, buttonForeground } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -190,17 +190,7 @@ export default function ExercisePickerModal({
   };
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      dragToClose
-      title={title}
-      headerRight={
-        <IconButton size="md" ghost onPress={onClose}>
-          <X size={20} color={COLORS.TEXT_TERTIARY} />
-        </IconButton>
-      }
-    >
+    <Sheet visible={visible} onClose={onClose} dragToClose title={title} closeButton>
       <View style={[UI.inset, styles.search]}>
         <Search size={16} color={COLORS.TEXT_TERTIARY} />
         <TextInput
@@ -243,10 +233,25 @@ export default function ExercisePickerModal({
         placement="center"
         title="Rename custom exercise"
         subtitle={renameTarget?.name}
-        headerRight={
-          <IconButton size="md" ghost onPress={() => setRenameTarget(null)}>
-            <X size={20} color={COLORS.TEXT_TERTIARY} />
-          </IconButton>
+        closeButton
+        footer={
+          <>
+            <Button
+              label="Cancel"
+              size="md"
+              onPress={() => setRenameTarget(null)}
+              style={styles.action}
+            />
+            <Button
+              label="Save"
+              size="md"
+              tone="primary"
+              variant="filled"
+              onPress={commitRename}
+              disabled={!canRename}
+              style={styles.action}
+            />
+          </>
         }
       >
         <KeyboardAvoidingView behavior="padding">
@@ -263,25 +268,6 @@ export default function ExercisePickerModal({
           {renameHint ? (
             <Text style={[TYPE.caption, { marginTop: SPACE.sm }]}>{renameHint}</Text>
           ) : null}
-          <View style={styles.renameActions}>
-            <Button
-              label="Cancel"
-              size="md"
-              icon={<X size={14} color={buttonForeground()} />}
-              onPress={() => setRenameTarget(null)}
-              style={{ flex: 1 }}
-            />
-            <Button
-              label="Save name"
-              size="md"
-              tone="primary"
-              variant="filled"
-              icon={<Pencil size={14} color={buttonForeground("primary", "filled")} />}
-              onPress={commitRename}
-              disabled={!canRename}
-              style={{ flex: 1 }}
-            />
-          </View>
         </KeyboardAvoidingView>
       </Sheet>
     </Sheet>
@@ -323,5 +309,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.md,
     paddingVertical: SPACE.md,
   },
-  renameActions: { flexDirection: "row", gap: SPACE.sm, marginTop: SPACE.lg },
+  action: { flex: 1 },
 });
