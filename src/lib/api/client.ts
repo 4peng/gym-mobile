@@ -1,26 +1,16 @@
-// ──────────────────────────────────────────────
-// Base fetch wrapper for the REST API
-// ──────────────────────────────────────────────
-// All API calls go through this module.
-// The base URL can be swapped per environment.
-
 import { USER_ID } from "@/constants/user";
 import Constants from "expo-constants";
 
-/**
- * QUICK TOGGLE FOR SERVER ADDRESS
- * Set this to "prod" to use Vercel, or "local" for local machine IP.
- */
+/** "prod" uses Vercel, "local" the machine's LAN IP. */
 const ENV: "local" | "prod" = "prod";
 
-const PROD_URL = "https://apen-gym.vercel.app"; // Update with your actual Vercel URL
+const PROD_URL = "https://apen-gym.vercel.app";
 const LOCAL_PORT = "4000";
 
 const getBaseUrl = () => {
   if (ENV === "prod") return PROD_URL;
 
-  // If we are on a physical device, we must use the machine's local IP
-  // instead of "localhost" (which would refer to the phone itself).
+  // A physical device needs the machine's LAN IP; "localhost" would be the phone.
   const debuggerHost = Constants.expoConfig?.hostUri;
   const localhost = debuggerHost ? debuggerHost.split(":")[0] : "192.168.1.104";
 
@@ -29,24 +19,17 @@ const getBaseUrl = () => {
 
 const BASE_URL = getBaseUrl();
 
-// Requests that stall (e.g. dead connection) should fail instead of hanging
-// forever and wedging the sync engine.
+// Stalled requests fail instead of wedging the sync engine.
 const REQUEST_TIMEOUT_MS = 15000;
 
-export interface ApiResponse<T> {
+interface ApiResponse<T> {
   ok: boolean;
   data?: T;
   error?: string;
   status: number;
 }
 
-/**
- * Thin wrapper around `fetch` with:
- *  - JSON content-type headers
- *  - userId header for auth
- *  - Typed response parsing
- *  - Error normalisation (never throws — returns `{ ok: false }`)
- */
+/** JSON fetch with the userId header; never throws, failures return `{ ok: false }`. */
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -75,7 +58,6 @@ export async function apiRequest<T>(
     const data = (await response.json()) as T;
     return { ok: true, data, status: response.status };
   } catch (err) {
-    // Network error / offline / timeout — perfectly normal in offline-first apps.
     const isTimeout = err instanceof Error && err.name === "AbortError";
     return {
       ok: false,

@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { X } from "lucide-react-native";
 import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { useDragToClose, useSheet } from "@/hooks/useSheet";
+import { IconButton } from "./IconButton";
 
 interface SheetProps {
   visible: boolean;
@@ -12,6 +14,10 @@ interface SheetProps {
   headerLeft?: ReactNode;
   /** Slot right of the title (e.g. confirm button). */
   headerRight?: ReactNode;
+  /** Show the standard close (X) button right of the title. */
+  closeButton?: boolean;
+  /** Footer actions row (kit `Button`s), pinned under the body. */
+  footer?: ReactNode;
   /** Bottom sheet (default) or centred dialog. */
   placement?: "bottom" | "center";
   /** Allow swipe-down to dismiss (bottom sheets only). */
@@ -21,10 +27,7 @@ interface SheetProps {
   children: ReactNode;
 }
 
-/**
- * The app's only overlay container: absolute view + 180ms animation, no native
- * Modal. Stays mounted until the close animation finishes.
- */
+/** The app's only overlay: absolute view animated over `MOTION.base`, never a native Modal. */
 export function Sheet({
   visible,
   onClose,
@@ -32,21 +35,25 @@ export function Sheet({
   subtitle,
   headerLeft,
   headerRight,
+  closeButton,
+  footer,
   placement = "bottom",
   dragToClose,
   onBackdropPress,
   children,
 }: SheetProps) {
   const { mounted, progress } = useSheet(visible);
-  const drag = useDragToClose(onBackdropPress ?? onClose);
+  const dismiss = onBackdropPress ?? onClose;
+  const drag = useDragToClose(dismiss);
   if (!mounted) return null;
 
   const isBottom = placement === "bottom";
+  const draggable = dragToClose && isBottom;
   const translateY = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [isBottom ? 600 : 24, 0],
   });
-  const hasHeader = !!(title || headerLeft || headerRight);
+  const hasHeader = !!(title || headerLeft || headerRight || closeButton);
 
   return (
     <View
@@ -54,7 +61,7 @@ export function Sheet({
       pointerEvents="box-none"
     >
       <Animated.View style={[UI.fill, styles.backdrop, { opacity: progress }]}>
-        <Pressable style={UI.fill} onPress={onBackdropPress ?? onClose} />
+        <Pressable style={UI.fill} onPress={dismiss} />
       </Animated.View>
 
       <Animated.View
@@ -62,13 +69,10 @@ export function Sheet({
           isBottom ? styles.bottomSheet : styles.dialog,
           {
             opacity: isBottom ? 1 : progress,
-            transform: [
-              { translateY },
-              ...(dragToClose && isBottom ? [{ translateY: drag.dragOffset }] : []),
-            ],
+            transform: [{ translateY }, ...(draggable ? [{ translateY: drag.dragOffset }] : [])],
           },
         ]}
-        {...(dragToClose && isBottom ? drag.panHandlers : {})}
+        {...(draggable ? drag.panHandlers : {})}
       >
         {hasHeader ? (
           <View style={styles.header}>
@@ -78,9 +82,17 @@ export function Sheet({
               {subtitle ? <Text style={[TYPE.caption, styles.subtitle]}>{subtitle}</Text> : null}
             </View>
             {headerRight}
+            {closeButton ? (
+              <IconButton ghost size="sm" onPress={onClose}>
+                <X size={20} color={COLORS.TEXT_SECONDARY} />
+              </IconButton>
+            ) : null}
           </View>
         ) : null}
         {children}
+        {footer ? (
+          <View style={[styles.footer, !isBottom && styles.footerDialog]}>{footer}</View>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -120,4 +132,11 @@ const styles = StyleSheet.create({
   },
   titles: { flex: 1 },
   subtitle: { marginTop: SPACE.xs },
+  footer: {
+    flexDirection: "row",
+    gap: SPACE.md,
+    paddingHorizontal: SPACE.xl,
+    paddingTop: SPACE.lg,
+  },
+  footerDialog: { paddingHorizontal: 0 },
 });

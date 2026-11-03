@@ -107,3 +107,19 @@ export function matchesExerciseSearchQuery(
 export function normalizeExerciseDisplayName(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
+
+type ExerciseRef = { exerciseDefinitionId?: string; name: string };
+
+/** Mutator renaming exercises linked to `defId`; returns true on change. */
+export const renameDefinitionRef = (defId: string, name: string) => (ex: ExerciseRef) => {
+  if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
+  ex.name = name;
+  return true;
+};
+
+/** Mutator unlinking exercises from `defId`; returns true on change. */
+export const clearDefinitionRef = (defId: string) => (ex: ExerciseRef) => {
+  if (ex.exerciseDefinitionId !== defId) return false;
+  ex.exerciseDefinitionId = "";
+  return true;
+};

@@ -12,6 +12,7 @@ import { Check, X } from "lucide-react-native";
 import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
+import { Button, buttonForeground } from "@/components/ui/Button";
 
 const ITEM_HEIGHT = 60;
 const VISIBLE_ITEMS = 3;
@@ -52,7 +53,6 @@ export default function RestTimerPicker({
   const secRef = useRef<FlatList<number>>(null);
   const settling = useRef(false);
 
-  // Snap both wheels to the current value each time the sheet opens.
   useEffect(() => {
     if (!visible) return;
     const sel = selectionFor(initialSeconds);
@@ -118,21 +118,9 @@ export default function RestTimerPicker({
       visible={visible}
       onClose={onClose}
       title="Rest duration"
-      headerLeft={
-        <IconButton size="md" tone="danger" onPress={onClose}>
-          <X size={20} color={COLORS.DANGER} />
-        </IconButton>
-      }
       headerRight={
-        <IconButton
-          size="md"
-          tone="success"
-          onPress={() => {
-            onSave(minute * 60 + second);
-            onClose();
-          }}
-        >
-          <Check size={20} color={COLORS.ACCENT_GREEN} />
+        <IconButton size="md" ghost onPress={onClose}>
+          <X size={20} color={COLORS.TEXT_TERTIARY} />
         </IconButton>
       }
     >
@@ -150,6 +138,17 @@ export default function RestTimerPicker({
           {minute}m {second}s
         </Text>
       </Text>
+      <Button
+        label="Save"
+        tone="primary"
+        variant="filled"
+        icon={<Check size={16} color={buttonForeground("primary", "filled")} />}
+        onPress={() => {
+          onSave(minute * 60 + second);
+          onClose();
+        }}
+        style={styles.save}
+      />
     </Sheet>
   );
 }
@@ -178,9 +177,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.xxl,
   },
   column: { flex: 1, height: PICKER_HEIGHT, maxWidth: 140 },
-  columnLabel: { position: "absolute", top: -25, alignSelf: "center" },
+  columnLabel: { position: "absolute", top: -SPACE.xxl, alignSelf: "center" },
   separator: { marginHorizontal: SPACE.lg },
   list: { flex: 1, width: "100%" },
   item: { height: ITEM_HEIGHT, justifyContent: "center", alignItems: "center", width: "100%" },
-  footer: { textAlign: "center", paddingTop: SPACE.sm + 2 },
+  footer: { textAlign: "center", paddingTop: SPACE.sm },
+  save: { marginHorizontal: SPACE.xl, marginTop: SPACE.xl },
 });

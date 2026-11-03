@@ -1,10 +1,6 @@
 import { Dimensions, StyleSheet } from "react-native";
 
-// ──────────────────────────────────────────────
-// Design tokens. Every colour, radius, spacing and text style used by a screen
-// or component comes from here; raw hex/rgba literals are lint errors elsewhere.
-// ──────────────────────────────────────────────
-
+/** Design tokens: raw hex/rgba literals outside this file are lint errors. */
 export const COLORS = {
   BG: "#000000", // OLED black
   CARD_BG: "#121212",
@@ -54,10 +50,7 @@ export const SET_TYPE_COLORS = {
   dropset: COLORS.ACCENT_GREEN,
 } as const;
 
-/**
- * Font registry. Adding a font: drop the file in assets/fonts/, add it here,
- * then reference it from FONT_FAMILIES.
- */
+/** Font registry: add the file under assets/fonts/, then reference it from FONT_FAMILIES. */
 export const FONT_ASSETS = {
   "NeueHaasUnicaPro-Medium": require("../../assets/fonts/NeueHaasUnicaPro-Medium.ttf"),
   "SpaceMono-Regular": require("../../assets/fonts/SpaceMono-Regular.ttf"),
@@ -68,10 +61,7 @@ export const FONT_ASSETS = {
   "Viga-Regular": require("../../assets/fonts/Viga-Regular.ttf"),
 };
 
-/**
- * Both families ship a single weight, so text styles never set `fontWeight`:
- * a weight the family lacks makes iOS substitute a system face mid-screen.
- */
+/** Single-weight families: never set `fontWeight` or iOS substitutes a system face. */
 export const FONT_FAMILIES = {
   /** UI text. */
   MEDIUM: "Viga-Regular",
@@ -93,14 +83,12 @@ export const LAYOUT = {
   buttonLg: 48,
   buttonMd: 40,
   buttonSm: 32,
-  /** Sheet/overlay animation duration (ms). */
-  sheetMs: 180,
 } as const;
 
-/**
- * Text presets. Viga for UI text, SpaceMono for numbers and small-caps labels.
- * Screens use these as-is; the only per-use overrides are colour and alignment.
- */
+/** Animation durations (ms). Every animation in the app uses one of these. */
+export const MOTION = { fast: 150, base: 180, slow: 300 } as const;
+
+/** Text presets (Viga for UI, SpaceMono for data); override colour/alignment only. */
 export const TYPE = StyleSheet.create({
   /** Screen title. */
   title: { fontFamily: FONT_FAMILIES.MEDIUM, fontSize: 26, color: COLORS.TEXT_PRIMARY },
@@ -173,5 +161,8 @@ export const UI = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
+  /** Pressed feedback for every tappable (kit buttons, rows, cards). */
   pressed: { opacity: 0.75 },
+  /** Disabled look for every tappable. */
+  disabled: { opacity: 0.3 },
 });

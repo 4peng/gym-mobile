@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
 
 interface SegmentedControlProps<T extends string> {
   options: readonly { value: T; label: string }[];
@@ -50,9 +50,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.BORDER,
   },
-  segment: { borderRadius: RADIUS.sm + 2, justifyContent: "center", alignItems: "center" },
-  segmentRegular: { flex: 1, height: 40 },
-  segmentCompact: { paddingHorizontal: SPACE.md, paddingVertical: SPACE.xs + 2 },
+  segment: { borderRadius: RADIUS.item - SPACE.xs, justifyContent: "center", alignItems: "center" },
+  segmentRegular: { flex: 1, height: LAYOUT.buttonMd },
+  segmentCompact: { paddingHorizontal: SPACE.md, paddingVertical: SPACE.xs },
   segmentActive: { backgroundColor: COLORS.BORDER },
   textActive: { color: COLORS.TEXT_PRIMARY },
 });

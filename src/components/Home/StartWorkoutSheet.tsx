@@ -74,12 +74,12 @@ export default function StartWorkoutSheet({
             onPress={pick(onStartBlank)}
             style={({ pressed }) => [UI.inset, styles.row, styles.blank, pressed && UI.pressed]}
           >
-            <Zap size={18} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />
-            <View style={{ flex: 1 }}>
+            <Zap size={18} color={COLORS.ACCENT_BLUE} fill={COLORS.ACCENT_BLUE} />
+            <View style={styles.grow}>
               <Text style={TYPE.body}>Blank workout</Text>
               <Text style={TYPE.caption}>Add exercises as you go</Text>
             </View>
-            <ChevronRight size={16} color={COLORS.ACCENT_GREEN} />
+            <ChevronRight size={16} color={COLORS.ACCENT_BLUE} />
           </Pressable>
         }
         renderItem={({ item }) => {
@@ -89,7 +89,7 @@ export default function StartWorkoutSheet({
               onPress={pick(() => onStartProgram(item))}
               style={({ pressed }) => [UI.inset, styles.row, pressed && UI.pressed]}
             >
-              <View style={{ flex: 1 }}>
+              <View style={styles.grow}>
                 <Text style={TYPE.body}>{item.name || "Untitled Routine"}</Text>
                 <Text style={TYPE.caption}>
                   {count} exercise{count === 1 ? "" : "s"} · Last run{" "}
@@ -118,9 +118,10 @@ const styles = StyleSheet.create({
     marginVertical: SPACE.lg,
     paddingHorizontal: SPACE.lg,
   },
-  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md + 2, marginLeft: SPACE.sm + 2 },
+  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md, marginLeft: SPACE.sm },
   list: { paddingHorizontal: SPACE.lg, paddingBottom: SPACE.lg, gap: SPACE.sm },
   row: { flexDirection: "row", alignItems: "center", gap: SPACE.md, padding: SPACE.lg },
-  blank: { backgroundColor: SURFACE.greenTint, borderColor: SURFACE.greenBorder },
+  blank: { backgroundColor: SURFACE.blueTint, borderColor: SURFACE.blueBorder },
+  grow: { flex: 1 },
   empty: { textAlign: "center", paddingVertical: SPACE.xxxl },
 });

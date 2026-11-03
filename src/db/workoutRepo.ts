@@ -42,11 +42,7 @@ const toSession = (row: WorkoutRow, exercises: WorkoutExercise[]): WorkoutSessio
   cumulativeRestSeconds: row.cumulative_rest_seconds,
 });
 
-/**
- * Completed-workout storage. Sessions live in `workouts`, each exercise as a JSON
- * row in `workout_exercises` keyed by identity so per-exercise stats are indexed reads.
- * All methods are synchronous; writers bump the db version so `useDbQuery` re-runs.
- */
+/** Synchronous completed-workout store (`workouts` + per-exercise JSON rows); writers bump the db version. */
 export function createWorkoutRepo(db: SqlDriver, userId: string) {
   const withUser = (s: WorkoutSession) => ({ ...s, userId });
 

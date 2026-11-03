@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
-import { Activity, Check } from "lucide-react-native";
-import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Check, X } from "lucide-react-native";
+import { COLORS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import {
   collapseDetailedMusclesToPrimary,
   DETAILED_MODE_MUSCLE_GROUPS,
@@ -15,6 +15,13 @@ import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { HapticFeedback } from "@/utils/haptics";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
+import { Button } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+
+const MODES = [
+  { value: "simple", label: "Simple" },
+  { value: "detailed", label: "Detailed" },
+] as const;
 
 interface MuscleSelectorProps {
   visible: boolean;
@@ -85,20 +92,21 @@ export default function MuscleSelector({
       dragToClose
       title={label}
       headerRight={
-        <IconButton size="md" tone="success" onPress={applyAndClose}>
-          <Check size={20} color={COLORS.ACCENT_GREEN} />
+        <IconButton size="md" ghost onPress={applyAndClose}>
+          <X size={20} color={COLORS.TEXT_TERTIARY} />
         </IconButton>
       }
     >
-      <Pressable
-        onPress={handleToggleDetailed}
-        style={({ pressed }) => [styles.modeToggle, pressed && UI.pressed]}
-      >
-        <Activity size={12} color={showDetailed ? COLORS.ACCENT_BLUE : COLORS.TEXT_TERTIARY} />
-        <Text style={[TYPE.label, showDetailed && { color: COLORS.ACCENT_BLUE }]}>
-          {showDetailed ? "Detailed mode" : "Simple mode"}
-        </Text>
-      </Pressable>
+      <View style={styles.modeToggle}>
+        <SegmentedControl
+          compact
+          options={MODES}
+          value={showDetailed ? "detailed" : "simple"}
+          onChange={(mode) => {
+            if ((mode === "detailed") !== showDetailed) handleToggleDetailed();
+          }}
+        />
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.list}
@@ -126,18 +134,19 @@ export default function MuscleSelector({
           );
         })}
       </ScrollView>
+      <Button
+        label="Done"
+        tone="primary"
+        variant="filled"
+        onPress={applyAndClose}
+        style={styles.done}
+      />
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modeToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACE.sm - 2,
-    paddingHorizontal: SPACE.xl,
-    paddingTop: SPACE.md,
-  },
+  modeToggle: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.md },
   list: { padding: SPACE.lg, gap: SPACE.sm },
   item: {
     flexDirection: "row",
@@ -145,7 +154,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: SPACE.lg,
     paddingHorizontal: SPACE.xl,
-    borderRadius: RADIUS.container,
   },
   itemActive: { backgroundColor: SURFACE.blueTint, borderColor: SURFACE.blueBorder },
+  done: { marginHorizontal: SPACE.lg, marginBottom: SPACE.lg },
 });

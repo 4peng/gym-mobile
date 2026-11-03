@@ -35,11 +35,18 @@ import { formatMuscleLabels } from "@/constants/muscles";
 import ExerciseHistoryGraph from "./ExerciseHistoryGraph";
 import { IconButton } from "@/components/ui/IconButton";
 import { Button, buttonForeground } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const CARD_PAD = SPACE.lg;
 /** Inner width of the card: screen minus gutters, padding and the 1px borders. */
 const PAGE_WIDTH = LAYOUT.screenWidth - LAYOUT.gutter * 2 - CARD_PAD * 2 - 2;
 const TRACKING_ICON = { strength: Dumbbell, timed: Timer, cardio: Activity } as const;
+const TABS = [
+  { value: "SETS", label: "SETS" },
+  { value: "HISTORY", label: "HISTORY" },
+] as const;
+type Tab = (typeof TABS)[number]["value"];
+const segmentStyle = ({ pressed }: { pressed: boolean }) => [styles.segment, pressed && UI.pressed];
 
 export type ExerciseCardPicker = "exercise" | "muscles" | "rest" | "tracking";
 export interface AnchorLayout {
@@ -64,7 +71,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
   onOpenPicker,
 }) {
   const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [activeTab, setActiveTab] = useState<"SETS" | "HISTORY">("SETS");
+  const [activeTab, setActiveTab] = useState<Tab>("SETS");
   // The history chart runs a query and draws an SVG, so it mounts on first visit only.
   const [historyVisited, setHistoryVisited] = useState(false);
   const pagerRef = useRef<ScrollView>(null);
@@ -107,11 +114,11 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       removeExercise(exercise.id);
     });
-  const showTab = useCallback((tab: "SETS" | "HISTORY") => {
+  const showTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
     if (tab === "HISTORY") setHistoryVisited(true);
   }, []);
-  const handleTabPress = (tab: "SETS" | "HISTORY") => {
+  const handleTabPress = (tab: Tab) => {
     showTab(tab);
     pagerRef.current?.scrollTo({ x: tab === "SETS" ? 0 : PAGE_WIDTH, animated: true });
   };
@@ -124,10 +131,16 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
     <View style={[UI.card, styles.card]}>
       <View style={styles.topRow}>
         <View style={styles.topContent}>
-          <Pressable onPress={() => onOpenPicker("exercise", exercise.id)}>
+          <Pressable
+            onPress={() => onOpenPicker("exercise", exercise.id)}
+            style={({ pressed }) => pressed && UI.pressed}
+          >
             <Text style={TYPE.titleSm}>{exercise.name || "Select exercise"}</Text>
           </Pressable>
-          <Pressable onPress={() => onOpenPicker("muscles", exercise.id)}>
+          <Pressable
+            onPress={() => onOpenPicker("muscles", exercise.id)}
+            style={({ pressed }) => pressed && UI.pressed}
+          >
             <Text style={styles.muscleText} numberOfLines={1}>
               {formatMuscleLabels(exercise.muscles).toUpperCase()}
             </Text>
@@ -140,7 +153,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
 
       <View style={[UI.inset, styles.instrumentBar]}>
         <View ref={trackingSegmentRef} style={styles.segmentWrap} collapsable={false}>
-          <Pressable style={styles.segment} onPress={openTrackingPicker}>
+          <Pressable style={segmentStyle} onPress={openTrackingPicker}>
             <TrackingIcon size={12} color={COLORS.ACCENT_BLUE} />
             <Text style={styles.segmentText}>
               {getTrackingModeLabel(exercise.trackingMode).toUpperCase()}
@@ -151,7 +164,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
           <>
             <View style={styles.divider} />
             <Pressable
-              style={styles.segment}
+              style={segmentStyle}
               onPress={() => {
                 HapticFeedback.selection();
                 toggleExerciseBodyweight(exercise.id);
@@ -175,7 +188,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
               <>
                 <View style={styles.divider} />
                 <Pressable
-                  style={styles.segment}
+                  style={segmentStyle}
                   onPress={() => {
                     HapticFeedback.selection();
                     toggleExerciseUnit(exercise.id);
@@ -190,24 +203,14 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
           </>
         ) : null}
         <View style={styles.divider} />
-        <Pressable style={styles.segment} onPress={() => onOpenPicker("rest", exercise.id)}>
+        <Pressable style={segmentStyle} onPress={() => onOpenPicker("rest", exercise.id)}>
           <Clock size={12} color={COLORS.TEXT_TERTIARY} />
           <Text style={styles.segmentText}>{formatSecondsToMMSS(exercise.restSeconds)}</Text>
         </Pressable>
       </View>
 
       <View style={styles.tabRow}>
-        {(["SETS", "HISTORY"] as const).map((tab) => (
-          <Pressable
-            key={tab}
-            onPress={() => handleTabPress(tab)}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-          >
-            <Text style={[TYPE.label, activeTab === tab && { color: COLORS.ACCENT_BLUE }]}>
-              {tab}
-            </Text>
-          </Pressable>
-        ))}
+        <SegmentedControl compact options={TABS} value={activeTab} onChange={handleTabPress} />
       </View>
 
       <ScrollView
@@ -231,7 +234,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
               pressed && !isEditingNotes && UI.pressed,
             ]}
           >
-            <StickyNote size={12} color={COLORS.TEXT_TERTIARY} style={{ marginTop: 2 }} />
+            <StickyNote size={12} color={COLORS.TEXT_TERTIARY} style={styles.notesIcon} />
             {isEditingNotes ? (
               <TextInput
                 style={styles.notesInput}
@@ -257,7 +260,7 @@ export const ExerciseCard = React.memo<ExerciseCardProps>(function ExerciseCard(
           </Pressable>
 
           <View style={styles.tableHeader}>
-            <View style={{ width: SET_ROW_LAYOUT.indexWidth, alignItems: "center" }}>
+            <View style={styles.headerIndex}>
               <Text style={styles.headerText}>#</Text>
             </View>
             <View style={styles.headerInputs}>
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
   instrumentBar: {
     flexDirection: "row",
     alignItems: "center",
-    height: 36,
+    height: LAYOUT.buttonMd,
     marginBottom: SPACE.lg,
     overflow: "hidden",
   },
@@ -330,33 +333,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: SPACE.sm - 2,
+    gap: SPACE.xs,
     height: "100%",
     paddingHorizontal: SPACE.sm,
   },
-  segmentText: { ...TYPE.label, letterSpacing: 0, color: COLORS.TEXT_SECONDARY },
+  segmentText: { ...TYPE.label, color: COLORS.TEXT_SECONDARY },
   divider: { width: 1, height: "60%", backgroundColor: SURFACE.hairline },
-  tabRow: {
-    flexDirection: "row",
-    gap: SPACE.lg,
-    marginBottom: SPACE.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: SURFACE.hairline,
-  },
-  tab: { paddingBottom: SPACE.sm },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.ACCENT_BLUE },
+  tabRow: { marginBottom: SPACE.lg },
   page: { width: PAGE_WIDTH },
   notes: {
     flexDirection: "row",
-    gap: SPACE.sm + 2,
+    gap: SPACE.sm,
     paddingHorizontal: SPACE.md,
-    paddingVertical: SPACE.sm + 2,
+    paddingVertical: SPACE.md,
     marginBottom: SPACE.md,
   },
+  notesIcon: { marginTop: SPACE.xs / 2 },
   notesText: { flex: 1 },
   notesInput: { ...TYPE.bodyMuted, flex: 1, padding: 0, textAlignVertical: "top" },
   tableHeader: { flexDirection: "row", paddingHorizontal: SPACE.xs, marginBottom: SPACE.sm },
-  headerText: { ...TYPE.label, letterSpacing: 0, color: COLORS.TEXT_PRIMARY },
+  headerIndex: { width: SET_ROW_LAYOUT.indexWidth, alignItems: "center" },
+  headerText: { ...TYPE.label, color: COLORS.TEXT_PRIMARY },
   headerInputs: {
     flex: 1,
     flexDirection: "row",
@@ -366,9 +363,8 @@ const styles = StyleSheet.create({
   headerCell: { width: SET_ROW_LAYOUT.inputWidth, alignItems: "center" },
   headerActions: {
     width: SET_ROW_LAYOUT.actionsWidth,
-    alignItems: "flex-end",
-    paddingRight: SPACE.sm + 2,
+    paddingLeft: SPACE.sm + SPACE.xs / 2,
   },
-  rows: { gap: 2 },
+  rows: { gap: SPACE.xs / 2 },
   addSet: { marginTop: SPACE.md },
 });

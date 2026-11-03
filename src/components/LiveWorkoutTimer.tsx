@@ -22,9 +22,5 @@ export default function LiveWorkoutTimer({
     return () => clearInterval(interval);
   }, [startedAt]);
 
-  return (
-    <Text style={[TYPE.mono, { color: COLORS.ACCENT_GREEN, letterSpacing: 1 }, textStyle]}>
-      {display}
-    </Text>
-  );
+  return <Text style={[TYPE.mono, { color: COLORS.ACCENT_GREEN }, textStyle]}>{display}</Text>;
 }

@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder } from "react-native";
+import { MOTION } from "@/constants/theme";
 
-const SHEET_MS = 180;
-
-/**
- * Open/close plumbing for absolute-positioned sheets (the app never uses a
- * native Modal). Keeps the sheet mounted until the close animation finishes.
- * `progress` runs 0 → 1 on open; interpolate it for backdrop opacity / translateY.
- */
+/** Open/close animation for sheets; `progress` runs 0 to 1 and stays mounted until closed. */
 export function useSheet(visible: boolean) {
   const progress = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [mounted, setMounted] = useState(visible);
@@ -16,7 +11,7 @@ export function useSheet(visible: boolean) {
     if (visible) setMounted(true);
     Animated.timing(progress, {
       toValue: visible ? 1 : 0,
-      duration: SHEET_MS,
+      duration: MOTION.base,
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished && !visible) setMounted(false);
@@ -29,7 +24,6 @@ export function useSheet(visible: boolean) {
 /** Drag-down-to-dismiss for a sheet. Spread `panHandlers` on the sheet and add `dragOffset` to its translateY. */
 export function useDragToClose(onClose: () => void) {
   const dragOffset = useRef(new Animated.Value(0)).current;
-  // Latest-value ref so the responder (created once) always calls the current onClose.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 

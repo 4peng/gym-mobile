@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { Pin, Trash2 } from "lucide-react-native";
-import { COLORS, LAYOUT, RADIUS, SPACE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, MOTION, RADIUS, SPACE, UI } from "@/constants/theme";
 import { HapticFeedback } from "@/utils/haptics";
 
 const BUTTON_WIDTH = 64;
@@ -117,7 +117,7 @@ export const Swipeable = ({
           HapticFeedback.heavy();
           Animated.timing(translateX, {
             toValue: -LAYOUT.screenWidth,
-            duration: 200,
+            duration: MOTION.base,
             useNativeDriver: true,
           }).start(() => {
             onDeleteRef.current?.();
@@ -140,7 +140,9 @@ export const Swipeable = ({
   }
 
   const close = (after: () => void) =>
-    Animated.timing(translateX, { toValue: 0, duration: 150, useNativeDriver: true }).start(after);
+    Animated.timing(translateX, { toValue: 0, duration: MOTION.fast, useNativeDriver: true }).start(
+      after,
+    );
   const pinOpacity = translateX.interpolate({
     inputRange: [0, BUTTON_WIDTH],
     outputRange: [0, 1],
@@ -152,57 +154,52 @@ export const Swipeable = ({
     extrapolate: "clamp",
   });
 
+  const action = (
+    backgroundColor: string,
+    opacity: Animated.AnimatedInterpolation<number>,
+    justifyContent: "flex-start" | "flex-end",
+    icon: React.ReactNode,
+    onPress: () => void,
+  ) => (
+    <Animated.View
+      style={[UI.fill, styles.action, { backgroundColor, opacity, justifyContent, borderRadius }]}
+    >
+      <Pressable
+        style={({ pressed }) => [styles.actionButton, pressed && UI.pressed]}
+        onPress={onPress}
+      >
+        {icon}
+      </Pressable>
+    </Animated.View>
+  );
+
   return (
     <View style={[styles.container, { borderRadius, marginBottom }]}>
       <View style={[UI.fill, { borderRadius, overflow: "hidden" }]}>
-        {onPin ? (
-          <Animated.View
-            style={[
-              UI.fill,
-              styles.action,
-              {
-                backgroundColor: COLORS.ACCENT_BLUE,
-                opacity: pinOpacity,
-                justifyContent: "flex-start",
-                borderRadius,
-              },
-            ]}
-          >
-            <Pressable
-              style={styles.actionButton}
-              onPress={() => {
+        {onPin
+          ? action(
+              COLORS.ACCENT_BLUE,
+              pinOpacity,
+              "flex-start",
+              <Pin size={22} color={COLORS.TEXT_PRIMARY} />,
+              () => {
                 HapticFeedback.medium();
                 close(() => onPin());
-              }}
-            >
-              <Pin size={22} color={COLORS.TEXT_PRIMARY} />
-            </Pressable>
-          </Animated.View>
-        ) : null}
-        {onDelete ? (
-          <Animated.View
-            style={[
-              UI.fill,
-              styles.action,
-              {
-                backgroundColor: COLORS.DANGER,
-                opacity: deleteOpacity,
-                justifyContent: "flex-end",
-                borderRadius,
               },
-            ]}
-          >
-            <Pressable
-              style={styles.actionButton}
-              onPress={() => {
+            )
+          : null}
+        {onDelete
+          ? action(
+              COLORS.DANGER,
+              deleteOpacity,
+              "flex-end",
+              <Trash2 size={22} color={COLORS.TEXT_PRIMARY} />,
+              () => {
                 HapticFeedback.heavy();
                 close(() => onDelete());
-              }}
-            >
-              <Trash2 size={22} color={COLORS.TEXT_PRIMARY} />
-            </Pressable>
-          </Animated.View>
-        ) : null}
+              },
+            )
+          : null}
       </View>
 
       <Animated.View style={{ transform: [{ translateX }] }} {...responder.current.panHandlers}>

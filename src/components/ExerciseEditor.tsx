@@ -3,6 +3,7 @@ import { LayoutAnimation, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { Clock, Dumbbell, Hash, Minus, Plus, StickyNote, X } from "lucide-react-native";
 import {
   COLORS,
+  LAYOUT,
   RADIUS,
   SET_TYPE_COLORS,
   SPACE,
@@ -75,12 +76,18 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
         <View style={styles.indexBadge}>
           <Text style={[TYPE.mono, { color: COLORS.ACCENT_BLUE }]}>{index + 1}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Pressable onPress={() => onOpenPicker("exercise", exercise.id)}>
+        <View style={styles.grow}>
+          <Pressable
+            onPress={() => onOpenPicker("exercise", exercise.id)}
+            style={({ pressed }) => pressed && UI.pressed}
+          >
             <Text style={TYPE.titleSm}>{exercise.name || "Select exercise"}</Text>
           </Pressable>
-          <Pressable onPress={() => onOpenPicker("muscles", exercise.id)}>
-            <Text style={styles.muscleText} numberOfLines={1}>
+          <Pressable
+            onPress={() => onOpenPicker("muscles", exercise.id)}
+            style={({ pressed }) => pressed && UI.pressed}
+          >
+            <Text style={[TYPE.monoSmall, styles.muscleText]} numberOfLines={1}>
               {formatMuscleLabels(exercise.muscles).toUpperCase()}
             </Text>
           </Pressable>
@@ -106,26 +113,28 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
               <Text style={TYPE.label}>Sets</Text>
             </View>
             <View style={[UI.inset, styles.stepper]}>
-              <Pressable
+              <IconButton
+                size="sm"
+                ghost
+                disabled={exercise.defaultSets.length <= 1}
                 onPress={() => {
-                  if (exercise.defaultSets.length <= 1) return;
                   animate();
                   update({ defaultSets: exercise.defaultSets.slice(0, -1) });
                 }}
-                style={styles.stepBtn}
               >
                 <Minus size={14} color={COLORS.TEXT_PRIMARY} />
-              </Pressable>
+              </IconButton>
               <Text style={[TYPE.mono, styles.stepCount]}>{exercise.defaultSets.length}</Text>
-              <Pressable
+              <IconButton
+                size="sm"
+                ghost
                 onPress={() => {
                   animate();
                   update({ defaultSets: [...exercise.defaultSets, { type: "working" }] });
                 }}
-                style={styles.stepBtn}
               >
                 <Plus size={14} color={COLORS.TEXT_PRIMARY} />
-              </Pressable>
+              </IconButton>
             </View>
           </View>
 
@@ -142,9 +151,10 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
                   }}
                   onPressOut={() => setShowLegend(false)}
                   delayLongPress={300}
-                  style={[
+                  style={({ pressed }) => [
                     styles.setNode,
                     { backgroundColor: withAlpha(color, 0.1), borderColor: withAlpha(color, 0.4) },
+                    pressed && UI.pressed,
                   ]}
                 >
                   <Text style={[TYPE.mono, { color }]}>{SET_INITIAL[set.type]}</Text>
@@ -158,7 +168,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
         <View style={styles.gridRow}>
           <Pressable
             onPress={() => onOpenPicker("rest", exercise.id)}
-            style={[UI.inset, styles.cell]}
+            style={({ pressed }) => [UI.inset, styles.cell, pressed && UI.pressed]}
           >
             <View style={styles.labelGroup}>
               <Clock size={12} color={COLORS.TEXT_TERTIARY} />
@@ -169,7 +179,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
 
           <Pressable
             onPress={() => update({ isBodyweight: !exercise.isBodyweight })}
-            style={[UI.inset, styles.cell]}
+            style={({ pressed }) => [UI.inset, styles.cell, pressed && UI.pressed]}
           >
             <Text style={TYPE.label}>BW</Text>
             <Text
@@ -185,7 +195,7 @@ const ExerciseEditor = React.memo<ExerciseEditorProps>(function ExerciseEditor({
           {!exercise.isBodyweight && (
             <Pressable
               onPress={() => update({ weightUnit: exercise.weightUnit === "lbs" ? "kg" : "lbs" })}
-              style={[UI.inset, styles.cell]}
+              style={({ pressed }) => [UI.inset, styles.cell, pressed && UI.pressed]}
             >
               <View style={styles.labelGroup}>
                 <Dumbbell size={12} color={COLORS.TEXT_TERTIARY} />
@@ -229,20 +239,22 @@ const styles = StyleSheet.create({
     gap: SPACE.md,
   },
   indexBadge: {
-    width: 28,
-    height: 24,
+    minWidth: SPACE.xxl,
+    height: SPACE.xxl,
+    paddingHorizontal: SPACE.xs,
     borderRadius: RADIUS.sm,
     backgroundColor: SURFACE.blueTint,
     justifyContent: "center",
     alignItems: "center",
   },
-  muscleText: { ...TYPE.monoSmall, color: COLORS.ORANGE, marginTop: 2 },
+  grow: { flex: 1 },
+  muscleText: { color: COLORS.ORANGE, marginTop: SPACE.xs },
   content: { padding: SPACE.lg },
   section: { marginBottom: SPACE.xl },
   labelGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACE.sm - 2,
+    gap: SPACE.xs,
     marginBottom: SPACE.sm,
   },
   stepper: {
@@ -251,20 +263,24 @@ const styles = StyleSheet.create({
     gap: SPACE.md,
     paddingHorizontal: SPACE.xs,
   },
-  stepBtn: { padding: SPACE.sm },
-  stepCount: { minWidth: 20, textAlign: "center" },
+  stepCount: { minWidth: SPACE.xl, textAlign: "center" },
   setStrip: { flexDirection: "row", flexWrap: "wrap", gap: SPACE.sm, position: "relative" },
   setNode: {
-    width: 36,
-    height: 36,
+    width: LAYOUT.buttonSm,
+    height: LAYOUT.buttonSm,
     borderRadius: RADIUS.item,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  legend: { position: "absolute", left: 0, top: -44 },
+  legend: { position: "absolute", left: 0, top: -(LAYOUT.buttonMd + SPACE.xs) },
   gridRow: { flexDirection: "row", gap: SPACE.md, marginBottom: SPACE.xl },
   cell: { flex: 1, padding: SPACE.md },
   cellValue: { ...TYPE.monoMedium, marginTop: SPACE.xs },
-  notesInput: { ...TYPE.bodyMuted, paddingTop: SPACE.sm, paddingBottom: SPACE.xs, minHeight: 40 },
+  notesInput: {
+    ...TYPE.bodyMuted,
+    paddingTop: SPACE.sm,
+    paddingBottom: SPACE.xs,
+    minHeight: LAYOUT.buttonMd,
+  },
 });

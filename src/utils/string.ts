@@ -1,8 +1,5 @@
-/**
- * Converts a string to Title Case (e.g., "bench press" -> "Bench Press")
- */
+/** "bench press" -> "Bench Press". */
 export function toTitleCase(str: string): string {
-  if (!str) return "";
   return str
     .trim()
     .toLowerCase()

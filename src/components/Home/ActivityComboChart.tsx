@@ -55,9 +55,9 @@ export default function ActivityComboChart({
       ))}
 
       <View style={styles.yAxis} pointerEvents="none">
-        <Text style={styles.axisText}>{chartCeil}m</Text>
-        <Text style={styles.axisText}>{Math.round(chartCeil / 2)}</Text>
-        <Text style={styles.axisText}>0</Text>
+        <Text style={[TYPE.caption, styles.axisText]}>{chartCeil}m</Text>
+        <Text style={[TYPE.caption, styles.axisText]}>{Math.round(chartCeil / 2)}</Text>
+        <Text style={[TYPE.caption, styles.axisText]}>0</Text>
       </View>
 
       <Svg width={drawWidth} height={height} style={styles.svg}>
@@ -67,7 +67,7 @@ export default function ActivityComboChart({
             x1={linePoints[i].x}
             y1={height}
             x2={linePoints[i].x}
-            y2={height - Math.max(8, (p.minutes / chartCeil) * (height - 8))}
+            y2={linePoints[i].y}
             stroke={SURFACE.blueTintStrong}
             strokeWidth={BAR_WIDTH}
           />
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     paddingTop: PADDING,
-    paddingBottom: SPACE.sm + 2,
+    paddingBottom: SPACE.sm,
     justifyContent: "flex-end",
     overflow: "hidden",
   },
@@ -139,14 +139,8 @@ const styles = StyleSheet.create({
     bottom: LABEL_BAND,
     justifyContent: "space-between",
   },
-  axisText: {
-    ...TYPE.label,
-    letterSpacing: 0,
-    textTransform: "none",
-    paddingLeft: SPACE.xs,
-    zIndex: 10,
-  },
-  labels: { position: "absolute", left: 0, right: 0, bottom: SPACE.sm + 2, height: 16 },
+  axisText: { paddingLeft: SPACE.xs, zIndex: 10 },
+  labels: { position: "absolute", left: 0, right: 0, bottom: SPACE.sm, height: SPACE.lg },
   label: { position: "absolute", alignItems: "center" },
   labelText: { color: COLORS.TEXT_TERTIARY, textAlign: "center" },
 });

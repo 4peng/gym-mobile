@@ -1,7 +1,4 @@
-/**
- * Minimal synchronous SQL surface. The app binds it to expo-sqlite; tests bind
- * it to Node's built-in `node:sqlite`, so the repository SQL runs for real in Jest.
- */
+/** Synchronous SQL surface: expo-sqlite in the app, node:sqlite in Jest. */
 export type SqlParam = string | number | null;
 
 export interface SqlDriver {

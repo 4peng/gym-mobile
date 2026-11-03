@@ -1,21 +1,15 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
-import { COLORS, LAYOUT, RADIUS, UI } from "@/constants/theme";
+import { LAYOUT, RADIUS, SPACE, UI } from "@/constants/theme";
+import { buttonOutline, type ButtonTone } from "./Button";
 
-type Tone = "neutral" | "primary" | "success" | "danger";
-
-const BORDER: Record<Tone, string> = {
-  neutral: COLORS.BORDER,
-  primary: COLORS.ACCENT_BLUE,
-  success: COLORS.ACCENT_GREEN,
-  danger: COLORS.DANGER,
-};
+const SIZE = { lg: LAYOUT.buttonLg, md: LAYOUT.buttonMd, sm: LAYOUT.buttonSm } as const;
 
 interface IconButtonProps {
   onPress?: () => void;
   onLongPress?: () => void;
-  tone?: Tone;
-  size?: "lg" | "md" | "sm";
+  tone?: ButtonTone;
+  size?: keyof typeof SIZE;
   disabled?: boolean;
   /** Draw without the outline (inline icon tap targets). */
   ghost?: boolean;
@@ -23,7 +17,7 @@ interface IconButtonProps {
   children: ReactNode;
 }
 
-/** Square ghost button: transparent fill, 1px outline in the tone colour. */
+/** Square icon button: transparent fill, 1px outline in the tone colour (none when `ghost`). */
 export function IconButton({
   onPress,
   onLongPress,
@@ -34,17 +28,17 @@ export function IconButton({
   style,
   children,
 }: IconButtonProps) {
-  const px = size === "lg" ? LAYOUT.buttonLg : size === "md" ? LAYOUT.buttonMd : LAYOUT.buttonSm;
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
       disabled={disabled}
-      hitSlop={ghost ? 8 : 0}
+      hitSlop={ghost ? SPACE.sm : 0}
       style={({ pressed }) => [
         styles.base,
-        { width: px, height: px, borderColor: ghost ? "transparent" : BORDER[tone] },
-        disabled && styles.disabled,
+        { width: SIZE[size], height: SIZE[size] },
+        { borderColor: ghost ? "transparent" : buttonOutline(tone) },
+        disabled && UI.disabled,
         pressed && UI.pressed,
         style,
       ]}
@@ -58,9 +52,7 @@ const styles = StyleSheet.create({
   base: {
     borderRadius: RADIUS.item,
     borderWidth: 1,
-    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
-  disabled: { opacity: 0.3 },
 });

@@ -8,7 +8,7 @@ export type ActivityChartPoint = {
   minutes: number;
 };
 
-export type ActivitySummary = {
+type ActivitySummary = {
   points: ActivityChartPoint[];
   totalMinutes: number;
   sessions: number;
@@ -97,7 +97,7 @@ export function activityRangeStart(mode: ActivityPeriodMode, now: Date): Date {
 }
 
 /** Only the timestamps are needed; accepts full sessions or bare rows. */
-export type ActivitySession = Pick<WorkoutSession, "startedAt"> & { completedAt?: string };
+type ActivitySession = Pick<WorkoutSession, "startedAt"> & { completedAt?: string };
 
 export function buildActivitySummary(
   history: ActivitySession[],

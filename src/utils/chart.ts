@@ -1,9 +1,6 @@
 const MS_PER_DAY = 86_400_000;
 
-/**
- * Calendar-day index of a Date's local Y/M/D. UTC-anchored so DST shifts never
- * move a session across a day boundary; use it to place sessions into day buckets.
- */
+/** UTC-anchored calendar-day index of a Date's local Y/M/D, so DST never shifts a day bucket. */
 export const calendarDayIndex = (d: Date): number =>
   Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / MS_PER_DAY);
 

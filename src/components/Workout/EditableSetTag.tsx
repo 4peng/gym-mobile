@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Check, X } from "lucide-react-native";
-import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface EditableSetTagProps {
   weight: number | null;
@@ -58,12 +59,12 @@ export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
         onChangeText={(v) => setDraft({ ...draft, reps: v })}
         keyboardType="numeric"
       />
-      <Pressable onPress={save} style={styles.editIcon} hitSlop={6}>
+      <IconButton ghost size="sm" tone="success" onPress={save}>
         <Check size={14} color={COLORS.ACCENT_GREEN} />
-      </Pressable>
-      <Pressable onPress={() => setDraft(null)} style={styles.editIcon} hitSlop={6}>
+      </IconButton>
+      <IconButton ghost size="sm" tone="danger" onPress={() => setDraft(null)}>
         <X size={14} color={COLORS.DANGER} />
-      </Pressable>
+      </IconButton>
     </View>
   );
 }
@@ -71,21 +72,20 @@ export function EditableSetTag({ weight, reps, onSave }: EditableSetTagProps) {
 const styles = StyleSheet.create({
   tag: {
     backgroundColor: SURFACE.blueTint,
-    paddingHorizontal: SPACE.sm + 2,
-    paddingVertical: SPACE.sm - 2,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm,
     borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: SURFACE.blueBorder,
   },
   tagText: { ...TYPE.monoSmall, color: COLORS.TEXT_PRIMARY },
-  tagX: { ...TYPE.monoSmall, color: COLORS.TEXT_TERTIARY, marginHorizontal: 2 },
+  tagX: { ...TYPE.monoSmall, color: COLORS.TEXT_TERTIARY, marginHorizontal: SPACE.xs },
   editRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACE.sm - 2,
-    paddingVertical: 2,
+    borderRadius: RADIUS.item,
+    paddingLeft: SPACE.sm,
     borderWidth: 1,
     borderColor: COLORS.ACCENT_BLUE,
   },
@@ -94,7 +94,6 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_PRIMARY,
     textAlign: "center",
     padding: 0,
-    width: 36,
+    width: LAYOUT.buttonSm + SPACE.xs,
   },
-  editIcon: { marginLeft: SPACE.xs, padding: 2 },
 });

@@ -18,6 +18,7 @@ import { COLORS, LAYOUT, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { toTitleCase } from "@/utils/string";
 import { Swipeable } from "@/components/Swipeable";
 import { EditableSetTag } from "@/components/Workout/EditableSetTag";
+import { IconButton } from "@/components/ui/IconButton";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { promptForDate, showConfirm } from "@/utils/alerts";
@@ -75,32 +76,32 @@ const WorkoutSessionCard = React.memo(function WorkoutSessionCard({
                 updateSessionDate(session._id, withDatePart(completedAt, d)),
               )
             }
-            style={({ pressed }) => [UI.row, { gap: SPACE.sm - 2 }, pressed && UI.pressed]}
+            style={({ pressed }) => [UI.row, { gap: SPACE.sm }, pressed && UI.pressed]}
           >
             <Calendar size={14} color={COLORS.ACCENT_BLUE} />
             <Text style={[TYPE.label, { color: COLORS.ACCENT_BLUE }]}>
               {formatDate(completedAt)}
             </Text>
           </Pressable>
-          <Pressable onPress={toggle} hitSlop={8}>
+          <IconButton ghost size="sm" onPress={toggle}>
             {expanded ? (
               <ChevronUp size={20} color={COLORS.TEXT_TERTIARY} />
             ) : (
               <ChevronDown size={20} color={COLORS.TEXT_TERTIARY} />
             )}
-          </Pressable>
+          </IconButton>
         </View>
 
-        <Pressable onPress={toggle}>
+        <Pressable onPress={toggle} style={({ pressed }) => pressed && UI.pressed}>
           <Text style={TYPE.titleSm}>{programName || "Quick session"}</Text>
           <View style={[UI.row, { gap: SPACE.lg, marginVertical: SPACE.sm }]}>
-            <View style={[UI.row, { gap: SPACE.sm - 2 }]}>
+            <View style={[UI.row, { gap: SPACE.sm }]}>
               <Clock size={12} color={COLORS.ACCENT_YELLOW} />
               <Text style={TYPE.monoSmall}>
                 {durationLabel(session.startedAt, session.completedAt)}
               </Text>
             </View>
-            <View style={[UI.row, { gap: SPACE.sm - 2 }]}>
+            <View style={[UI.row, { gap: SPACE.sm }]}>
               <Dumbbell size={12} color={COLORS.ACCENT_GREEN} />
               <Text style={TYPE.monoSmall}>{session.exercises.length} exercises</Text>
             </View>
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
   card: { padding: SPACE.md, gap: SPACE.md },
   details: { gap: SPACE.lg },
   notes: {
-    padding: SPACE.md + 2,
+    padding: SPACE.md,
     gap: SPACE.xs,
     backgroundColor: SURFACE.blueTint,
     borderColor: SURFACE.blueBorder,

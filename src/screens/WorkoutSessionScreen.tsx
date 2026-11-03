@@ -298,13 +298,13 @@ function RoutineNamePrompt({
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { flexGrow: 1, paddingTop: SPACE.sm + 2, paddingBottom: 140 },
+  scrollContent: { flexGrow: 1, paddingTop: SPACE.md, paddingBottom: LAYOUT.buttonLg * 3 },
   noExercise: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     gap: SPACE.xl,
-    paddingTop: 100,
+    paddingTop: LAYOUT.buttonLg * 2,
   },
   promptInput: {
     ...TYPE.body,

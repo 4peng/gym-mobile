@@ -6,7 +6,7 @@ import DraggableFlatList, {
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
 import { Pressable as GesturePressable } from "react-native-gesture-handler";
-import { COLORS, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import { HapticFeedback } from "@/utils/haptics";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
@@ -123,13 +123,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACE.md,
-    height: 60,
+    minHeight: LAYOUT.buttonLg + SPACE.md,
     paddingHorizontal: SPACE.md,
   },
   rowActive: { borderColor: COLORS.ACCENT_BLUE, backgroundColor: SURFACE.blueTint },
   badge: {
-    width: 32,
-    height: 32,
+    width: LAYOUT.buttonSm,
+    height: LAYOUT.buttonSm,
     borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
@@ -137,5 +137,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   label: { flex: 1 },
-  handle: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  handle: {
+    width: LAYOUT.buttonMd,
+    height: LAYOUT.buttonMd,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

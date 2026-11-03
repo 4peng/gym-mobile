@@ -1,14 +1,6 @@
 import * as Notifications from "expo-notifications";
 
-// ──────────────────────────────────────────────
-// Foreground handler
-// ──────────────────────────────────────────────
-
-/**
- * Call once at app root mount.
- * Ensures notifications show alert + play sound even when the app
- * is foregrounded.
- */
+/** Call once at app root: show alert and sound while foregrounded. */
 export function configureNotificationHandler(): void {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -21,10 +13,7 @@ export function configureNotificationHandler(): void {
   });
 }
 
-/**
- * Clear delivered notifications and reset the badge when the app becomes active.
- * This intentionally keeps future scheduled notifications intact.
- */
+/** Clears delivered notifications and the badge on activation; scheduled ones stay. */
 export async function clearAppNotifications(): Promise<void> {
   try {
     await Promise.all([
@@ -36,14 +25,7 @@ export async function clearAppNotifications(): Promise<void> {
   }
 }
 
-// ──────────────────────────────────────────────
-// Permissions (iOS)
-// ──────────────────────────────────────────────
-
-/**
- * Request notification permissions gracefully.
- * Returns `true` if granted.
- */
+/** Requests notification permission; true if granted. */
 export async function requestNotificationPermissions(): Promise<boolean> {
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === "granted") return true;
@@ -52,14 +34,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   return status === "granted";
 }
 
-// ──────────────────────────────────────────────
-// Schedule / Cancel helpers
-// ──────────────────────────────────────────────
-
-/**
- * Schedule a local notification that fires after `seconds` from now.
- * Returns the notification identifier (used to cancel later).
- */
+/** Schedules a local notification `seconds` from now; returns its id. */
 export async function scheduleRestCompleteNotification(
   exerciseName: string,
   seconds: number,
@@ -79,10 +54,7 @@ export async function scheduleRestCompleteNotification(
   return id;
 }
 
-/**
- * Cancel a previously scheduled notification by its identifier.
- * Silently no-ops if the notification was already delivered or invalid.
- */
+/** Cancels a scheduled notification; no-op if already delivered or unknown. */
 export async function cancelScheduledNotification(notificationId: string): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);

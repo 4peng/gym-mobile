@@ -4,6 +4,8 @@ import { immer } from "zustand/middleware/immer";
 import { zustandAsyncStorage } from "@/storage/asyncStorage";
 import { USER_ID } from "@/constants/user";
 import { generateId } from "@/utils/id";
+import { addUnique } from "@/utils/array";
+import { clearDefinitionRef, renameDefinitionRef } from "@/utils/exerciseIdentity";
 import type { Program, ProgramExercise } from "@/types";
 import { normalizeExercises } from "@/shared/programs.js";
 
@@ -51,10 +53,6 @@ function normalizeProgram(raw: unknown): Program {
       typeof r?.updatedAt === "number" && Number.isFinite(r.updatedAt) ? r.updatedAt : Date.now(),
   };
 }
-
-const addUnique = (list: string[], id: string) => {
-  if (!list.includes(id)) list.push(id);
-};
 
 /** Applies `mutate` to every exercise of every program; dirties the ones that changed. */
 function rewriteProgramExerciseRefs(
@@ -124,28 +122,16 @@ export const useProgramStore = create<ProgramState & ProgramActions>()(
           }),
 
         renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
-          const defId = String(exerciseDefinitionId).trim();
-          const name = String(nextName).trim();
+          const defId = exerciseDefinitionId.trim();
+          const name = nextName.trim();
           if (!defId || !name) return;
-          set((state) =>
-            rewriteProgramExerciseRefs(state, (ex) => {
-              if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
-              ex.name = name;
-              return true;
-            }),
-          );
+          set((state) => rewriteProgramExerciseRefs(state, renameDefinitionRef(defId, name)));
         },
 
         removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
-          const defId = String(exerciseDefinitionId).trim();
+          const defId = exerciseDefinitionId.trim();
           if (!defId) return;
-          set((state) =>
-            rewriteProgramExerciseRefs(state, (ex) => {
-              if (ex.exerciseDefinitionId !== defId) return false;
-              ex.exerciseDefinitionId = "";
-              return true;
-            }),
-          );
+          set((state) => rewriteProgramExerciseRefs(state, clearDefinitionRef(defId)));
         },
 
         getProgramById: (id) => get().programs.find((p) => p._id === id),

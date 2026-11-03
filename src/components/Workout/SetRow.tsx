@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { Check, X } from "lucide-react-native";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { COLORS, RADIUS, SET_TYPE_COLORS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, RADIUS, SET_TYPE_COLORS, SPACE, SURFACE, TYPE } from "@/constants/theme";
+import { IconButton } from "@/components/ui/IconButton";
 import { toTitleCase } from "@/utils/string";
 import type { ExerciseTrackingMode, WorkoutSet } from "@/types";
 import { resolveSetOnComplete, type SetPlaceholder } from "@/utils/placeholders";
@@ -192,24 +193,17 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
       </View>
 
       <View style={styles.actions}>
-        <Pressable
+        <IconButton
+          size="sm"
+          tone={isCompleted ? "success" : "neutral"}
           onPress={handleToggleComplete}
-          style={({ pressed }) => [
-            styles.check,
-            isCompleted && styles.checkCompleted,
-            pressed && UI.pressed,
-          ]}
         >
           {isCompleted ? <Check size={14} color={COLORS.ACCENT_GREEN} strokeWidth={3} /> : null}
-        </Pressable>
+        </IconButton>
         {!isCompleted ? (
-          <Pressable
-            onPress={() => removeSet(exerciseId, set.id)}
-            hitSlop={10}
-            style={styles.remove}
-          >
+          <IconButton ghost size="sm" tone="danger" onPress={() => removeSet(exerciseId, set.id)}>
             <X size={12} color={COLORS.DANGER} />
-          </Pressable>
+          </IconButton>
         ) : null}
       </View>
     </View>
@@ -217,23 +211,28 @@ export const SetRow = React.memo<SetRowProps>(function SetRow({
 });
 
 export const SET_ROW_LAYOUT = {
-  indexWidth: 32,
-  inputWidth: 72,
+  indexWidth: LAYOUT.buttonSm,
+  inputWidth: LAYOUT.buttonSm * 2 + SPACE.sm,
   gap: SPACE.md,
-  actionsWidth: 60,
+  actionsWidth: LAYOUT.buttonSm * 2 + SPACE.sm + SPACE.xs,
 } as const;
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", minHeight: 44, paddingHorizontal: SPACE.xs },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: LAYOUT.buttonMd + SPACE.xs,
+    paddingHorizontal: SPACE.xs,
+  },
   rowCompleted: { backgroundColor: COLORS.ACCENT_GREEN_DEEP, borderRadius: RADIUS.item },
   indexCell: { width: SET_ROW_LAYOUT.indexWidth, alignItems: "center", justifyContent: "center" },
-  legend: { position: "absolute", left: 40, top: -40 },
+  legend: { position: "absolute", left: LAYOUT.buttonMd, top: -LAYOUT.buttonMd },
   inputs: { flex: 1, flexDirection: "row", justifyContent: "center", gap: SET_ROW_LAYOUT.gap },
   inputCell: {
     width: SET_ROW_LAYOUT.inputWidth,
-    height: 32,
+    height: LAYOUT.buttonSm,
     backgroundColor: SURFACE.raised,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     justifyContent: "center",
@@ -248,15 +247,4 @@ const styles = StyleSheet.create({
     gap: SPACE.sm,
     paddingRight: SPACE.xs,
   },
-  check: {
-    width: 28,
-    height: 28,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkCompleted: { borderColor: COLORS.ACCENT_GREEN },
-  remove: { padding: SPACE.xs },
 });

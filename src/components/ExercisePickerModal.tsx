@@ -160,14 +160,13 @@ export default function ExercisePickerModal({
         {item.isCustom ? (
           <IconButton
             size="sm"
-            tone="success"
             onPress={() => {
               setRenameTarget(item);
               setRenameDraft(item.name);
             }}
             style={{ marginRight: SPACE.md }}
           >
-            <Pencil size={14} color={COLORS.ACCENT_GREEN} />
+            <Pencil size={14} color={COLORS.TEXT_SECONDARY} />
           </IconButton>
         ) : null}
       </View>
@@ -238,10 +237,19 @@ export default function ExercisePickerModal({
         }
       />
 
-      <Sheet visible={!!renameTarget} onClose={() => setRenameTarget(null)} placement="center">
+      <Sheet
+        visible={!!renameTarget}
+        onClose={() => setRenameTarget(null)}
+        placement="center"
+        title="Rename custom exercise"
+        subtitle={renameTarget?.name}
+        headerRight={
+          <IconButton size="md" ghost onPress={() => setRenameTarget(null)}>
+            <X size={20} color={COLORS.TEXT_TERTIARY} />
+          </IconButton>
+        }
+      >
         <KeyboardAvoidingView behavior="padding">
-          <Text style={[TYPE.label, { color: COLORS.ACCENT_GREEN }]}>Rename custom exercise</Text>
-          <Text style={[TYPE.heading, { marginTop: SPACE.sm }]}>{renameTarget?.name}</Text>
           <TextInput
             ref={renameInputRef}
             style={[UI.inset, styles.renameInput]}
@@ -266,9 +274,9 @@ export default function ExercisePickerModal({
             <Button
               label="Save name"
               size="md"
-              tone="success"
+              tone="primary"
               variant="filled"
-              icon={<Pencil size={14} color={buttonForeground("success", "filled")} />}
+              icon={<Pencil size={14} color={buttonForeground("primary", "filled")} />}
               onPress={commitRename}
               disabled={!canRename}
               style={{ flex: 1 }}
@@ -285,11 +293,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: SPACE.xl,
-    marginTop: SPACE.lg,
-    marginBottom: SPACE.lg,
+    marginVertical: SPACE.lg,
     paddingHorizontal: SPACE.lg,
   },
-  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md + 2, marginLeft: SPACE.sm + 2 },
+  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md, marginLeft: SPACE.sm },
   addCustom: {
     marginHorizontal: SPACE.lg,
     marginBottom: SPACE.md,
@@ -313,9 +320,8 @@ const styles = StyleSheet.create({
   empty: { textAlign: "center", paddingVertical: SPACE.xxxl },
   renameInput: {
     ...TYPE.body,
-    paddingHorizontal: SPACE.md + 2,
+    paddingHorizontal: SPACE.md,
     paddingVertical: SPACE.md,
-    marginTop: SPACE.md,
   },
-  renameActions: { flexDirection: "row", gap: SPACE.sm + 2, marginTop: SPACE.lg },
+  renameActions: { flexDirection: "row", gap: SPACE.sm, marginTop: SPACE.lg },
 });

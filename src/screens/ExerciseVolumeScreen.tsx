@@ -13,7 +13,7 @@ import Svg, { G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
-import { workoutRepo, type ExerciseRow } from "@/db";
+import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
 import {
   COLORS,
@@ -76,8 +76,6 @@ interface DayLog {
   isPR: boolean;
 }
 
-// ── Chart (memoised so scrubbing doesn't re-render the list) ──
-
 const VolumeChart = React.memo(function VolumeChart({
   buckets,
   unit,
@@ -130,30 +128,23 @@ const VolumeChart = React.memo(function VolumeChart({
     [buckets, barWidth, gap],
   );
 
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e) => {
-          const idx = bucketAt(e.nativeEvent.locationX);
-          if (idx === -1) return;
-          setActiveIdx((prev) => {
-            HapticFeedback.selection();
-            return prev === idx ? null : idx;
-          });
-        },
-        onPanResponderMove: (e) => {
-          const idx = bucketAt(e.nativeEvent.locationX);
-          if (idx === -1) return;
-          setActiveIdx((prev) => {
-            if (prev !== idx) HapticFeedback.selection();
-            return idx;
-          });
-        },
-      }),
-    [bucketAt],
-  );
+  const pan = useMemo(() => {
+    /** A tap toggles the bucket under the finger; a drag scrubs to it. */
+    const select = (locationX: number, isTap: boolean) => {
+      const idx = bucketAt(locationX);
+      if (idx === -1) return;
+      setActiveIdx((prev) => {
+        if (isTap || prev !== idx) HapticFeedback.selection();
+        return isTap && prev === idx ? null : idx;
+      });
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => select(e.nativeEvent.locationX, true),
+      onPanResponderMove: (e) => select(e.nativeEvent.locationX, false),
+    });
+  }, [bucketAt]);
 
   const selected = activeIdx !== null ? buckets[activeIdx] : null;
   const fmt = (ts: number, withYear: boolean) =>
@@ -281,8 +272,6 @@ const VolumeChart = React.memo(function VolumeChart({
   );
 });
 
-// ── Log row ──
-
 const LogRow = React.memo(function LogRow({
   log,
   unit,
@@ -308,7 +297,7 @@ const LogRow = React.memo(function LogRow({
         <View style={UI.rowBetween}>
           <Pressable
             onPress={() => onEditDate(log.sessionIds, log.date.toISOString())}
-            style={({ pressed }) => [UI.row, { gap: SPACE.sm - 2 }, pressed && UI.pressed]}
+            style={({ pressed }) => [UI.row, { gap: SPACE.sm }, pressed && UI.pressed]}
           >
             <Calendar size={14} color={COLORS.TEXT_TERTIARY} />
             <Text style={TYPE.bodyMuted}>
@@ -355,8 +344,6 @@ function StatTile({ label, value, unit }: { label: string; value: number; unit: 
   );
 }
 
-// ── Screen ──
-
 export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: string }) {
   const router = useRouter();
   const deleteHistorySession = useWorkoutSessionStore((s) => s.deleteHistorySession);
@@ -377,7 +364,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
   const displayName = latest?.name || exerciseKey;
   const currentMuscles = (latest?.muscles ?? []) as MuscleGroup[];
 
-  const data = useMemo(() => {
+  const { unit, buckets, logs, stats } = useMemo(() => {
     const unit: WeightUnit = latest?.weightUnit || "kg";
     const spec = RANGES.find((r) => r.value === range)!;
     const now = new Date();
@@ -404,7 +391,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
     let max1RM = 0;
     const logsByDay = new Map<string, DayLog>();
 
-    for (const row of rows as ExerciseRow[]) {
+    for (const row of rows) {
       const date = new Date(row.completedAt);
       const dayKey = date.toISOString().slice(0, 10);
       const resolveLoad = makeLoadResolver(
@@ -486,7 +473,6 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
     [updateHistorySet],
   );
 
-  const { unit, buckets, logs, stats } = data;
   return (
     <KeyboardAvoidingView style={UI.screen} behavior="padding">
       <View style={styles.header}>
@@ -538,7 +524,7 @@ export default function ExerciseVolumeScreen({ exerciseKey }: { exerciseKey: str
 
             <View style={[UI.inset, styles.disclosure]}>
               <TrendingUp size={14} color={COLORS.TEXT_TERTIARY} />
-              <Text style={[TYPE.caption, { flex: 1, lineHeight: 16 }]}>
+              <Text style={[TYPE.caption, { flex: 1 }]}>
                 Est. 1RM uses the Epley formula, weight × (1 + reps / 30), and is most accurate
                 under 10 reps.
               </Text>
@@ -569,7 +555,7 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: LAYOUT.headerTop,
     paddingHorizontal: LAYOUT.gutter,
-    paddingBottom: SPACE.sm + 2,
+    paddingBottom: SPACE.sm,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -582,7 +568,7 @@ const styles = StyleSheet.create({
     gap: SPACE.md,
     paddingVertical: SPACE.md,
     paddingHorizontal: SPACE.lg,
-    borderRadius: RADIUS.container,
+    borderRadius: RADIUS.item,
     marginBottom: SPACE.xxxl,
   },
   statsRow: { flexDirection: "row", gap: SPACE.sm, marginBottom: SPACE.xxxl + SPACE.sm },
@@ -591,7 +577,7 @@ const styles = StyleSheet.create({
     height: 60,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: SPACE.sm + 2,
+    marginBottom: SPACE.sm,
     gap: SPACE.xs,
   },
   touchOverlay: {
@@ -604,7 +590,7 @@ const styles = StyleSheet.create({
   disclosure: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACE.sm + 2,
+    gap: SPACE.sm,
     padding: SPACE.md,
     marginTop: SPACE.xl,
     marginBottom: SPACE.xxl,
@@ -612,9 +598,9 @@ const styles = StyleSheet.create({
   logCard: { padding: SPACE.lg, gap: SPACE.md },
   prBadge: {
     backgroundColor: SURFACE.yellowTint,
-    paddingHorizontal: SPACE.sm - 2,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm - 2,
+    paddingHorizontal: SPACE.sm,
+    paddingVertical: SPACE.xs / 2,
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: SURFACE.yellowBorder,
   },

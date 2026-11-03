@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { X } from "lucide-react-native";
-import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, RADIUS, SPACE, TYPE } from "@/constants/theme";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { formatSecondsToMMSS } from "@/utils/conversions";
+import { IconButton } from "@/components/ui/IconButton";
 
 /** Countdown chip for the active rest timer; hidden when no timer is running. */
 const FloatingRestTimer = React.memo(function FloatingRestTimer() {
@@ -31,14 +32,10 @@ const FloatingRestTimer = React.memo(function FloatingRestTimer() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.countdown}>{formatSecondsToMMSS(Math.ceil(remainingMs / 1000))}</Text>
-      <Pressable
-        onPress={() => void cancelRestTimer()}
-        hitSlop={12}
-        style={({ pressed }) => [styles.cancel, pressed && UI.pressed]}
-      >
-        <X size={12} color={COLORS.DANGER} />
-      </Pressable>
+      <Text style={TYPE.monoMedium}>{formatSecondsToMMSS(Math.ceil(remainingMs / 1000))}</Text>
+      <IconButton size="sm" tone="danger" onPress={() => void cancelRestTimer()}>
+        <X size={14} color={COLORS.DANGER} />
+      </IconButton>
     </View>
   );
 });
@@ -49,21 +46,12 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: RADIUS.item,
-    paddingVertical: SPACE.sm - 2,
-    paddingHorizontal: SPACE.md,
+    borderRadius: RADIUS.container,
+    paddingVertical: SPACE.xs,
+    paddingLeft: SPACE.md,
+    paddingRight: SPACE.xs,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    gap: SPACE.sm + 2,
-  },
-  countdown: { ...TYPE.monoMedium },
-  cancel: {
-    width: 24,
-    height: 24,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: SPACE.sm,
   },
 });

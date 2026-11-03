@@ -2,25 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, type AppStateStatus } from "react-native";
 import type { StateStorage } from "zustand/middleware";
 
-/**
- * NOTE: This module is named `mmkv` for historical reasons only. Persistence is
- * backed by the async `@react-native-async-storage/async-storage`, NOT by MMKV.
- * There is no synchronous storage layer in this app; all persisted stores use
- * this async adapter. (Kept the filename to avoid churning every import site.)
- */
-
-// ──────────────────────────────────────────────
-// Debounced writes
-// ──────────────────────────────────────────────
-// Zustand's `persist` middleware calls `setItem` on every state change, which
-// for stores updated on every keystroke (e.g. the active workout session)
-// means re-serializing and writing a large JSON blob dozens of times a
-// second. We coalesce rapid writes to the SAME key into a single trailing
-// write ~400ms after the last change. Writes to different keys are
-// independent (per-key debounce), so unrelated stores never block each other.
-//
-// Durability: if the app is backgrounded/inactivated while a debounced write
-// is still pending, we flush everything immediately so nothing is lost.
+// Per-key trailing debounce: persist writes on every change, so rapid writes to one key coalesce.
 const DEBOUNCE_MS = 400;
 
 interface PendingWrite {
@@ -53,23 +35,17 @@ function flushKey(name: string): void {
 
 /** Immediately flushes ALL pending debounced writes, across every key. */
 function flushAllPendingWrites(): void {
-  // Snapshot keys first — commitPendingWrite is async, and we've already
-  // removed each entry from the map by the time its write settles.
+  // Snapshot keys first: each entry leaves the map before its async write settles.
   Array.from(pendingWrites.keys()).forEach(flushKey);
 }
 
-// Backgrounding/inactivating the app must not lose in-flight edits: flush
-// every pending debounced write right away so it lands on disk before the
-// app is suspended.
 AppState.addEventListener("change", (nextState: AppStateStatus) => {
   if (nextState === "inactive" || nextState === "background") {
     flushAllPendingWrites();
   }
 });
 
-/**
- * Zustand-compatible StateStorage adapter.
- */
+/** Zustand-compatible StateStorage adapter. */
 export const zustandAsyncStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     return await AsyncStorage.getItem(name);
@@ -94,8 +70,7 @@ export const zustandAsyncStorage: StateStorage = {
     });
   },
   removeItem: async (name: string): Promise<void> => {
-    // Cancel any pending debounced write for this key first — otherwise it
-    // could fire after the removal and resurrect the value.
+    // Cancel the pending write first, or it could fire after removal and resurrect the value.
     const pending = pendingWrites.get(name);
     if (pending) {
       clearTimeout(pending.timeout);

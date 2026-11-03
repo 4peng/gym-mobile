@@ -41,12 +41,7 @@ export function isBodyweightStrengthExercise(exercise: ExerciseIdentityLike): bo
   return BODYWEIGHT_NAME_PATTERNS.some((pattern) => pattern.test(identityKey));
 }
 
-/**
- * Builds a per-exercise load resolver: the identity/bodyweight lookup and the
- * bodyweight conversion depend only on the exercise, so they run once here
- * instead of once per set. Bodyweight exercises add the analytics bodyweight
- * to any logged extra load; everything else just converts the logged weight.
- */
+/** Per-exercise load resolver: bodyweight exercises add analytics bodyweight to the logged extra load. */
 export function makeLoadResolver(
   exercise: ExerciseIdentityLike & { weightUnit?: WeightUnit },
   targetUnit: WeightUnit,

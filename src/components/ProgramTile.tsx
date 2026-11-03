@@ -49,7 +49,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
         style={({ pressed }) => [UI.card, styles.card, pressed && UI.pressed]}
       >
         <View style={UI.rowBetween}>
-          <View style={[UI.row, { gap: SPACE.sm - 2 }]}>
+          <View style={[UI.row, { gap: SPACE.sm }]}>
             <Text style={[TYPE.label, program.pinned && { color: COLORS.ACCENT_BLUE }]}>
               {program.pinned ? "Pinned" : "Routine"}
             </Text>
@@ -61,7 +61,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
           ) : null}
         </View>
 
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={TYPE.titleSm} numberOfLines={2}>
           {title}
         </Text>
 
@@ -80,7 +80,7 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 
         <View style={UI.rowBetween}>
           <Text style={TYPE.caption}>Tap card to edit</Text>
-          <View style={[UI.row, { gap: SPACE.sm + 2 }]}>
+          <View style={[UI.row, { gap: SPACE.sm }]}>
             <IconButton size="md" onPress={() => onPress(program._id)}>
               <MoreHorizontal size={18} color={COLORS.TEXT_SECONDARY} />
             </IconButton>
@@ -96,13 +96,11 @@ export const ProgramTile = React.memo<ProgramTileProps>(function ProgramTile({
 
 const styles = StyleSheet.create({
   card: { padding: SPACE.lg, gap: SPACE.md },
-  name: { ...TYPE.titleSm, lineHeight: 24 },
   meta: { flexDirection: "row", gap: SPACE.md },
   metaCell: {
     flex: 1,
-    minHeight: 54,
     paddingHorizontal: SPACE.md,
-    paddingVertical: SPACE.sm + 2,
+    paddingVertical: SPACE.md,
     justifyContent: "center",
     gap: SPACE.xs,
   },

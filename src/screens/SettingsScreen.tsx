@@ -29,6 +29,7 @@ import { showAlert, showConfirm } from "@/utils/alerts";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Chip } from "@/components/ui/Chip";
 
 const UNITS = [
   { value: "kg", label: "KG" },
@@ -58,8 +59,8 @@ function SettingsRow({
       disabled={disabled || !onPress}
       style={({ pressed }) => [
         styles.row,
-        pressed && onPress && { backgroundColor: COLORS.CARD_HOVER },
-        disabled && { opacity: 0.5 },
+        pressed && onPress && UI.pressed,
+        disabled && styles.disabled,
       ]}
     >
       <View
@@ -203,11 +204,11 @@ export default function SettingsScreen() {
             description="Show delts, lats, biceps and so on"
             onPress={toggleDetailed}
             right={
-              <View style={[styles.togglePill, showDetailed && styles.togglePillOn]}>
-                <Text style={[TYPE.label, showDetailed && { color: COLORS.ACCENT_BLUE }]}>
-                  {showDetailed ? "On" : "Off"}
-                </Text>
-              </View>
+              <Chip
+                label={showDetailed ? "On" : "Off"}
+                active={showDetailed}
+                onPress={toggleDetailed}
+              />
             }
           />
           <View style={[UI.hairline, styles.divider]} />
@@ -232,7 +233,7 @@ export default function SettingsScreen() {
           <Text style={TYPE.bodyMuted}>
             Added to the load of bodyweight exercises like pull-ups, dips and push-ups.
           </Text>
-          <View style={[UI.row, { gap: SPACE.sm + 2 }]}>
+          <View style={[UI.row, { gap: SPACE.sm }]}>
             <TextInput
               style={[UI.inset, styles.bodyweightInput]}
               value={bodyweightText}
@@ -242,14 +243,14 @@ export default function SettingsScreen() {
               placeholderTextColor={COLORS.TEXT_TERTIARY}
               keyboardType="decimal-pad"
             />
-            <Pressable
-              onPress={toggleAnalyticsBodyweightUnit}
-              style={({ pressed }) => [styles.unitToggle, pressed && UI.pressed]}
-            >
-              <Text style={[TYPE.mono, { color: COLORS.ACCENT_BLUE }]}>
-                {analyticsBodyweightUnit.toUpperCase()}
-              </Text>
-            </Pressable>
+            <SegmentedControl
+              compact
+              options={UNITS}
+              value={analyticsBodyweightUnit}
+              onChange={(unit) =>
+                unit !== analyticsBodyweightUnit && toggleAnalyticsBodyweightUnit()
+              }
+            />
           </View>
         </View>
 
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACE.sm + 2,
+    gap: SPACE.sm,
     paddingVertical: SPACE.md,
     paddingHorizontal: SPACE.md,
   },
@@ -290,32 +291,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  togglePill: {
-    minWidth: 46,
-    paddingHorizontal: SPACE.sm + 2,
-    paddingVertical: SPACE.xs,
-    borderRadius: RADIUS.item,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    alignItems: "center",
-  },
-  togglePillOn: { backgroundColor: SURFACE.blueTintStrong, borderColor: SURFACE.blueBorder },
+  disabled: { opacity: 0.3 },
   profile: { padding: SPACE.lg, gap: SPACE.sm, marginBottom: SPACE.xxl },
   bodyweightInput: {
     ...TYPE.monoMedium,
     flex: 1,
-    minHeight: 54,
+    minHeight: LAYOUT.buttonLg,
     paddingHorizontal: SPACE.lg,
   },
-  unitToggle: {
-    minWidth: 72,
-    minHeight: 54,
-    borderRadius: RADIUS.item,
-    backgroundColor: SURFACE.blueTint,
-    borderWidth: 1,
-    borderColor: SURFACE.blueBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  footer: { textAlign: "center", marginTop: SPACE.lg, lineHeight: 18 },
+  footer: { textAlign: "center", marginTop: SPACE.lg },
 });

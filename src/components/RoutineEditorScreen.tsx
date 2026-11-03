@@ -1,17 +1,9 @@
-import React, { useCallback, useMemo, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ArrowUpDown, Check, ChevronRight, Play, Plus, Save, Trash2, X } from "lucide-react-native";
+import { ArrowUpDown, Check, Play, Plus, Save, Trash2, X } from "lucide-react-native";
 import { showAlert } from "@/utils/alerts";
-import { COLORS, LAYOUT, RADIUS, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, SPACE, SURFACE, TYPE, UI } from "@/constants/theme";
 import ExerciseEditor, {
   type ExerciseEditorPicker,
   type ExerciseFormData,
@@ -149,17 +141,17 @@ export default function RoutineEditorScreen({
 
   return (
     <KeyboardAvoidingView style={UI.screen} behavior="padding">
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+      <SafeAreaView style={styles.fill} edges={["top", "left", "right"]}>
         <View style={styles.topBar}>
-          <IconButton tone="danger" onPress={() => onCancel(draft(), hasChanges)}>
-            <X size={20} color={COLORS.DANGER} strokeWidth={2.8} />
+          <IconButton onPress={() => onCancel(draft(), hasChanges)}>
+            <X size={20} color={COLORS.TEXT_SECONDARY} />
           </IconButton>
-          <View style={{ flex: 1 }}>
+          <View style={styles.fill}>
             <Text style={TYPE.body}>{isCreate ? "New routine" : "Edit routine"}</Text>
             <Text style={TYPE.caption}>{hasChanges ? "Unsaved changes" : "All changes saved"}</Text>
           </View>
-          <IconButton tone="success" onPress={isCreate ? doSave : () => setOptionsVisible(true)}>
-            <Check size={20} color={COLORS.ACCENT_GREEN} strokeWidth={2.8} />
+          <IconButton tone="primary" onPress={isCreate ? doSave : () => setOptionsVisible(true)}>
+            <Check size={20} color={COLORS.ACCENT_BLUE} />
           </IconButton>
         </View>
 
@@ -195,14 +187,14 @@ export default function RoutineEditorScreen({
               tone="primary"
               icon={<Plus size={18} color={buttonForeground("primary")} />}
               onPress={() => setPicker({ kind: "add" })}
-              style={{ flex: 1 }}
+              style={styles.fill}
             />
             <Button
               label="Reorder"
               icon={<ArrowUpDown size={18} color={buttonForeground()} />}
               onPress={() => setReorderVisible(true)}
               disabled={exercises.length < 2}
-              style={{ flex: 1 }}
+              style={styles.fill}
             />
           </View>
 
@@ -230,28 +222,33 @@ export default function RoutineEditorScreen({
         onClose={() => setOptionsVisible(false)}
         placement="center"
         title="Routine options"
+        headerRight={
+          <IconButton size="md" ghost onPress={() => setOptionsVisible(false)}>
+            <X size={20} color={COLORS.TEXT_TERTIARY} />
+          </IconButton>
+        }
       >
         <View style={styles.options}>
-          <OptionItem
-            icon={<Save size={20} color={COLORS.ACCENT_BLUE} />}
-            title="Save changes"
-            subtitle="Update the routine and go back"
+          <Button
+            label="Save changes"
+            tone="primary"
+            variant="filled"
+            icon={<Save size={18} color={buttonForeground("primary", "filled")} />}
             onPress={withOptionsClosed(doSave)}
           />
           {onSaveAndStart ? (
-            <OptionItem
-              icon={<Play size={20} color={COLORS.ACCENT_GREEN} fill={COLORS.ACCENT_GREEN} />}
-              title="Save and start"
-              subtitle="Launch this routine now"
+            <Button
+              label="Save and start"
+              tone="primary"
+              icon={<Play size={18} color={buttonForeground("primary")} />}
               onPress={withOptionsClosed(doSaveAndStart)}
             />
           ) : null}
           {onDelete ? (
-            <OptionItem
-              icon={<Trash2 size={20} color={COLORS.DANGER} />}
-              title="Delete routine"
-              subtitle="Remove this routine permanently"
-              danger
+            <Button
+              label="Delete routine"
+              tone="danger"
+              icon={<Trash2 size={18} color={buttonForeground("danger")} />}
               onPress={withOptionsClosed(() => onDelete(draft()))}
             />
           ) : null}
@@ -291,34 +288,8 @@ export default function RoutineEditorScreen({
   );
 }
 
-function OptionItem({
-  icon,
-  title,
-  subtitle,
-  onPress,
-  danger,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.option, pressed && UI.pressed]}>
-      <View style={[styles.optionIcon, danger && { backgroundColor: SURFACE.dangerTint }]}>
-        {icon}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[TYPE.body, danger && { color: COLORS.DANGER }]}>{title}</Text>
-        <Text style={TYPE.caption}>{subtitle}</Text>
-      </View>
-      <ChevronRight size={16} color={COLORS.TEXT_TERTIARY} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -328,7 +299,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: SURFACE.hairline,
   },
-  content: { paddingHorizontal: LAYOUT.gutter, paddingTop: SPACE.xxl, paddingBottom: 140 },
+  content: {
+    paddingHorizontal: LAYOUT.gutter,
+    paddingTop: SPACE.xxl,
+    paddingBottom: SPACE.xxxl * 4,
+  },
   nameInput: { ...TYPE.title, padding: 0, marginBottom: SPACE.lg },
   summary: {
     flexDirection: "row",
@@ -336,17 +311,8 @@ const styles = StyleSheet.create({
     padding: SPACE.md,
     marginBottom: SPACE.xl,
   },
-  summaryItem: { flex: 1, alignItems: "center", gap: 2 },
-  summaryDivider: { width: 1, height: 24, backgroundColor: SURFACE.hairline },
+  summaryItem: { flex: 1, alignItems: "center", gap: SPACE.xs },
+  summaryDivider: { width: 1, height: SPACE.xxl, backgroundColor: SURFACE.hairline },
   actions: { flexDirection: "row", gap: SPACE.md, marginBottom: SPACE.xxl },
-  options: { paddingTop: SPACE.sm },
-  option: { flexDirection: "row", alignItems: "center", paddingVertical: SPACE.md, gap: SPACE.lg },
-  optionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.item,
-    backgroundColor: SURFACE.raisedStrong,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  options: { paddingTop: SPACE.sm, gap: SPACE.md },
 });

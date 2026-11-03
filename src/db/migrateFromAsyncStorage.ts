@@ -6,11 +6,7 @@ import type { WorkoutRepo } from "./workoutRepo";
 const SHARD_PREFIX = "workout_";
 const LEGACY_KEYS = ["workout-stats-index-v1"];
 
-/**
- * One-time import of the pre-SQLite layout: completed sessions were stored one
- * AsyncStorage key per session (`workout_<id>`). Imports every shard into the
- * repo, then removes the shard keys. No-op once no shards remain.
- */
+/** One-time import of pre-SQLite `workout_<id>` AsyncStorage shards; no-op once none remain. */
 export async function migrateFromAsyncStorage(repo: WorkoutRepo): Promise<number> {
   const keys = (await AsyncStorage.getAllKeys()).filter(
     (k) => k.startsWith(SHARD_PREFIX) || LEGACY_KEYS.includes(k),

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
 import { generateId } from "@/utils/id";
 import { USER_ID } from "@/constants/user";
-import { COLORS, RADIUS, SPACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, SPACE, TYPE } from "@/constants/theme";
+import { Button } from "@/components/ui/Button";
 import type { MuscleGroup } from "@/constants/muscles";
 import type { WorkoutSession } from "@/types";
 
@@ -88,15 +89,13 @@ export default function MockDataInjector() {
     <View style={styles.container}>
       <Text style={[TYPE.title, styles.center]}>Mock Data Injector</Text>
       <Text style={[TYPE.bodyMuted, styles.center, styles.status]}>{status}</Text>
-      <Pressable style={({ pressed }) => [styles.btn, pressed && UI.pressed]} onPress={injectData}>
-        <Text style={TYPE.body}>Inject 90 Days of History</Text>
-      </Pressable>
-      <Pressable
-        style={({ pressed }) => [styles.btn, styles.btnSecondary, pressed && UI.pressed]}
-        onPress={() => router.back()}
-      >
-        <Text style={TYPE.body}>Go Back</Text>
-      </Pressable>
+      <Button
+        label="Inject 90 Days of History"
+        tone="primary"
+        variant="filled"
+        onPress={injectData}
+      />
+      <Button label="Go Back" onPress={() => router.back()} />
     </View>
   );
 }
@@ -111,11 +110,4 @@ const styles = StyleSheet.create({
   },
   center: { textAlign: "center" },
   status: { marginBottom: SPACE.xl },
-  btn: {
-    backgroundColor: COLORS.ACCENT_BLUE,
-    padding: SPACE.xl,
-    borderRadius: RADIUS.container,
-    alignItems: "center",
-  },
-  btnSecondary: { backgroundColor: COLORS.CARD_HOVER },
 });

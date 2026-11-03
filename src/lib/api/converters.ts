@@ -1,14 +1,10 @@
-// ID Conversion Boundary
-// All ObjectId <-> string conversions live here.
-// No other file should import or mention ObjectId.
+// The only place ObjectId <-> string conversion happens.
 
 import type { Program, WorkoutSession } from "@/types";
 import type { ProgramServer, WorkoutServer } from "./serverTypes";
 import type { MuscleGroup } from "@/constants/muscles";
 import { normalizeTrackingMode } from "@/utils/exerciseTracking";
 import { normalizeSets } from "@/shared/programs.js";
-
-// Program: Client -> Server
 
 export function mapProgramToBackend(program: Program): ProgramServer {
   return {
@@ -20,9 +16,7 @@ export function mapProgramToBackend(program: Program): ProgramServer {
       exerciseDefinitionId: e.exerciseDefinitionId,
       trackingMode: e.trackingMode,
       name: e.name,
-      // Send the full set-type template array (warmup/working/dropset) so
-      // set-type markers survive the sync round-trip instead of being
-      // collapsed to a bare count.
+      // Full set-type template so warmup/dropset markers survive the round-trip.
       defaultSets: e.defaultSets,
       restSeconds: e.restSeconds,
       notes: e.notes,
@@ -35,8 +29,6 @@ export function mapProgramToBackend(program: Program): ProgramServer {
     updatedAt: program.updatedAt,
   };
 }
-
-// Program: Server -> Client
 
 export function mapProgramFromBackend(server: ProgramServer): Program {
   return {
@@ -62,8 +54,6 @@ export function mapProgramFromBackend(server: ProgramServer): Program {
     updatedAt: server.updatedAt,
   };
 }
-
-// Workout: Client -> Server
 
 export function mapWorkoutToBackend(session: WorkoutSession): WorkoutServer {
   return {
@@ -96,8 +86,6 @@ export function mapWorkoutToBackend(session: WorkoutSession): WorkoutServer {
     })),
   };
 }
-
-// Workout: Server -> Client
 
 export function mapWorkoutFromBackend(server: WorkoutServer): WorkoutSession {
   return {

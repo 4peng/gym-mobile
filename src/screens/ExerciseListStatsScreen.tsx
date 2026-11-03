@@ -144,6 +144,8 @@ export default function ExerciseListStatsScreen() {
     );
   }, []);
 
+  const filtered = search !== "" || selectedMuscles.length > 0;
+
   return (
     <View style={UI.screen}>
       <ScreenHeader title="Exercise stats" back />
@@ -183,8 +185,8 @@ export default function ExerciseListStatsScreen() {
         ListEmptyComponent={
           <EmptyState
             icon={<BarChart2 size={48} color={COLORS.BORDER} strokeWidth={1} />}
-            title={search || selectedMuscles.length ? "No matches" : "No stats yet"}
-            subtitle={search || selectedMuscles.length ? undefined : "Complete a workout first."}
+            title={filtered ? "No matches" : "No stats yet"}
+            subtitle={filtered ? undefined : "Complete a workout first."}
           />
         }
         renderItem={({ item }) => (
@@ -198,11 +200,7 @@ export default function ExerciseListStatsScreen() {
             marginBottom={SPACE.md}
           >
             <Pressable
-              style={({ pressed }) => [
-                UI.card,
-                styles.item,
-                pressed && { backgroundColor: COLORS.CARD_HOVER },
-              ]}
+              style={({ pressed }) => [UI.card, styles.item, pressed && UI.pressed]}
               onPress={() => router.push(`/exercises/${encodeURIComponent(item.key)}/volume`)}
             >
               <View style={{ flex: 1, gap: SPACE.xs }}>
@@ -237,11 +235,12 @@ const styles = StyleSheet.create({
   search: {
     flexDirection: "row",
     alignItems: "center",
+    gap: SPACE.sm,
     marginHorizontal: LAYOUT.gutter,
     marginBottom: SPACE.lg,
     paddingHorizontal: SPACE.lg,
   },
-  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md, marginLeft: SPACE.sm + 2 },
+  searchInput: { ...TYPE.body, flex: 1, paddingVertical: SPACE.md },
   chipRow: { flexGrow: 0, marginBottom: SPACE.xl },
   chips: { paddingHorizontal: LAYOUT.gutter, gap: SPACE.sm },
   list: { paddingHorizontal: LAYOUT.gutter, paddingBottom: SPACE.xxxl + SPACE.sm },

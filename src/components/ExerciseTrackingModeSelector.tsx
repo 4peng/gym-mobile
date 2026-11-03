@@ -76,25 +76,24 @@ export default function ExerciseTrackingModeSelector({
 
 const styles = StyleSheet.create({
   overlay: { zIndex: 1000 },
-  backdrop: { backgroundColor: SURFACE.backdrop, opacity: 0.6 },
+  backdrop: { backgroundColor: SURFACE.backdrop },
   menu: {
     position: "absolute",
     backgroundColor: COLORS.CARD_BG,
-    borderRadius: RADIUS.item,
+    borderRadius: RADIUS.container,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     padding: SPACE.xs,
-    zIndex: 1000,
   },
   option: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: SPACE.md,
-    paddingVertical: SPACE.sm + 2,
-    borderRadius: RADIUS.sm,
+    paddingVertical: SPACE.md,
+    borderRadius: RADIUS.item,
     gap: SPACE.sm,
   },
   optionSelected: { backgroundColor: SURFACE.blueTint },
-  optionText: { color: COLORS.TEXT_SECONDARY, letterSpacing: 0.5 },
+  optionText: { color: COLORS.TEXT_SECONDARY },
 });

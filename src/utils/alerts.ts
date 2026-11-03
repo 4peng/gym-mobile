@@ -4,14 +4,9 @@ export function showAlert(title: string, message: string) {
   Alert.alert(title, message);
 }
 
-export function showConfirm(
-  title: string,
-  message: string,
-  onConfirm: () => void,
-  onCancel?: () => void,
-) {
+export function showConfirm(title: string, message: string, onConfirm: () => void) {
   Alert.alert(title, message, [
-    { text: "Cancel", onPress: onCancel, style: "cancel" },
+    { text: "Cancel", style: "cancel" },
     { text: "Confirm", onPress: onConfirm },
   ]);
 }

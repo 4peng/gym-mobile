@@ -1,8 +1,4 @@
-// ──────────────────────────────────────────────
-// Network-aware backup
-// ──────────────────────────────────────────────
-// On startup: restore from the cloud if this install has no data yet,
-// otherwise push anything pending. On every reconnect: push pending.
+// On startup restore if this install is empty, else push pending; push again on every reconnect.
 
 import NetInfo, { type NetInfoState } from "@react-native-community/netinfo";
 import { InteractionManager } from "react-native";
@@ -11,8 +7,7 @@ import { isLocalEmpty } from "@/lib/api/backup";
 
 let _wasOffline = false;
 
-// Throttles how often a reconnect can kick off a new push; a failed push clears
-// the throttle so the next reconnect retries immediately.
+// Reconnect push throttle; a failed push clears it so the next reconnect retries.
 const MIN_PUSH_INTERVAL_MS = 60_000;
 let _lastPushAt: number | null = null;
 

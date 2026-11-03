@@ -18,7 +18,7 @@ export function SetTypeLegend({ style }: { style?: StyleProp<ViewStyle> }) {
 const styles = StyleSheet.create({
   popup: {
     backgroundColor: SURFACE.sheet,
-    padding: SPACE.sm + 2,
+    padding: SPACE.md,
     borderRadius: RADIUS.item,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
@@ -28,6 +28,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   item: { flexDirection: "row", alignItems: "center", gap: SPACE.xs },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  text: { color: COLORS.TEXT_PRIMARY, letterSpacing: 0.5 },
+  dot: { width: SPACE.sm, height: SPACE.sm, borderRadius: SPACE.xs },
+  text: { color: COLORS.TEXT_PRIMARY },
 });

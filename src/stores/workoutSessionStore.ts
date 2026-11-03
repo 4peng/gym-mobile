@@ -13,7 +13,13 @@ import type {
   WorkoutExercise,
   WorkoutSet,
 } from "@/types";
-import { getExerciseIdentityKey, normalizeExerciseIdentityKey } from "@/utils/exerciseIdentity";
+import {
+  clearDefinitionRef,
+  getExerciseIdentityKey,
+  normalizeExerciseIdentityKey,
+  renameDefinitionRef,
+} from "@/utils/exerciseIdentity";
+import { addUnique } from "@/utils/array";
 import {
   inferTrackingModeFromExerciseDefinition,
   normalizeSetForTrackingMode,
@@ -38,7 +44,7 @@ import { convertWeight } from "@/utils/conversions";
 
 const STORE_VERSION = 7;
 
-export interface ActiveRestTimer {
+interface ActiveRestTimer {
   /** Absolute epoch-ms when the rest period ends. */
   endTime: number;
   /** Absolute epoch-ms when the rest period started. */
@@ -49,10 +55,7 @@ export interface ActiveRestTimer {
   notificationId: string;
 }
 
-/**
- * Live-session state plus backup bookkeeping. Completed sessions live in SQLite
- * (`workoutRepo`); this store only tracks which of them still need pushing.
- */
+/** Live session plus the ids of completed (SQLite) sessions still to push. */
 interface WorkoutSessionState {
   activeSession: WorkoutSession | null;
   activeRestTimer: ActiveRestTimer | null;
@@ -123,8 +126,6 @@ interface WorkoutSessionActions {
   /** Clears push bookkeeping, keeping any id edited after `pushedAt`. */
   clearDirtyWorkouts: (ids: string[], pushedAt: number) => void;
 }
-
-// ── Helpers ────────────────────────────────────
 
 function createEmptySet(
   trackingMode: WorkoutExercise["trackingMode"] = "strength",
@@ -212,16 +213,9 @@ function buildCompletedSession(session: WorkoutSession): WorkoutSession {
   };
 }
 
-const addUnique = (list: string[], id: string) => {
-  if (!list.includes(id)) list.push(id);
-};
-
 type StoreSet = (recipe: (state: WorkoutSessionState) => void) => void;
 
-/**
- * Applies `mutate` to every stored exercise (via the repo) and to the active
- * session; marks changed stored sessions dirty. `mutate` returns true on change.
- */
+/** Applies `mutate` (true on change) to every stored exercise and the active session; marks changes dirty. */
 function propagateExerciseEdit(
   set: StoreSet,
   mutate: (exercise: WorkoutExercise) => boolean,
@@ -260,8 +254,6 @@ function normalizePersistedState(
     deletedWorkoutIds: ids(state?.deletedWorkoutIds),
   };
 }
-
-// ── Store ──────────────────────────────────────
 
 export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessionActions>()(
   persist(
@@ -307,8 +299,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
         pinnedExerciseNames: [],
         dirtyWorkoutIds: [],
         deletedWorkoutIds: [],
-
-        // ── Session lifecycle ──
 
         startQuickSession: () => {
           set((state) => {
@@ -406,8 +396,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
           if (!workoutRepo.updateDate(sessionId, completedAtIso)) return;
           set((state) => addUnique(state.dirtyWorkoutIds, sessionId));
         },
-
-        // ── Exercise mutations ──
 
         addExercise: (exerciseDefinition = null) => {
           const trackingMode = inferTrackingMode(exerciseDefinition);
@@ -533,8 +521,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
             ex.isBodyweight = !ex.isBodyweight;
           }),
 
-        // ── Set mutations ──
-
         addSet: (exerciseId) =>
           withExercise(exerciseId, (ex) => {
             ex.sets.push(createEmptySet(ex.trackingMode));
@@ -567,8 +553,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
             const s = ex.sets.find((x) => x.id === setId);
             if (s) s.type = NEXT_SET_TYPE[s.type ?? "working"];
           }),
-
-        // ── Rest timer ──
 
         startRestTimer: async (exerciseId, restSeconds, exerciseName) => {
           const current = get().activeRestTimer;
@@ -619,8 +603,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
           void endRestTimerLiveActivity(props);
         },
 
-        // ── Stats ──
-
         togglePinExercise: (identityKey) => {
           const key = normalizeExerciseIdentityKey(identityKey);
           if (!key) return;
@@ -630,8 +612,6 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
               : [...state.pinnedExerciseNames, key];
           });
         },
-
-        // ── Exercise-definition propagation ──
 
         updateMusclesInHistory: (exerciseIdentityKey, muscles) => {
           const key = normalizeExerciseIdentityKey(exerciseIdentityKey);
@@ -652,14 +632,10 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
         },
 
         renameExerciseDefinitionReferences: (exerciseDefinitionId, nextName) => {
-          const defId = String(exerciseDefinitionId).trim();
-          const name = String(nextName).trim();
+          const defId = exerciseDefinitionId.trim();
+          const name = nextName.trim();
           if (!defId || !name) return;
-          propagateExerciseEdit(set, (ex) => {
-            if (ex.exerciseDefinitionId !== defId || ex.name === name) return false;
-            ex.name = name;
-            return true;
-          });
+          propagateExerciseEdit(set, renameDefinitionRef(defId, name));
           set((state) => {
             const timer = state.activeRestTimer;
             const timerEx =
@@ -669,16 +645,10 @@ export const useWorkoutSessionStore = create<WorkoutSessionState & WorkoutSessio
         },
 
         removeExerciseDefinitionReferences: (exerciseDefinitionId) => {
-          const defId = String(exerciseDefinitionId).trim();
+          const defId = exerciseDefinitionId.trim();
           if (!defId) return;
-          propagateExerciseEdit(set, (ex) => {
-            if (ex.exerciseDefinitionId !== defId) return false;
-            ex.exerciseDefinitionId = "";
-            return true;
-          });
+          propagateExerciseEdit(set, clearDefinitionRef(defId));
         },
-
-        // ── Backup bookkeeping ──
 
         importWorkouts: (sessions, markDirty) => {
           const completed = sessions.filter((s) => !!s.completedAt);

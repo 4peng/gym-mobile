@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 
-/**
- * Bumped after every repository write so query hooks re-run.
- * Deliberately coarse: one counter, no per-table invalidation.
- */
+/** Coarse counter bumped after every repository write so query hooks re-run. */
 const useDbVersion = create<{ version: number; bump: () => void }>()((set) => ({
   version: 0,
   bump: () => set((s) => ({ version: s.version + 1 })),

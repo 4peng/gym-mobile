@@ -1,18 +1,11 @@
-// Server-side types (MongoDB document shapes)
-// These mirror the MongoDB collection schemas.
-// ObjectId is represented as `string` here because the API boundary
-// serializes everything as JSON - actual ObjectId wrapping happens
-// only in the fetch body via `converters.ts`.
+// MongoDB document shapes; ObjectId is a string at the JSON boundary (see converters.ts).
 
 interface ProgramExerciseServer {
   id: string;
   exerciseDefinitionId?: string;
   trackingMode?: string;
   name: string;
-  // Legacy docs (pre-template-sync-fix) store a plain set count (number).
-  // Current docs store the full set-type template array so warmup/dropset
-  // markers survive the sync round-trip. converters.ts tolerantly reads
-  // both shapes.
+  // Legacy docs store a set count; current docs store the set-type template array.
   defaultSets: number | { type: "working" | "warmup" | "dropset" }[];
   restSeconds: number;
   notes: string;

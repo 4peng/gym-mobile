@@ -43,11 +43,11 @@ export const HUDHeader = React.memo(function HUDHeader({
         <View style={styles.stickyRow}>
           <View style={styles.stat}>
             <Timer size={14} color={COLORS.ACCENT_GREEN} />
-            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.stickyText} />}
+            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={TYPE.mono} />}
           </View>
           <View style={styles.stat}>
             <Clock size={14} color={COLORS.TEXT_TERTIARY} />
-            <LiveRestTimer textStyle={styles.stickyText} />
+            <LiveRestTimer textStyle={TYPE.mono} />
           </View>
         </View>
       </Animated.View>
@@ -56,11 +56,11 @@ export const HUDHeader = React.memo(function HUDHeader({
         <View style={styles.topLine}>
           <View style={styles.stat}>
             <Text style={styles.statLabel}>ELAPSED</Text>
-            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={styles.statValue} />}
+            {startedAt && <LiveWorkoutTimer startedAt={startedAt} textStyle={TYPE.mono} />}
           </View>
           <View style={styles.stat}>
             <Text style={styles.statLabel}>REST</Text>
-            <LiveRestTimer textStyle={styles.statValue} />
+            <LiveRestTimer textStyle={TYPE.mono} />
             <View style={styles.restSlot}>
               <FloatingRestTimer />
             </View>
@@ -77,9 +77,7 @@ export const HUDHeader = React.memo(function HUDHeader({
 
         <View style={styles.track}>
           <View style={[styles.bar, { width: pct }]} />
-          <View style={[styles.indicator, { left: pct }]}>
-            <View style={styles.indicatorDot} />
-          </View>
+          <View style={[styles.indicator, { left: pct }]} />
         </View>
       </View>
     </>
@@ -92,19 +90,18 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: LAYOUT.headerTop + 30,
+    height: LAYOUT.headerTop + SPACE.xxxl,
     backgroundColor: SURFACE.backdrop,
     zIndex: 100,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER,
-    paddingTop: LAYOUT.headerTop - 20,
+    paddingTop: LAYOUT.headerTop - SPACE.xl,
     justifyContent: "center",
     paddingHorizontal: LAYOUT.gutter + SPACE.xs,
   },
   stickyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  stickyText: { ...TYPE.mono },
   header: {
-    paddingTop: LAYOUT.headerTop - 10,
+    paddingTop: LAYOUT.headerTop - SPACE.md,
     paddingHorizontal: LAYOUT.gutter + SPACE.xs,
     paddingBottom: SPACE.xl,
   },
@@ -116,29 +113,27 @@ const styles = StyleSheet.create({
   },
   stat: { flexDirection: "row", alignItems: "center", gap: SPACE.sm },
   statLabel: { ...TYPE.mono, color: COLORS.TEXT_TERTIARY },
-  statValue: { ...TYPE.mono },
-  restSlot: { position: "absolute", top: 28, right: 0, zIndex: 20 },
+  restSlot: { position: "absolute", top: SPACE.xxl + SPACE.xs, right: 0, zIndex: 20 },
   progressLine: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACE.sm - 2,
+    gap: SPACE.xs,
     marginBottom: SPACE.sm,
   },
-  track: { height: 4, backgroundColor: SURFACE.greenTint, borderRadius: 2, marginTop: SPACE.xs },
-  bar: { height: "100%", backgroundColor: COLORS.ACCENT_GREEN, borderRadius: 2 },
+  track: {
+    height: SPACE.xs,
+    backgroundColor: SURFACE.greenTint,
+    borderRadius: SPACE.xs / 2,
+    marginTop: SPACE.xs,
+  },
+  bar: { height: "100%", backgroundColor: COLORS.ACCENT_GREEN, borderRadius: SPACE.xs / 2 },
   indicator: {
     position: "absolute",
-    top: -4,
-    width: 12,
-    height: 12,
-    marginLeft: -6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  indicatorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    top: -SPACE.xs,
+    width: SPACE.md,
+    height: SPACE.md,
+    marginLeft: -SPACE.md / 2,
+    borderRadius: SPACE.md / 2,
     backgroundColor: COLORS.ACCENT_GREEN,
     borderWidth: 2,
     borderColor: COLORS.BG,

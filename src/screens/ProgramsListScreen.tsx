@@ -92,7 +92,7 @@ export default function ProgramsListScreen() {
 
   return (
     <View style={UI.screen}>
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+      <SafeAreaView style={styles.fill} edges={["top", "left", "right"]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
@@ -200,13 +200,13 @@ export default function ProgramsListScreen() {
           </Text>
           <Button
             label={hasActiveSession ? "Resume" : "Start"}
-            tone="success"
+            tone="primary"
             variant="filled"
             icon={
               <Play
                 size={16}
-                color={buttonForeground("success", "filled")}
-                fill={buttonForeground("success", "filled")}
+                color={buttonForeground("primary", "filled")}
+                fill={buttonForeground("primary", "filled")}
               />
             }
             onPress={handlePrimary}
@@ -227,7 +227,8 @@ export default function ProgramsListScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: LAYOUT.gutter, paddingBottom: 140, gap: SPACE.md + 2 },
+  fill: { flex: 1 },
+  content: { paddingHorizontal: LAYOUT.gutter, paddingBottom: SPACE.xxxl * 4, gap: SPACE.md },
   headerRow: {
     paddingTop: SPACE.sm,
     flexDirection: "row",
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: { padding: SPACE.lg, gap: SPACE.sm },
   resumeCard: {
-    minHeight: 72,
+    paddingVertical: SPACE.lg,
     borderColor: SURFACE.blueBorder,
     paddingHorizontal: SPACE.lg,
     flexDirection: "row",
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: SPACE.md },
-  metric: { width: "48%", minHeight: 128, padding: SPACE.md + 2, justifyContent: "space-between" },
+  metric: { flexBasis: "47%", flexGrow: 1, gap: SPACE.sm, padding: SPACE.md },
   sectionTitle: { marginTop: SPACE.sm },
   emptyRoutines: { paddingVertical: SPACE.sm },
   floatingWrap: {
@@ -254,6 +255,6 @@ const styles = StyleSheet.create({
     bottom: SPACE.xxl + SPACE.xs,
     alignItems: "center",
   },
-  floating: { width: LAYOUT.screenWidth - LAYOUT.gutter * 2, height: 72, gap: SPACE.sm },
+  floating: { width: LAYOUT.screenWidth - LAYOUT.gutter * 2, gap: SPACE.sm },
   floatingLabel: { flex: 1, paddingHorizontal: SPACE.xs, color: COLORS.TEXT_SECONDARY },
 });

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import Svg, { Path, Rect, G, Text as SvgText } from "react-native-svg";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, FONT_FAMILIES, LAYOUT, SPACE, SURFACE, TYPE } from "@/constants/theme";
+import { COLORS, SPACE, SURFACE, TYPE } from "@/constants/theme";
 import { normalizeExerciseIdentityKey } from "@/utils/exerciseIdentity";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { makeLoadResolver } from "@/utils/bodyweightAnalytics";
@@ -13,14 +13,7 @@ const CHART_HEIGHT = 160;
 const DAYS = 20;
 
 /** Volume per day for the last 20 days of one exercise. Lives inside ExerciseCard's HISTORY tab. */
-function ExerciseHistoryGraph({
-  exerciseKey,
-  width = LAYOUT.screenWidth - 64,
-}: {
-  exerciseKey: string;
-  /** Drawing width; defaults to the screen minus card padding. */
-  width?: number;
-}) {
+function ExerciseHistoryGraph({ exerciseKey, width }: { exerciseKey: string; width: number }) {
   const key = normalizeExerciseIdentityKey(exerciseKey);
   const analyticsBodyweight = useUiPreferencesStore((s) => s.analyticsBodyweight);
   const analyticsBodyweightUnit = useUiPreferencesStore((s) => s.analyticsBodyweightUnit);
@@ -125,9 +118,9 @@ function ExerciseHistoryGraph({
                   x={x + barWidth / 2}
                   y={CHART_HEIGHT - 5}
                   fill={COLORS.TEXT_TERTIARY}
-                  fontSize="8"
+                  fontSize={TYPE.label.fontSize}
                   textAnchor="middle"
-                  fontFamily={FONT_FAMILIES.MONO}
+                  fontFamily={TYPE.label.fontFamily}
                 >
                   {b.label.toUpperCase()}
                 </SvgText>
@@ -151,7 +144,6 @@ function ExerciseHistoryGraph({
   );
 }
 
-// Memo keeps the SVG from re-rendering on every keystroke in the sibling SETS page.
 export default React.memo(ExerciseHistoryGraph);
 
 const styles = StyleSheet.create({

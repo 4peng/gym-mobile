@@ -7,12 +7,7 @@ export interface SetPlaceholder {
   reps: number | null;
 }
 
-/**
- * Placeholders for every set of an exercise:
- * 1. start from the most recent stored occurrence of the exercise (positional),
- * 2. then a value typed into an earlier set in this session fills forward into
- *    later, still-empty sets.
- */
+/** Set placeholders: last stored occurrence by position, then earlier sets this session fill forward. */
 export function resolveExercisePlaceholders(
   currentSets: WorkoutSet[],
   previous: WorkoutExercise | null,

@@ -1,9 +1,4 @@
-// ──────────────────────────────────────────────
-// Cloud backup for a single device
-// ──────────────────────────────────────────────
-// Local data is the source of truth. The server is a mirror used to restore
-// after a reinstall, so there is no merging: push what changed, pull everything
-// when local is empty.
+// Local data is the source of truth; the server is a mirror for restoring after a reinstall.
 
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
@@ -40,8 +35,7 @@ export async function pushPending(): Promise<boolean> {
     else ok = false;
   }
 
-  // Captured before the network calls: anything edited during the await keeps
-  // an updatedAt newer than this and stays dirty for the next push.
+  // Captured before the network calls so edits made during the await stay dirty.
   const pushedAt = Date.now();
 
   const dirtyPrograms = programs.programs.filter((p) => programs.dirtyProgramIds.includes(p._id));
