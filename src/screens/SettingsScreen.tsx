@@ -24,7 +24,7 @@ import { useSyncStore } from "@/stores/syncStore";
 import { useUiPreferencesStore } from "@/stores/uiPreferencesStore";
 import { workoutRepo } from "@/db";
 import { useDbQuery } from "@/db/dbVersion";
-import { COLORS, LAYOUT, SPACE, TYPE, UI } from "@/constants/theme";
+import { COLORS, LAYOUT, MOTION, SPACE, TYPE, UI } from "@/constants/theme";
 import { showAlert, showConfirm } from "@/utils/alerts";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SectionLabel } from "@/components/ui/SectionLabel";
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
     const loop = Animated.loop(
       Animated.timing(spin, {
         toValue: 1,
-        duration: 1000,
+        duration: MOTION.spin,
         easing: Easing.linear,
         useNativeDriver: true,
       }),

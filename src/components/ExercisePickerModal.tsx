@@ -24,7 +24,7 @@ import {
 } from "@/utils/exerciseIdentity";
 import { useProgramStore } from "@/stores/programStore";
 import { useWorkoutSessionStore } from "@/stores/workoutSessionStore";
-import { showAlert } from "@/utils/alerts";
+import { showAlert, showConfirm } from "@/utils/alerts";
 import { Swipeable } from "./Swipeable";
 import { Sheet } from "@/components/ui/Sheet";
 import { IconButton } from "@/components/ui/IconButton";
@@ -115,9 +115,11 @@ export default function ExercisePickerModal({
   };
 
   const deleteCustom = (id: string) => {
-    removeInPrograms(id);
-    removeInWorkouts(id);
-    removeCustomExercise(id);
+    showConfirm("Delete exercise?", "This custom exercise will be removed.", () => {
+      removeInPrograms(id);
+      removeInWorkouts(id);
+      removeCustomExercise(id);
+    });
   };
 
   const commitRename = () => {

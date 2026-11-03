@@ -46,18 +46,13 @@ export const SURFACE = {
 /** Set-marker colours by set type. */
 export const SET_TYPE_COLORS = {
   working: COLORS.ACCENT_BLUE,
-  warmup: COLORS.ACCENT_YELLOW,
-  dropset: COLORS.ACCENT_GREEN,
+  warmup: COLORS.TEXT_SECONDARY,
+  dropset: COLORS.TEXT_TERTIARY,
 } as const;
 
 /** Font registry: add the file under assets/fonts/, then reference it from FONT_FAMILIES. */
 export const FONT_ASSETS = {
-  "NeueHaasUnicaPro-Medium": require("../../assets/fonts/NeueHaasUnicaPro-Medium.ttf"),
   "SpaceMono-Regular": require("../../assets/fonts/SpaceMono-Regular.ttf"),
-  "FiraCode-Bold": require("../../assets/fonts/FiraCode-Bold.ttf"),
-  "NeoGramTrial-BoldCondensed": require("../../assets/fonts/NeoGramTrial-BoldCondensed.otf"),
-  "NeoGramTrial-ExtraBold": require("../../assets/fonts/NeoGramTrial-ExtraBold.otf"),
-  "NeoGramTrial-HeavyCondensed": require("../../assets/fonts/NeoGramTrial-HeavyCondensed.otf"),
   "Viga-Regular": require("../../assets/fonts/Viga-Regular.ttf"),
 };
 
@@ -86,7 +81,7 @@ export const LAYOUT = {
 } as const;
 
 /** Animation durations (ms). Every animation in the app uses one of these. */
-export const MOTION = { fast: 150, base: 180, slow: 300 } as const;
+export const MOTION = { fast: 150, base: 180, slow: 300, spin: 1000 } as const;
 
 /** Text presets (Viga for UI, SpaceMono for data); override colour/alignment only. */
 export const TYPE = StyleSheet.create({

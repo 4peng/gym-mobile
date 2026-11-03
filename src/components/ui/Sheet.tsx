@@ -38,7 +38,7 @@ export function Sheet({
   closeButton,
   footer,
   placement = "bottom",
-  dragToClose,
+  dragToClose = true,
   onBackdropPress,
   children,
 }: SheetProps) {
